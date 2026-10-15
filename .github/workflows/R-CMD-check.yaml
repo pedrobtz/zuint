@@ -19,6 +19,11 @@ jobs:
   R-CMD-check:
     uses: pedrobtz/r-actions/.github/workflows/r-cmd-check.yml@v1
     with:
+      # Full profile only: CRAN's NOSUGGESTS and NOLD flavors. zuint has
+      # Suggests, and its parsing and double conversion must not lean on
+      # 80-bit intermediates.
+      nosuggests: true
+      nold: true
       # Quick on each push to a pull request, full after merge. The
       # `full-ci` label runs the full set on a pull request before merging.
       profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}

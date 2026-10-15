@@ -1,3 +1,4 @@
-# zuint (development version)
+# zuint 0.0.0.9000
 
-* Initial CRAN submission.
+* Package identity, licence and continuous integration; no user-facing
+  functionality yet.
