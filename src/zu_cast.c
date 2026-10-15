@@ -117,9 +117,9 @@ static double zu_mag_to_double(zuf_u128 m)
     if (high == 0) return (double)low;
     /* keep the top 64 bits and fold the rest into a sticky bit, which sits
        far below the rounding position and so only breaks ties correctly */
-    k = zuf_int_bit_width64(high);
-    top = (high << (64 - k)) | (low >> k);
-    if (low & ((UINT64_C(1) << k) - 1)) top |= 1;
+    k = zuf_int_bit_width64(high);   /* 1..64: m >> k has exactly 64 bits */
+    top = zuf_u128_low(zuf_int_u128_shr(m, k));
+    if (k == 64 ? low != 0 : (low & ((UINT64_C(1) << k) - 1)) != 0) top |= 1;
     return ldexp((double)top, (int)k);
 }
 
