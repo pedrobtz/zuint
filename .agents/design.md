@@ -286,12 +286,12 @@ logical ─► integer ─► int64 ──► int128
 | --- | --- |
 | logical ⊕ integer | integer, as base R |
 | integer ⊕ int64 | int64 |
-| integer ⊕ uint64 | int128 (a negative integer needs the signed type; see §15 for the alternative) |
+| integer ⊕ uint64 | uint64. The integer is cast first; a negative value is out of range and goes through the overflow policy (§6). Decided 2026-10-15 |
 | int64 ⊕ uint64 | int128 |
 | uint64 ⊕ uint64 | uint64 |
 | integer, int64 or uint64 ⊕ int128 | int128 |
-| uint64 ⊕ uint128 | uint128 |
-| int128 ⊕ uint128, int64 ⊕ uint128, integer ⊕ uint128 | error: no lossless common type, cast explicitly (see §15) |
+| integer ⊕ uint128, uint64 ⊕ uint128 | uint128 (a negative integer as above) |
+| int128 ⊕ uint128, int64 ⊕ uint128 | error: no lossless common type, cast explicitly |
 | any ⊕ double | error if any double is non-integral or out of range; otherwise the wide type. Option `zuint.double = "allow"` falls back to double with a warning |
 
 Comparison is the exception to the double rule: `x == 1.5` and `x < 1e300` are
@@ -316,7 +316,13 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
 - **`^`** with a non-negative integer exponent stays exact; anything else gives
   double.
 - **Unsigned negation** is an error (`checked_`) or wraps (`wrapping_`); the
-  default gives NA plus a warning.
+  default gives NA plus a warning. A negative integer operand to an unsigned
+  type (§5) is the same case: out of range, handled by the policy.
+- **The NA sentinel under `wrapping_`** (decided 2026-10-15): NA in, NA out,
+  and a wrapped result that lands on the sentinel becomes NA. NA-ness never
+  depends on which policy produced the bits. The chance is 2⁻⁶⁴ per
+  operation on uint64 and documented; code that needs the full modular range
+  uses `uint128`.
 - **Bit operations** (`bit_and/or/xor/not`, shifts, `popcount`, `clz`, `ctz`)
   are defined for all types; shifts beyond the width give NA.
 - **Comparison** (`== != < <= > >=`) is exact across types via the lattice,
@@ -326,7 +332,7 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
 
 | Function | Behaviour |
 | --- | --- |
-| `sum` | int64/uint64 accumulate in int128. The result is int64/uint64 if it fits, else int128 (`sum(x, .wide = TRUE)` forces int128). int128 sums overflow to NA plus a warning |
+| `sum` | type stable (decided 2026-10-15): the result has the input's type, and overflow gives NA plus a warning, as base R's `sum()` on integers does. int64 and uint64 accumulate in 128 bits so the overflow check is exact; `sum(int128(x))` is the wide sum |
 | `cumsum`, `cumprod` | same type as input; overflow gives NA from that point on |
 | `mean` | exact sum ÷ n, returned as double; `mean_exact()` returns the quotient and remainder |
 | `min`, `max`, `range` | exact; `na.rm` supported |
@@ -453,7 +459,8 @@ x <- int64("9007199254740993")
 y <- uint64("18446744073709551614")
 x + 1L                       # int64
 x + y                        # int128 (lossless)
-sum(int64(c(2^62, 2^62)))    # int128: 9223372036854775808
+sum(int64(c(2^62, 2^62)))    # NA with a warning: int64 overflow
+sum(int128(c(2^62, 2^62)))   # int128: 9223372036854775808
 wrapping_mul(y, 31L)         # modular
 checked_add(int64("9223372036854775807"), 1L)   # error
 format_hex(y)                # "0xfffffffffffffffe"
@@ -529,23 +536,8 @@ zu_storage(int128(1))        # raw CPLXSXP payload
 
 ## 15. Open questions
 
-Open, with the reviewer's recommendation of 2026-10-15 where there is one:
+Open:
 
-- In `wrapping_` arithmetic, should the uint64 NA bit pattern be a normal value
-  (true modular arithmetic) or stay NA? *Recommendation:* NA in, NA out; a
-  result that lands on the sentinel becomes NA. Document it; the chance is
-  2⁻⁶⁴ per operation, and the alternative makes NA depend on the policy.
-- Should `sum()` of int64 return int128 *always* (type-stable) or only on
-  overflow (value-dependent)? *Recommendation:* neither. `sum(int64)` returns
-  int64, NA with a warning on overflow, exactly as base R's `sum(integer)`.
-  A wide sum is `sum(int128(x))`, which costs one cast. This drops the
-  `.wide` argument, which cannot be passed through `sum(...)` cleanly.
-- `integer ⊕ uint64 → int128` (§5) makes `y + 1L` change type on the most
-  common unsigned operation and costs a 128-bit pass. *Recommendation:*
-  `integer ⊕ uint64 → uint64` and `integer ⊕ uint128 → uint128`, with a
-  negative integer operand handled by the overflow policy (NA plus a warning
-  by default, error under `checked_`). It stays lossless or explicit, and
-  matches every typed language. Decide before Stage 3 lands the lattice.
 - Should the DuckDB bridge use DuckDB's C API directly (no R duckdb dependency)
   or go through duckdb's Arrow export? Arrow export is the plan (§9.1); the C
   API would add a non-zu runtime dependency (§2.1).
@@ -554,6 +546,18 @@ Open, with the reviewer's recommendation of 2026-10-15 where there is one:
 - Name check: `zuint` on CRAN, r-universe and PyPI.
 
 Resolved on 2026-10-15:
+
+- **`integer ⊕ uint64 → uint64` and `integer ⊕ uint128 → uint128`** (§5).
+  The former `int128` rule made `y + 1L` change type on the most common
+  unsigned operation and left `uint128 + 1L` an error. A negative integer
+  operand is out of range and goes through the overflow policy, so the rule
+  stays lossless or explicit.
+- **The NA sentinel stays NA under `wrapping_`** (§6), and a result landing
+  on it becomes NA. The alternative would make NA-ness depend on which
+  policy produced the bits.
+- **`sum()` is type stable** (§7): the input's type, NA plus a warning on
+  overflow, as base R. `sum(int128(x))` is the wide sum. The `.wide`
+  argument is dropped because it cannot pass through `sum(...)` cleanly.
 
 - The duckdb R client (1.5.4.1) accepts only `bigint = "numeric" |
   "integer64"`; UBIGINT under `"integer64"` is the bits reinterpreted, and
