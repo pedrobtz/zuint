@@ -141,8 +141,9 @@ signed overflow reaching C.
   against doubles (never errors).
 - The promotion order and `zu_common_type()`; the `zuint.double` option;
   `c()` across types follows the same table.
-- Resolve the three §15 questions that block this stage (see Open
-  questions) and record the answers in design §5, §6 and §15.
+- The decisions of 2026-10-15 (design §15): `integer ⊕ uint64 → uint64`,
+  `integer ⊕ uint128 → uint128` with a negative integer handled by the
+  policy, and the NA sentinel staying NA under `wrapping_`.
 - Policy tests: each operation × each policy × each type pair, against the
   gmp oracle, with edge values and the NaN-pattern ranges.
 
@@ -284,9 +285,9 @@ summaries are exact and type-correct for every type.
   ranks).
 - `src/zu_hash.c`: open-addressing hash on the exact bits; `unique`,
   `duplicated`, `match`, `%in%`, `table`.
-- `src/zu_reduce.c`: `sum` (per the Stage 6 open question), `cumsum`,
-  `cumprod`, `mean` and `median` as doubles, `min`, `max`, `range` with
-  `na.rm`, `diff`, `seq_zu()`.
+- `src/zu_reduce.c`: `sum` (type stable, 128-bit accumulator, NA plus a
+  warning on overflow; design §7), `cumsum`, `cumprod`, `mean` and `median`
+  as doubles, `min`, `max`, `range` with `na.rm`, `diff`, `seq_zu()`.
 - Property tests against gmp and against base R on values below 2⁵³.
 
 **Exit criteria.**
@@ -294,8 +295,8 @@ summaries are exact and type-correct for every type.
   beyond 2⁵³; `sort()` is stable and NA placement follows `na.last`.
 - `match()` and `unique()` agree with gmp-based references on random fills
   with collisions in the low and high words.
-- `sum()` of `int64(c(2^62, 2^62))` behaves as the resolved open question
-  says, and `mean(int64(1:2))` is `1.5`.
+- `sum(int64(c(2^62, 2^62)))` is NA with a warning,
+  `sum(int128(c(2^62, 2^62)))` is 2⁶³, and `mean(int64(1:2))` is `1.5`.
 - `R CMD check` passes with 0 errors, 0 warnings, 0 notes.
 
 **Design.** §7, §10 of design.md.
@@ -403,12 +404,8 @@ default branch's code.
 
 ## Open questions
 
-- **`integer ⊕ uint64` and `integer ⊕ uint128`** (design §5, §15): int128 /
-  error as written, or the unsigned type with negative integers handled by
-  the overflow policy, as the review recommends. Blocks Stage 2.
-- **Wrapping arithmetic and the NA sentinel** (design §15): NA in, NA out
-  with a result on the sentinel becoming NA, as recommended, or true modular
-  arithmetic. Blocks Stage 2.
-- **`sum()` return type** (design §7, §15): type-stable int64 with NA on
-  overflow, as recommended, or int128 always or on overflow. Blocks Stage 6.
 - **zufast 0.1.1 on CRAN**: required before Stage 9 can close.
+
+Resolved 2026-10-15, recorded in design §15: the `integer ⊕ unsigned`
+promotion rule and the wrapping NA rule (Stage 2), and the type-stable
+`sum()` (Stage 6).
