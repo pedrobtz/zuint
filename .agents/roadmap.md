@@ -23,7 +23,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | Stage | Title | CI | Issue | Pull request | Done |
 | --- | --- | --- | --- | --- | --- |
 | 0 | [Package identity](#stage-0--package-identity) | quick | [#2](https://github.com/pedrobtz/zuint/issues/2) | [#15](https://github.com/pedrobtz/zuint/pull/15) | 2026-10-16 |
-| 1 | [Storage and construction](#stage-1--storage-and-construction) | full — first compiled code | [#3](https://github.com/pedrobtz/zuint/issues/3) | | |
+| 1 | [Storage and construction](#stage-1--storage-and-construction) | full — first compiled code | [#3](https://github.com/pedrobtz/zuint/issues/3) | [#16](https://github.com/pedrobtz/zuint/pull/16) | 2026-10-16 |
 | 2 | [Arithmetic and the promotion order](#stage-2--arithmetic-and-the-promotion-order) | quick | [#4](https://github.com/pedrobtz/zuint/issues/4) | | |
 | 3 | [Parsing, formatting and bit operations](#stage-3--parsing-formatting-and-bit-operations) | quick | [#5](https://github.com/pedrobtz/zuint/issues/5) | | |
 | 4 | [Arrow C Data Interface bridge](#stage-4--arrow-c-data-interface-bridge) | full — vendored header, external pointers and release callbacks | [#6](https://github.com/pedrobtz/zuint/issues/6) | | |
@@ -134,6 +134,21 @@ vectors in base R. No arithmetic yet.
 - `R CMD check` passes with 0 errors, 0 warnings, 0 notes.
 
 **Design.** §4, §4.1, §4.3, §8 (decimal only), §10 of design.md.
+
+**Deviations (2026-10-16).**
+- `summary()` reports Min., Max. and the NA count; quartiles need sorting
+  and come with Stage 6.
+- `length<-` and `as.logical()` join the vector protocol: bit64 defines
+  both for `integer64`, so without them `zu_int64` would fall through to
+  bit64 when it is loaded.
+- `as.double()` warns when a value rounds, not whenever it exceeds 2⁵³:
+  2⁶⁰ converts exactly and silently.
+- `c()` converts every argument to the type of the first. Stage 2 moves it
+  to the common type of the promotion order.
+- The `nm -u` guard is a test (`test-symbols.R`) rather than a workflow
+  step, so every CI leg but Windows runs it on the object it built.
+- The edge values are each type's true minimum (one above the NA
+  sentinel) and the one above that, as well as MAX − 1 and MAX.
 
 ## Stage 2 — Arithmetic and the promotion order
 

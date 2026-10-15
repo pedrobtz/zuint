@@ -1,0 +1,3 @@
+# ZUINT_CPPFLAGS comes from the environment, empty by default. CI sets it to
+# -DZUF_NO_INT128 to build zufast/wide.h's portable fallback (see CLAUDE.md).
+PKG_CPPFLAGS = $(ZUINT_CPPFLAGS)

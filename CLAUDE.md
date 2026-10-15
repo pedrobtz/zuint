@@ -90,16 +90,42 @@ Rscript -e 'devtools::check()'                   # R CMD check
 air format .                                     # format R sources
 ```
 
+The fallback for compilers without `__int128` is built by setting
+`ZUINT_CPPFLAGS=-DZUF_NO_INT128` in the environment, which
+[`src/Makevars`](src/Makevars) passes to the compiler. Clean the old objects
+first, and set `ZUINT_EXPECT_INT128=false` so `test-storage.R` confirms the
+fallback really was built:
+
+```sh
+Rscript -e 'devtools::clean_dll()'
+ZUINT_CPPFLAGS=-DZUF_NO_INT128 ZUINT_EXPECT_INT128=false \
+  Rscript -e 'devtools::test()'
+Rscript -e 'devtools::clean_dll()'               # back to the native build
+```
+
+CI runs this as the `no-int128` job of `R-CMD-check.yaml`, on every pull
+request.
+
 ## Architecture
 
-To be written as stages land; see `.agents/design.md` (§10 for the planned C
-layout). The scaffold set up a C layer with `usethis::use_c()`:
-[`src/zuint.c`](src/zuint.c) is an empty stub and
-[`R/zuint-package.R`](R/zuint-package.R) holds `@useDynLib`.
+Grows with the stages; `.agents/design.md` §10 has the planned C layout.
+
+- [`src/zu_wide.h`](src/zu_wide.h) is the type layer: the type codes, the
+  NA sentinels, raw word access to the REALSXP and CPLXSXP payloads, and
+  `zu_val`, a sign plus a 128-bit magnitude that slow paths use to move a
+  value between types with one range check (`zu_val_fits()`).
+- [`src/zu_cast.c`](src/zu_cast.c) holds construction and conversion. Entry
+  points that can lose a value return `list(result, n_lost)` and R raises
+  the warning, so condition classes live only in R.
+- [`R/types.R`](R/types.R) has the constructors, the `NA_*_` constants and
+  `zu_storage()`; [`R/cast.R`](R/cast.R) is the one conversion path every
+  method uses; [`R/conditions.R`](R/conditions.R) lists the condition
+  classes.
+- [`R/vector.R`](R/vector.R) holds the base vector methods, written once and
+  registered for all four classes from the `zu_methods` table through
+  `@evalNamespace`. To add a method, add it to that table.
 
 ## Invariants that are easy to break
-
-None established by code yet. The design already fixes these:
 
 - **`int64` keeps the bit64 layout**: a REALSXP whose bits are `int64_t`,
   class `c("zu_int64", "integer64")`. data.table, arrow, duckdb and others
@@ -126,6 +152,21 @@ None established by code yet. The design already fixes these:
 - **Mixed-type operations are lossless or an error**, following the
   promotion lattice in design §5. Never coerce through double.
 
+- **Base R pads with its own NA, which is a valid value here.** `x[i]` past
+  the end, `x[i] <- v` past the end and `length<-` fill with `NA_real_` or
+  `NA_complex_`, whose bits are an ordinary int64 or int128. The methods in
+  `R/vector.R` find the padded positions and write the type's sentinel;
+  any new method that can grow a vector must do the same.
+- **Bits move between doubles and integers by `memcpy` only.** A cast
+  through `double` would canonicalise the NaN payloads that negative int64
+  values and the unsigned NAs occupy.
+- **The `NA_*_` constants are built in pure R at install time**, from bit
+  patterns (`-0` is INT64_MIN), because the shared object is not loaded
+  when the package's R code is evaluated.
+- **Native routines are called through their registered symbols.**
+  `init.c` calls `R_forceSymbols()`, so `.Call("name", ...)` with a string
+  fails; use the symbol `useDynLib(.registration = TRUE)` defines.
+
 Add each new one when a stage establishes it.
 
 ## Testing conventions
@@ -141,15 +182,20 @@ Add each new one when a stage establishes it.
   definition of done.
 - **Borrow a conformance suite before writing one.** Mainstream
   implementations in Python, Java, Go or Node usually ship a test corpus.
-  Use it as an oracle rather than inventing cases by hand. The design
-  plans `gmp::as.bigz` as the arithmetic, parsing and formatting oracle, and
-  a DuckDB/Arrow/Parquet round-trip matrix as the acceptance test; neither
-  exists yet.
+  Use it as an oracle rather than inventing cases by hand. `gmp` is the
+  oracle for values (`helper-oracle.R`); the DuckDB/Arrow/Parquet
+  round-trip matrix, the acceptance test, arrives in Stage 5.
 - **Run the int64 tests with and without bit64 attached.** Any difference
   means a method is missing on `zu_int64` (see Invariants). The
   bit64-attached run also covers mixed `zu_int64` ⊕ `integer64` dispatch.
-- **Helpers live in `tests/testthat/helper-*.R`.** None yet.
-- **Keep the suite inside the CRAN time budget.** No real tests yet.
+- **Helpers live in `tests/testthat/helper-*.R`.** `helper-oracle.R` gives
+  each type's range, edge values, out-of-range values and random fills,
+  computed with gmp (and skips without it). `helper-bit64.R` runs a string
+  of R code in two fresh Rscript processes, one with bit64 attached and one
+  where it never loaded, because S3 methods stay registered once a
+  namespace has loaded; it skips on CRAN.
+- **Keep the suite inside the CRAN time budget.** About 5 seconds locally
+  (2026-10-16), most of it the two bit64 processes.
 
 ## Definition of done
 

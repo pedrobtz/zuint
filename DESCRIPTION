@@ -18,6 +18,8 @@ Depends:
 LinkingTo: 
     zufast (>= 0.1.0.9000)
 Suggests: 
+    bit64,
+    gmp,
     testthat (>= 3.0.0),
     withr
 Remotes: 

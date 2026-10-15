@@ -24,6 +24,24 @@ jobs:
       # 80-bit intermediates.
       nosuggests: true
       nold: true
+      # Every leg is 64-bit gcc or clang, so every leg must build on
+      # __int128; test-storage.R checks.
+      env: |
+        ZUINT_EXPECT_INT128=true
       # Quick on each push to a pull request, full after merge. The
       # `full-ci` label runs the full set on a pull request before merging.
+      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+
+  # zufast/wide.h's portable fallback, forced: src/Makevars passes
+  # ZUINT_CPPFLAGS to the compiler, and test-storage.R checks that the build
+  # really took the fallback. One Ubuntu leg, in both profiles.
+  no-int128:
+    uses: pedrobtz/r-actions/.github/workflows/r-cmd-check.yml@v1
+    with:
+      runners: '[{"os": "ubuntu-latest", "r": "release"}]'
+      containers: '[]'
+      quick-containers: '[]'
+      env: |
+        ZUINT_CPPFLAGS=-DZUF_NO_INT128
+        ZUINT_EXPECT_INT128=false
       profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
