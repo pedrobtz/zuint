@@ -64,3 +64,75 @@ oracle_fits <- function(type, values) {
   v <- gmp::as.bigz(values)
   v >= r$min & v <= r$max
 }
+
+# Operand kinds for the arithmetic matrix: R's integer and the four types.
+zu_all_kinds <- c("integer", zu_all_types)
+
+oracle_kind_values <- function(kind) {
+  if (kind == "integer") {
+    return(c("0", "1", "-1", "7", "-7", "2147483647", "-2147483647"))
+  }
+  edges <- oracle_edges(kind)
+  c(edges, oracle_random(kind, 6, seed = nchar(kind)))
+}
+
+# A vector of `kind` holding the decimal strings `v`.
+oracle_make <- function(kind, v) {
+  if (kind == "integer") as.integer(v) else zu_ctor(kind)(v)
+}
+
+# The type operands of kinds a and b compute in, or NA when there is none.
+oracle_common <- function(a, b) {
+  if (a == "integer") {
+    return(b)
+  }
+  if (b == "integer" || a == b) {
+    return(a)
+  }
+  pair <- sort(c(a, b))
+  key <- paste(pair, collapse = "+")
+  switch(
+    key,
+    "int64+uint64" = "int128",
+    "int128+int64" = "int128",
+    "int128+uint64" = "int128",
+    "uint128+uint64" = "uint128",
+    NA_character_
+  )
+}
+
+# The exact result of `op` on bigz vectors, R's semantics: %/% floors and
+# %% takes the sign of the divisor. Division by zero is NA.
+oracle_op <- function(op, a, b) {
+  zero <- b == 0 & op %in% c("%/%", "%%")
+  b[zero] <- 1
+  r <- switch(
+    op,
+    "+" = a + b,
+    "-" = a - b,
+    "*" = a * b,
+    "%/%" = a %/% b,
+    "%%" = a - b * (a %/% b)
+  )
+  r[zero] <- NA
+  r
+}
+
+# v modulo 2^width, in the range of `type`; NA where that is the NA pattern.
+oracle_wrap <- function(v, type) {
+  bits <- switch(type, int64 = , uint64 = 64, int128 = , uint128 = 128)
+  m <- gmp::as.bigz(2)^bits
+  r <- v %% m
+  if (type %in% c("int64", "int128")) {
+    hi <- r >= m / 2
+    r[hi] <- r[hi] - m
+  }
+  r[!is.na(r) & !oracle_fits(type, as.character(r))] <- NA
+  r
+}
+
+oracle_chr <- function(v) {
+  out <- as.character(v)
+  out[is.na(v)] <- NA_character_
+  out
+}

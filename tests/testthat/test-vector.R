@@ -81,9 +81,9 @@ test_that("length<- truncates or pads with NA", {
   }
 })
 
-test_that("c() converts every argument to the type of the first", {
+test_that("c() converts every argument to the common type", {
   x <- c(int64(1), 2L, 3, "4", NA, uint64(5), a = int128(6))
-  expect_identical(class(x), class(int64()))
+  expect_identical(class(x), class(int128()))
   expect_identical(as.character(x), c("1", "2", "3", "4", NA, "5", "6"))
   expect_identical(names(x), c("", "", "", "", "", "", "a"))
   expect_warning(y <- c(uint64(1), -1L), class = "zuint_cast_warning")

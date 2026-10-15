@@ -50,3 +50,47 @@ test_that("int64 and bit64 integer64 mix in c() and [<-", {
   x[1] <- bit64::as.integer64(-7)
   expect_identical(as.character(x), c("-7", "9007199254740993"))
 })
+
+test_that("int64 arithmetic behaves the same with bit64 attached and absent", {
+  parity_code <- '
+x <- int64(c("-9223372036854775807", "-3", "0", "7", "9007199254740993", NA))
+y <- int64(c("2", "-2", "5", "0", "3", "1"))
+list(
+  add = zu_storage(suppressWarnings(x + y)),
+  sub = zu_storage(suppressWarnings(x - y)),
+  mul = zu_storage(suppressWarnings(x * y)),
+  idiv = zu_storage(x %/% y),
+  mod = zu_storage(x %% y),
+  pow = zu_storage(suppressWarnings(int64(3)^40L)),
+  neg = zu_storage(-x),
+  abs = zu_storage(abs(x)),
+  sign = zu_storage(sign(x)),
+  div = x / y,
+  cmp = list(x == y, x < y, x >= 1.5, x == 9007199254740992),
+  int = zu_storage(x + 1L),
+  dbl = zu_storage(x + 2),
+  mixed = zu_storage(x + uint64(1)),
+  checked = tryCatch(checked_add(x, x), error = function(e) class(e)),
+  wrapping = zu_storage(wrapping_mul(x, y)),
+  not = !x
+)
+'
+  res <- bit64_states(parity_code)
+  expect_identical(res$attached, res$absent)
+  expect_identical(res$attached$value$checked, c("zuint_overflow_error", "zuint_error", "error", "condition"))
+})
+
+test_that("zu_int64 and integer64 mix exactly and without warnings", {
+  skip_if_not_installed("bit64")
+  big <- bit64::as.integer64("9007199254740993")
+  expect_no_warning(r <- int64(1) + big)
+  expect_s3_class(r, "zu_int64")
+  expect_identical(as.character(r), "9007199254740994")
+  expect_no_warning(r <- int64("9007199254740993") == big)
+  expect_true(r)
+  # bit64 >= 4.8 claims Ops through its own chooseOpsMethod(), and R asks the
+  # left operand first, so integer64 on the left runs bit64's method. The
+  # value is still exact.
+  expect_no_warning(r <- big + int64(1))
+  expect_identical(as.character(r), "9007199254740994")
+})
