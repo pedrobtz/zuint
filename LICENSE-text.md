@@ -1,4 +1,4 @@
 # License
 
     YEAR: 2026
-    COPYRIGHT HOLDER: zuint authors
+    COPYRIGHT HOLDER: Pedro Baltazar

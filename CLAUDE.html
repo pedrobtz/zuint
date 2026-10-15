@@ -19,6 +19,7 @@
 <li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="search.json"></form></li>
+<li class="nav-item"><a class="external-link nav-link" href="https://github.com/pedrobtz/zuint/" aria-label="GitHub"><span class="fa fab fa-github fa-lg"></span></a></li>
       </ul></div>
 
 
@@ -28,7 +29,7 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>CLAUDE.md</h1>
-
+      <small class="dont-index">Source: <a href="https://github.com/pedrobtz/zuint/blob/main/CLAUDE.md" class="external-link"><code>CLAUDE.md</code></a></small>
     </div>
 
 <div id="claudemd" class="section level1">
@@ -152,7 +153,7 @@
 <div class="section level2">
 <h2 id="continuous-integration">Continuous integration<a class="anchor" aria-label="anchor" href="#continuous-integration"></a></h2>
 <p>Workflows come from <code>pedrobtz/r-actions</code>. Call those reusable workflows instead of writing bespoke ones, and pin a released tag rather than <code>main</code>. Pin a workflow that holds a write token, such as <code>coverage.yml</code>, to a commit, with the tag in a comment. The <code>R-CMD-check</code> workflow must call <code>r-cmd-check.yml</code>, because a hand-rolled one does not count as the pre-submission check.</p>
-<p>This package calls <code>r-cmd-check.yml@v1</code> (from <code>R-CMD-check.yaml</code>) and <code>coverage.yml@v1</code> (from <code>coverage.yaml</code>). <code>pkgdown.yaml</code> is the r-lib example workflow, not a shared one.</p>
+<p>This package calls <code>r-cmd-check.yml@v1</code> with <code>nosuggests</code> and <code>nold</code> on (from <code>R-CMD-check.yaml</code>); <code>valgrind.yml</code>, <code>lto.yml</code>, <code>gctorture.yml</code>, <code>rchk.yml</code>, <code>analyzers.yml</code> and <code>cran-special.yml</code> (from <code>native-checks.yml</code>); and <code>coverage.yml</code>, pinned to the v1 commit, with its badge on <code>gh-pages</code> because <code>main</code> takes no direct pushes (from <code>coverage.yaml</code>). <code>pkgdown.yaml</code> is the r-lib example workflow, not a shared one; its deploy uses <code>force: false</code> so it cannot overwrite a badge commit. <code>sanitizers.yml</code> with <code>asan: true</code> joins in Stage 1. Until zufast 0.1.1 is on CRAN, <code>rchk.yml</code> installs it through <code>github-packages</code>.</p>
 <p>Small edits get a small run. The shared workflows look at the files a pull request changes, compared with its merge base:</p>
 <ul><li>
 <strong>Markdown only</strong>, such as <code>README.md</code>, <code>NEWS.md</code> or <code>cran-comments.md</code>, skips every check. Only coverage and the pkgdown site run.</li>
@@ -199,7 +200,7 @@
 
 
     <footer><div class="pkgdown-footer-left">
-  <p>Developed by First Last.</p>
+  <p>Developed by Pedro Baltazar.</p>
 </div>
 
 <div class="pkgdown-footer-right">
