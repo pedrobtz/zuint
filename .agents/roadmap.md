@@ -22,7 +22,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 
 | Stage | Title | CI | Issue | Pull request | Done |
 | --- | --- | --- | --- | --- | --- |
-| 0 | [Package identity](#stage-0--package-identity) | quick | [#2](https://github.com/pedrobtz/zuint/issues/2) | | |
+| 0 | [Package identity](#stage-0--package-identity) | quick | [#2](https://github.com/pedrobtz/zuint/issues/2) | | 2026-10-16 |
 | 1 | [Storage and construction](#stage-1--storage-and-construction) | full — first compiled code | [#3](https://github.com/pedrobtz/zuint/issues/3) | | |
 | 2 | [Arithmetic and the promotion order](#stage-2--arithmetic-and-the-promotion-order) | quick | [#4](https://github.com/pedrobtz/zuint/issues/4) | | |
 | 3 | [Parsing, formatting and bit operations](#stage-3--parsing-formatting-and-bit-operations) | quick | [#5](https://github.com/pedrobtz/zuint/issues/5) | | |
@@ -67,6 +67,19 @@ stages rely on, and a pull request finishes its checks in under five minutes.
   needs nothing further.
 
 **Design.** §2.1, §4.1 of design.md.
+
+**Deviations (2026-10-16).**
+- `r-cmd-check.yml` has no `asan` input; ASan is the `asan: true` job of
+  `sanitizers.yml`, so it is set there, in `native-checks.yml`.
+- `native-checks.yml` takes the whole r-actions example for packages with
+  C: `lto.yml`, `rchk.yml` and `analyzers.yml` join the three the work list
+  names, and `R-CMD-check.yaml` turns on `nosuggests` and `nold`, which
+  Stage 8 needs. All of these add nothing to the quick profile but `lto`,
+  `rchk` and `analyzers`, which run in minutes.
+- `coverage.yml` sends its badge to `gh-pages` (`badge-branch`), because
+  the `main` ruleset rejected the badge commit on every push.
+- `src/init.c` with empty routine registration lands here rather than in
+  Stage 1: without it R CMD check gives a "no registration" note.
 
 ## Stage 1 — Storage and construction
 
