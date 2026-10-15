@@ -1,0 +1,55 @@
+# The C layer under UBSan, ASan, valgrind, LTO, gctorture and rchk, plus
+# GCC's analyzer and CRAN's special checks. Quick on each push to a pull
+# request, full after merge; the full-ci label runs the full set on a pull
+# request. `profile` goes to the four workflows it changes: quick skips the
+# asan containers, valgrind and cran-special, and runs gctorture at step 500
+# instead of 20.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+name: native-checks
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  sanitizers:
+    uses: pedrobtz/r-actions/.github/workflows/sanitizers.yml@v1
+    with:
+      asan: true
+      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+
+  valgrind:
+    uses: pedrobtz/r-actions/.github/workflows/valgrind.yml@v1
+    with:
+      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+
+  lto:
+    uses: pedrobtz/r-actions/.github/workflows/lto.yml@v1
+
+  gctorture:
+    uses: pedrobtz/r-actions/.github/workflows/gctorture.yml@v1
+    with:
+      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+
+  rchk:
+    uses: pedrobtz/r-actions/.github/workflows/rchk.yml@v1
+    with:
+      # The rchk image ignores Remotes:; drop this once zufast 0.1.1 is on
+      # CRAN.
+      github-packages: |
+        pedrobtz/zufast
+
+  analyzers:
+    uses: pedrobtz/r-actions/.github/workflows/analyzers.yml@v1
+
+  cran-special:
+    uses: pedrobtz/r-actions/.github/workflows/cran-special.yml@v1
+    with:
+      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}

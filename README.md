@@ -3,7 +3,7 @@
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/pedrobtz/zuint/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/pedrobtz/zuint/actions/workflows/R-CMD-check.yaml)
-[![coverage](https://raw.githubusercontent.com/pedrobtz/zuint/main/.github/badges/coverage.svg)](https://github.com/pedrobtz/zuint/actions/workflows/coverage.yaml)
+[![coverage](https://raw.githubusercontent.com/pedrobtz/zuint/gh-pages/badges/coverage.svg)](https://github.com/pedrobtz/zuint/actions/workflows/coverage.yaml)
 <!-- badges: end -->
 
 The goal of zuint is to ...
