@@ -70,7 +70,9 @@ stages rely on, and a pull request finishes its checks in under five minutes.
 
 **Deviations (2026-10-16).**
 - `r-cmd-check.yml` has no `asan` input; ASan is the `asan: true` job of
-  `sanitizers.yml`, so it is set there, in `native-checks.yml`.
+  `sanitizers.yml`. That workflow moves to Stage 1: it fails when the
+  installed object has no `__ubsan` symbols, and Stage 0's `init.c` has no
+  code UBSan instruments, so it would fail without checking anything.
 - `native-checks.yml` takes the whole r-actions example for packages with
   C: `lto.yml`, `rchk.yml` and `analyzers.yml` join the three the work list
   names, and `R-CMD-check.yaml` turns on `nosuggests` and `nold`, which
@@ -98,6 +100,8 @@ vectors in base R. No arithmetic yet.
 - `src/zu_wide.h`: the type traits `ZU_INT64`, `ZU_UINT64`, `ZU_INT128`,
   `ZU_UINT128` over `zufast/wide.h`; NA sentinels; the REALSXP and CPLXSXP
   storage accessors. `src/init.c` with registration.
+- `sanitizers.yml` with `asan: true` in `native-checks.yml`, moved here
+  from Stage 0 (see its deviations).
 - A CI leg that compiles with `ZUF_NO_INT128` defined, so the portable
   fallback never rots (mechanism chosen here and recorded in `CLAUDE.md`).
 - R side: classes `c("zu_int64", "integer64")`, `zu_uint64`, `zu_int128`,

@@ -199,14 +199,13 @@ the tag in a comment. The `R-CMD-check` workflow must call `r-cmd-check.yml`,
 because a hand-rolled one does not count as the pre-submission check.
 
 This package calls `r-cmd-check.yml@v1` with `nosuggests` and `nold` on
-(from `R-CMD-check.yaml`); `sanitizers.yml` with `asan: true`,
-`valgrind.yml`, `lto.yml`, `gctorture.yml`, `rchk.yml`, `analyzers.yml` and
+(from `R-CMD-check.yaml`); `valgrind.yml`, `lto.yml`, `gctorture.yml`, `rchk.yml`, `analyzers.yml` and
 `cran-special.yml` (from `native-checks.yml`); and `coverage.yml`, pinned to
 the v1 commit, with its badge on `gh-pages` because `main` takes no direct
 pushes (from `coverage.yaml`). `pkgdown.yaml` is the r-lib example workflow,
 not a shared one; its deploy uses `force: false` so it cannot overwrite a
-badge commit. Until zufast 0.1.1 is on CRAN, `rchk.yml` installs it through
-`github-packages`.
+badge commit. `sanitizers.yml` with `asan: true` joins in Stage 1. Until
+zufast 0.1.1 is on CRAN, `rchk.yml` installs it through `github-packages`.
 
 Small edits get a small run. The shared workflows look at the files a pull
 request changes, compared with its merge base:

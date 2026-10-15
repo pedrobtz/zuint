@@ -1,9 +1,9 @@
-# The C layer under UBSan, ASan, valgrind, LTO, gctorture and rchk, plus
-# GCC's analyzer and CRAN's special checks. Quick on each push to a pull
+# The C layer under valgrind, LTO, gctorture and rchk, plus GCC's analyzer
+# and CRAN's special checks. UBSan and ASan (sanitizers.yml) join in Stage 1,
+# with the first C they can instrument. Quick on each push to a pull
 # request, full after merge; the full-ci label runs the full set on a pull
-# request. `profile` goes to the four workflows it changes: quick skips the
-# asan containers, valgrind and cran-special, and runs gctorture at step 500
-# instead of 20.
+# request. `profile` goes to the workflows it changes: quick skips valgrind
+# and cran-special, and runs gctorture at step 500 instead of 20.
 on:
   push:
     branches: [main, master]
@@ -19,12 +19,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  sanitizers:
-    uses: pedrobtz/r-actions/.github/workflows/sanitizers.yml@v1
-    with:
-      asan: true
-      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
-
   valgrind:
     uses: pedrobtz/r-actions/.github/workflows/valgrind.yml@v1
     with:
