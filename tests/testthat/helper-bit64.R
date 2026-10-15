@@ -34,6 +34,8 @@ bit64_child <- function(code, loader, attach) {
   on.exit(unlink(c(out, script)))
   writeLines(
     c(
+      # the parent's libraries; system2(env =) does not work on Windows
+      sprintf(".libPaths(%s)", deparse1(.libPaths())),
       if (attach) "suppressPackageStartupMessages(library(bit64))",
       loader,
       sprintf("stopifnot(isNamespaceLoaded('bit64') == %s)", attach),
@@ -56,10 +58,6 @@ bit64_child <- function(code, loader, attach) {
   status <- system2(
     file.path(R.home("bin"), "Rscript"),
     c("--vanilla", shQuote(script)),
-    env = sprintf(
-      "R_LIBS=%s",
-      paste(.libPaths(), collapse = .Platform$path.sep)
-    ),
     stdout = FALSE,
     stderr = FALSE
   )
