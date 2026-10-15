@@ -26,6 +26,8 @@ zu_methods <- c(
   print = "zu_print",
   str = "zu_str",
   summary = "zu_summary",
+  Ops = "zu_ops",
+  Math = "zu_math",
   chooseOpsMethod = "zu_choose_ops_method"
 )
 
@@ -149,12 +151,35 @@ zu_set_length <- function(x, value) {
   zu_new(s, code)
 }
 
-# Every argument becomes the type of the first.
+# Every argument takes the common type of the promotion order (design 5).
+# Strings are parsed into it. A negative integer an unsigned type cannot take
+# becomes NA with a warning, as in any conversion.
 zu_c <- function(...) {
   args <- list(...)
-  code <- zu_code(args[[1L]])
   call <- sys.call()
-  parts <- lapply(args, function(a) zu_unclass(zu_cast(a, code, call = call)))
+  kinds <- vapply(args, zu_kind, integer(1))
+  if (anyNA(kinds)) {
+    zu_abort(
+      sprintf("Can't combine %s with a zuint vector.", zu_kind_label(args[[which(is.na(kinds))[[1L]]]])),
+      "type",
+      call = call
+    )
+  }
+  code <- zu_common_code(kinds, call)
+  parts <- vector("list", length(args))
+  lost <- 0
+  for (i in seq_along(args)) {
+    r <- zu_convert(args[[i]], kinds[[i]], code)
+    if (kinds[[i]] == zu_kind_dbl && r[[2L]] > 0) {
+      zu_double_problem(zu_types[[code]], call)
+      return(unlist(lapply(args, zu_dbl_quiet)))
+    }
+    lost <- lost + r[[2L]]
+    parts[[i]] <- r[[1L]]
+    names(parts[[i]]) <- names(args[[i]])
+  }
+  zu_warn_lost(lost, zu_types[[code]], call = call)
+  names(parts) <- names(args)
   zu_new(do.call(c, parts), code)
 }
 
