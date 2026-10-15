@@ -14,3 +14,17 @@
   `as.logical()`, `as.list()`, data frame columns, `format()`, `print()`,
   `str()` and `summary()`.
 * `zu_storage()` and `zu_from_storage()` expose the raw payload.
+* Exact arithmetic: `+`, `-`, `*`, `%/%` (floor), `%%` (sign of the
+  divisor), `^` with a non-negative integer exponent, unary minus, `abs()`
+  and `sign()`. An out-of-range result is `NA` with one
+  `zuint_overflow_warning` per call. `/` and other `Math` functions compute
+  in double.
+* `checked_add()`, `checked_sub()`, `checked_mul()`, `checked_pow()` and
+  `checked_neg()` raise a `zuint_overflow_error` instead;
+  `wrapping_add()`, `wrapping_sub()`, `wrapping_mul()`, `wrapping_pow()`
+  and `wrapping_neg()` compute modulo 2^64 or 2^128.
+* Mixed types follow a lossless promotion order (`zu_common_type()`), in
+  arithmetic and in `c()`. A double must be integral and in range, unless
+  `options(zuint.double = "allow")`.
+* Comparison is exact across all types and doubles: `int64(1) == 1.5` is
+  `FALSE`, and nothing is compared through double.
