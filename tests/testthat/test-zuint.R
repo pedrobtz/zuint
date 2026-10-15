@@ -1,3 +1,4 @@
-test_that("multiplication works", {
-  expect_equal(2 * 2, 4)
+test_that("the namespace loads and its shared object is registered", {
+  expect_true(isNamespaceLoaded("zuint"))
+  expect_true("zuint" %in% names(getLoadedDLLs()))
 })

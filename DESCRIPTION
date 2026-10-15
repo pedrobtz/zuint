@@ -1,18 +1,28 @@
 Package: zuint
-Title: What the Package Does (One Line, Title Case)
+Title: Lossless 64- And 128-Bit Integers for 'Arrow' and 'DuckDB'
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+    person("Pedro", "Baltazar", , "pedrobtz@gmail.com", role = c("aut", "cre", "cph"))
+Description: Wide integer vectors, signed and unsigned 64-bit and 128-bit,
+    matching the integer types of 'Apache Arrow' and 'DuckDB'. The four types
+    share one 'C' core and one lossless promotion order, with exact
+    arithmetic, comparison, parsing and formatting, and explicit overflow
+    policies. The signed 64-bit type keeps the 'bit64' 'integer64' storage
+    layout, and every type converts exactly to and from the 'Arrow' 'C' Data
+    Interface.
 License: MIT + file LICENSE
-Encoding: UTF-8
-Roxygen: list(markdown = TRUE)
-RoxygenNote: 8.1.0
+URL: https://pedrobtz.github.io/zuint/, https://github.com/pedrobtz/zuint
+BugReports: https://github.com/pedrobtz/zuint/issues
+Depends: 
+    R (>= 4.3.0)
 LinkingTo: 
     zufast (>= 0.1.0.9000)
 Suggests: 
-    testthat (>= 3.0.0)
+    testthat (>= 3.0.0),
+    withr
 Remotes: 
     pedrobtz/zufast
 Config/testthat/edition: 3
-URL: https://pedrobtz.github.io/zuint/
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Config/roxygen2/version: 8.1.0
