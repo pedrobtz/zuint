@@ -34,7 +34,15 @@
 
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.0.0.9000" id="zuint-0009000">zuint 0.0.0.9000<a class="anchor" aria-label="anchor" href="#zuint-0009000"></a></h2>
-<ul><li>Package identity, licence and continuous integration; no user-facing functionality yet.</li>
+<ul><li>
+<code><a href="../reference/zuint-types.html">int64()</a></code>, <code><a href="../reference/zuint-types.html">uint64()</a></code>, <code><a href="../reference/zuint-types.html">int128()</a></code> and <code><a href="../reference/zuint-types.html">uint128()</a></code> create signed and unsigned 64- and 128-bit integer vectors from logical, integer, double, decimal character, bit64 <code>integer64</code> and each other. Conversion is exact or gives <code>NA</code> with a <code>zuint_cast_warning</code>; it never rounds or clamps.</li>
+<li>
+<code>int64</code> has class <code>c("zu_int64", "integer64")</code> and bit64’s storage, so code that reads <code>integer64</code> reads it unchanged.</li>
+<li>
+<code>NA_int64_</code>, <code>NA_uint64_</code>, <code>NA_int128_</code> and <code>NA_uint128_</code>.</li>
+<li>The base vector protocol for all four types: subsetting and assignment (with exact casting of the assigned value), <code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code>, <code><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep()</a></code>, <code><a href="https://rdrr.io/r/base/rev.html" class="external-link">rev()</a></code>, <code>length&lt;-</code>, <code><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na()</a></code>, <code><a href="https://rdrr.io/r/base/NA.html" class="external-link">anyNA()</a></code>, <code><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character()</a></code>, <code><a href="https://rdrr.io/r/base/double.html" class="external-link">as.double()</a></code> (with a <code>zuint_precision_warning</code> when it rounds), <code><a href="https://rdrr.io/r/base/integer.html" class="external-link">as.integer()</a></code>, <code><a href="https://rdrr.io/r/base/logical.html" class="external-link">as.logical()</a></code>, <code><a href="https://rdrr.io/r/base/list.html" class="external-link">as.list()</a></code>, data frame columns, <code><a href="https://rdrr.io/r/base/format.html" class="external-link">format()</a></code>, <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code>, <code><a href="https://rdrr.io/r/utils/str.html" class="external-link">str()</a></code> and <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code>.</li>
+<li>
+<code><a href="../reference/zu_storage.html">zu_storage()</a></code> and <code><a href="../reference/zu_storage.html">zu_from_storage()</a></code> expose the raw payload.</li>
 </ul></div>
   </main></div>
 

@@ -23,5 +23,21 @@ library(zuint)
 ## basic example code
 ```
 
-# 
+# Package index
+
+## All functions
+
+- [`zu_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
+  [`zu_from_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
+  : Raw storage of a zuint vector
+- [`NA_int64_`](https://pedrobtz.github.io/zuint/reference/zuint-na.md)
+  [`NA_uint64_`](https://pedrobtz.github.io/zuint/reference/zuint-na.md)
+  [`NA_int128_`](https://pedrobtz.github.io/zuint/reference/zuint-na.md)
+  [`NA_uint128_`](https://pedrobtz.github.io/zuint/reference/zuint-na.md)
+  : Missing values of each type
+- [`int64()`](https://pedrobtz.github.io/zuint/reference/zuint-types.md)
+  [`uint64()`](https://pedrobtz.github.io/zuint/reference/zuint-types.md)
+  [`int128()`](https://pedrobtz.github.io/zuint/reference/zuint-types.md)
+  [`uint128()`](https://pedrobtz.github.io/zuint/reference/zuint-types.md)
+  : Wide integer vectors
 

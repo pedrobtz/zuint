@@ -78,30 +78,39 @@
 <span id="cb1-5"><a href="#cb1-5" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::test(shuffle = TRUE)'</span>      <span class="co"># order independence</span></span>
 <span id="cb1-6"><a href="#cb1-6" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::check()'</span>                   <span class="co"># R CMD check</span></span>
 <span id="cb1-7"><a href="#cb1-7" tabindex="-1"></a><span class="ex">air</span> format .                                     <span class="co"># format R sources</span></span></code></pre></div>
+<p>The fallback for compilers without <code>__int128</code> is built by setting <code>ZUINT_CPPFLAGS=-DZUF_NO_INT128</code> in the environment, which <a href="src/Makevars"><code>src/Makevars</code></a> passes to the compiler. Clean the old objects first, and set <code>ZUINT_EXPECT_INT128=false</code> so <code>test-storage.R</code> confirms the fallback really was built:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::clean_dll()'</span></span>
+<span id="cb2-2"><a href="#cb2-2" tabindex="-1"></a><span class="va">ZUINT_CPPFLAGS</span><span class="op">=</span>-DZUF_NO_INT128 <span class="va">ZUINT_EXPECT_INT128</span><span class="op">=</span>false <span class="dt">\</span></span>
+<span id="cb2-3"><a href="#cb2-3" tabindex="-1"></a>  <span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::test()'</span></span>
+<span id="cb2-4"><a href="#cb2-4" tabindex="-1"></a><span class="ex">Rscript</span> <span class="at">-e</span> <span class="st">'devtools::clean_dll()'</span>               <span class="co"># back to the native build</span></span></code></pre></div>
+<p>CI runs this as the <code>no-int128</code> job of <code>R-CMD-check.yaml</code>, on every pull request.</p>
 </div>
 <div class="section level2">
 <h2 id="architecture">Architecture<a class="anchor" aria-label="anchor" href="#architecture"></a></h2>
-<p>To be written as stages land; see <code>.agents/design.md</code> (§10 for the planned C layout). The scaffold set up a C layer with <code>usethis::use_c()</code>: <a href="src/zuint.c"><code>src/zuint.c</code></a> is an empty stub and <a href="R/zuint-package.R"><code>R/zuint-package.R</code></a> holds <code>@useDynLib</code>.</p>
-</div>
+<p>Grows with the stages; <code>.agents/design.md</code> §10 has the planned C layout.</p>
+<ul><li>
+<a href="src/zu_wide.h"><code>src/zu_wide.h</code></a> is the type layer: the type codes, the NA sentinels, raw word access to the REALSXP and CPLXSXP payloads, and <code>zu_val</code>, a sign plus a 128-bit magnitude that slow paths use to move a value between types with one range check (<code>zu_val_fits()</code>).</li>
+<li>
+<a href="src/zu_cast.c"><code>src/zu_cast.c</code></a> holds construction and conversion. Entry points that can lose a value return <code>list(result, n_lost)</code> and R raises the warning, so condition classes live only in R.</li>
+<li>
+<a href="R/types.R"><code>R/types.R</code></a> has the constructors, the <code>NA_*_</code> constants and <code><a href="reference/zu_storage.html">zu_storage()</a></code>; <a href="R/cast.R"><code>R/cast.R</code></a> is the one conversion path every method uses; <a href="R/conditions.R"><code>R/conditions.R</code></a> lists the condition classes.</li>
+<li>
+<a href="R/vector.R"><code>R/vector.R</code></a> holds the base vector methods, written once and registered for all four classes from the <code>zu_methods</code> table through <code>@evalNamespace</code>. To add a method, add it to that table.</li>
+</ul></div>
 <div class="section level2">
 <h2 id="invariants-that-are-easy-to-break">Invariants that are easy to break<a class="anchor" aria-label="anchor" href="#invariants-that-are-easy-to-break"></a></h2>
-<p>None established by code yet. The design already fixes these:</p>
-<ul><li>
-<strong><code>int64</code> keeps the bit64 layout</strong>: a REALSXP whose bits are <code>int64_t</code>, class <code>c("zu_int64", "integer64")</code>. data.table, arrow, duckdb and others read <code>REAL(x)</code> as <code>int64_t*</code>; any other layout breaks them silently.</li>
-<li>
-<strong>Never register methods on bare <code>integer64</code></strong>, only on <code>zu_*</code> classes. Otherwise zuint changes bit64’s behaviour for everyone who loads it.</li>
-<li>
-<strong>Every method bit64 defines for <code>integer64</code>, zuint defines for <code>zu_int64</code>.</strong> A missing one falls through to bit64’s method when bit64 is loaded and to base R on the raw bits when it is not, so the answer would depend on what else is attached.</li>
-<li>
-<strong><code><a href="https://rdrr.io/r/base/chooseOpsMethod.html" class="external-link">chooseOpsMethod()</a></code> must return TRUE for every <code>zu_*</code> class.</strong> Without it, <code>zu_int64 + integer64</code> warns “incompatible methods” and R does double arithmetic on the bits. This is why <code>R (&gt;= 4.3.0)</code>.</li>
-<li>
-<strong>128-bit values cross the Arrow bridge as the <code>arrow.opaque</code> hugeint/uhugeint extension</strong>, not as <code>decimal128(38, 0)</code>: DuckDB reads the decimal back as DECIMAL, and the decimal form reads UHUGEINT ≥ 2¹²⁷ as negative (design §9.1).</li>
-<li>
-<strong>128-bit arithmetic comes from <code>zufast/wide.h</code></strong>, not from code written here. <code>zu_ops.h</code> holds only the NA and overflow-policy layer, so zuint and zutempo share one implementation. The portable fallback (<code>ZUF_NO_INT128</code>) must keep building.</li>
-<li>
-<strong>Signed overflow must never reach C undefined behaviour.</strong> Check before the operation, using the checked or wrapping primitives.</li>
-<li>
-<strong>Mixed-type operations are lossless or an error</strong>, following the promotion lattice in design §5. Never coerce through double.</li>
+<ul><li><p><strong><code>int64</code> keeps the bit64 layout</strong>: a REALSXP whose bits are <code>int64_t</code>, class <code>c("zu_int64", "integer64")</code>. data.table, arrow, duckdb and others read <code>REAL(x)</code> as <code>int64_t*</code>; any other layout breaks them silently.</p></li>
+<li><p><strong>Never register methods on bare <code>integer64</code></strong>, only on <code>zu_*</code> classes. Otherwise zuint changes bit64’s behaviour for everyone who loads it.</p></li>
+<li><p><strong>Every method bit64 defines for <code>integer64</code>, zuint defines for <code>zu_int64</code>.</strong> A missing one falls through to bit64’s method when bit64 is loaded and to base R on the raw bits when it is not, so the answer would depend on what else is attached.</p></li>
+<li><p><strong><code><a href="https://rdrr.io/r/base/chooseOpsMethod.html" class="external-link">chooseOpsMethod()</a></code> must return TRUE for every <code>zu_*</code> class.</strong> Without it, <code>zu_int64 + integer64</code> warns “incompatible methods” and R does double arithmetic on the bits. This is why <code>R (&gt;= 4.3.0)</code>.</p></li>
+<li><p><strong>128-bit values cross the Arrow bridge as the <code>arrow.opaque</code> hugeint/uhugeint extension</strong>, not as <code>decimal128(38, 0)</code>: DuckDB reads the decimal back as DECIMAL, and the decimal form reads UHUGEINT ≥ 2¹²⁷ as negative (design §9.1).</p></li>
+<li><p><strong>128-bit arithmetic comes from <code>zufast/wide.h</code></strong>, not from code written here. <code>zu_ops.h</code> holds only the NA and overflow-policy layer, so zuint and zutempo share one implementation. The portable fallback (<code>ZUF_NO_INT128</code>) must keep building.</p></li>
+<li><p><strong>Signed overflow must never reach C undefined behaviour.</strong> Check before the operation, using the checked or wrapping primitives.</p></li>
+<li><p><strong>Mixed-type operations are lossless or an error</strong>, following the promotion lattice in design §5. Never coerce through double.</p></li>
+<li><p><strong>Base R pads with its own NA, which is a valid value here.</strong> <code>x[i]</code> past the end, <code>x[i] &lt;- v</code> past the end and <code>length&lt;-</code> fill with <code>NA_real_</code> or <code>NA_complex_</code>, whose bits are an ordinary int64 or int128. The methods in <code>R/vector.R</code> find the padded positions and write the type’s sentinel; any new method that can grow a vector must do the same.</p></li>
+<li><p><strong>Bits move between doubles and integers by <code>memcpy</code> only.</strong> A cast through <code>double</code> would canonicalise the NaN payloads that negative int64 values and the unsigned NAs occupy.</p></li>
+<li><p><strong>The <code>NA_*_</code> constants are built in pure R at install time</strong>, from bit patterns (<code>-0</code> is INT64_MIN), because the shared object is not loaded when the package’s R code is evaluated.</p></li>
+<li><p><strong>Native routines are called through their registered symbols.</strong> <code>init.c</code> calls <code>R_forceSymbols()</code>, so <code>.Call("name", ...)</code> with a string fails; use the symbol <code>useDynLib(.registration = TRUE)</code> defines.</p></li>
 </ul><p>Add each new one when a stage establishes it.</p>
 </div>
 <div class="section level2">
@@ -115,13 +124,13 @@
 <li>
 <strong>Order independence.</strong> <code>devtools::test(shuffle = TRUE)</code> is part of the definition of done.</li>
 <li>
-<strong>Borrow a conformance suite before writing one.</strong> Mainstream implementations in Python, Java, Go or Node usually ship a test corpus. Use it as an oracle rather than inventing cases by hand. The design plans <code>gmp::as.bigz</code> as the arithmetic, parsing and formatting oracle, and a DuckDB/Arrow/Parquet round-trip matrix as the acceptance test; neither exists yet.</li>
+<strong>Borrow a conformance suite before writing one.</strong> Mainstream implementations in Python, Java, Go or Node usually ship a test corpus. Use it as an oracle rather than inventing cases by hand. <code>gmp</code> is the oracle for values (<code>helper-oracle.R</code>); the DuckDB/Arrow/Parquet round-trip matrix, the acceptance test, arrives in Stage 5.</li>
 <li>
 <strong>Run the int64 tests with and without bit64 attached.</strong> Any difference means a method is missing on <code>zu_int64</code> (see Invariants). The bit64-attached run also covers mixed <code>zu_int64</code> ⊕ <code>integer64</code> dispatch.</li>
 <li>
-<strong>Helpers live in <code>tests/testthat/helper-*.R</code>.</strong> None yet.</li>
+<strong>Helpers live in <code>tests/testthat/helper-*.R</code>.</strong> <code>helper-oracle.R</code> gives each type’s range, edge values, out-of-range values and random fills, computed with gmp (and skips without it). <code>helper-bit64.R</code> runs a string of R code in two fresh Rscript processes, one with bit64 attached and one where it never loaded, because S3 methods stay registered once a namespace has loaded; it skips on CRAN.</li>
 <li>
-<strong>Keep the suite inside the CRAN time budget.</strong> No real tests yet.</li>
+<strong>Keep the suite inside the CRAN time budget.</strong> About 5 seconds locally (2026-10-16), most of it the two bit64 processes.</li>
 </ul></div>
 <div class="section level2">
 <h2 id="definition-of-done">Definition of done<a class="anchor" aria-label="anchor" href="#definition-of-done"></a></h2>
