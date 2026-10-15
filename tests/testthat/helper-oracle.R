@@ -1,0 +1,66 @@
+# gmp as the oracle for values (design 12). Every helper skips the calling
+# test when gmp is absent.
+
+zu_all_types <- c("int64", "uint64", "int128", "uint128")
+
+zu_ctor <- function(type) {
+  switch(
+    type,
+    int64 = int64,
+    uint64 = uint64,
+    int128 = int128,
+    uint128 = uint128
+  )
+}
+
+# The representable range of each type, NA sentinel excluded, as bigz.
+oracle_range <- function(type) {
+  testthat::skip_if_not_installed("gmp")
+  two <- gmp::as.bigz(2)
+  switch(
+    type,
+    int64 = list(min = -(two^63 - 1), max = two^63 - 1),
+    uint64 = list(min = gmp::as.bigz(0), max = two^64 - 2),
+    int128 = list(min = -(two^127 - 1), max = two^127 - 1),
+    uint128 = list(min = gmp::as.bigz(0), max = two^128 - 2)
+  )
+}
+
+# 0, +-1, +-(2^53 - 1, 2^53, 2^53 + 1), MIN, MIN + 1, MAX - 1 and MAX, as
+# far as the type reaches, as decimal strings.
+oracle_edges <- function(type) {
+  r <- oracle_range(type)
+  two <- gmp::as.bigz(2)
+  p53 <- c(two^53 - 1, two^53, two^53 + 1)
+  v <- c(gmp::as.bigz(0:1), p53, r$min, r$min + 1, r$max - 1, r$max)
+  if (r$min < 0) {
+    v <- c(v, gmp::as.bigz(-1), -p53)
+  }
+  v <- v[v >= r$min & v <= r$max]
+  unique(as.character(v))
+}
+
+# The values just outside the range, as decimal strings.
+oracle_outside <- function(type) {
+  r <- oracle_range(type)
+  as.character(c(r$min - 1, r$max + 1))
+}
+
+# n random values across the whole range, as decimal strings.
+oracle_random <- function(type, n, seed) {
+  r <- oracle_range(type)
+  bits <- switch(type, int64 = , uint64 = 64, int128 = , uint128 = 128)
+  # urand.bigz() announces its seeding on stdout
+  utils::capture.output(v <- gmp::urand.bigz(n, bits, seed = seed))
+  if (r$min < 0) {
+    v <- v - gmp::as.bigz(2)^(bits - 1)
+  }
+  v <- v[v >= r$min & v <= r$max]
+  as.character(v)
+}
+
+oracle_fits <- function(type, values) {
+  r <- oracle_range(type)
+  v <- gmp::as.bigz(values)
+  v >= r$min & v <= r$max
+}
