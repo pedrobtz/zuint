@@ -1,49 +1,62 @@
-# Source kinds for zu_cast_c(); positive values are type codes.
-zu_from_int <- 0L
-zu_from_dbl <- -1L
-zu_from_chr <- -2L
+# Operand kinds, shared with the C code: 1 to 4 are the type codes, the rest
+# are bare base vectors. NA is anything zuint does not convert.
+zu_kind_int <- 0L
+zu_kind_dbl <- -1L
+zu_kind_chr <- -2L
+
+zu_kind <- function(x) {
+  code <- zu_code(x)
+  if (!is.na(code)) {
+    return(code)
+  }
+  if (is.null(x)) {
+    return(zu_kind_int)
+  }
+  if (is.object(x) || !is.atomic(x)) {
+    return(NA_integer_)
+  }
+  switch(
+    typeof(x),
+    logical = ,
+    integer = zu_kind_int,
+    double = zu_kind_dbl,
+    character = zu_kind_chr,
+    NA_integer_
+  )
+}
+
+zu_kind_label <- function(x) {
+  if (is.object(x)) paste0("<", paste(class(x), collapse = "/"), ">") else paste("a", typeof(x), "vector")
+}
+
+# x, of kind `kind`, as a bare payload of type `code`, and how many values
+# were lost to NA.
+zu_convert <- function(x, kind, code) {
+  if (kind == code) {
+    return(list(zu_bare(x), 0))
+  }
+  if (is.null(x)) {
+    x <- integer()
+  }
+  .Call(zu_cast_c, zu_bare(x), kind, code)
+}
 
 # x as zuint type `code`, names kept. Lost values warn, reported against
 # `call`.
 zu_cast <- function(x, code, call = sys.call(-1L)) {
-  from <- zu_code(x)
-  if (!is.na(from)) {
-    if (from == code) {
-      # the same type, or a bit64 integer64 for int64: only the class changes
-      return(zu_new(x, code))
-    }
-  } else if (is.null(x)) {
-    x <- integer()
-    from <- zu_from_int
-  } else if (is.object(x) || !is.atomic(x)) {
+  kind <- zu_kind(x)
+  if (is.na(kind)) {
     zu_abort(
-      sprintf(
-        "Can't convert an object of class <%s> to %s.",
-        paste(class(x), collapse = "/"),
-        zu_types[[code]]
-      ),
+      sprintf("Can't convert %s to %s.", zu_kind_label(x), zu_types[[code]]),
       "type",
       call = call
     )
-  } else {
-    from <- switch(
-      typeof(x),
-      logical = ,
-      integer = zu_from_int,
-      double = zu_from_dbl,
-      character = zu_from_chr,
-      zu_abort(
-        sprintf(
-          "Can't convert a %s vector to %s.",
-          typeof(x),
-          zu_types[[code]]
-        ),
-        "type",
-        call = call
-      )
-    )
   }
-  res <- .Call(zu_cast_c, zu_bare(x), from, code)
+  if (kind == code) {
+    # the same type, or a bit64 integer64 for int64: only the class changes
+    return(zu_new(x, code))
+  }
+  res <- zu_convert(x, kind, code)
   zu_warn_lost(res[[2L]], zu_types[[code]], call = call)
   out <- res[[1L]]
   names(out) <- names(x)
