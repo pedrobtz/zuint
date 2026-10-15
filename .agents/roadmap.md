@@ -22,7 +22,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 
 | Stage | Title | CI | Issue | Pull request | Done |
 | --- | --- | --- | --- | --- | --- |
-| 0 | [Package identity](#stage-0--package-identity) | quick | [#2](https://github.com/pedrobtz/zuint/issues/2) | | 2026-10-16 |
+| 0 | [Package identity](#stage-0--package-identity) | quick | [#2](https://github.com/pedrobtz/zuint/issues/2) | [#15](https://github.com/pedrobtz/zuint/pull/15) | 2026-10-16 |
 | 1 | [Storage and construction](#stage-1--storage-and-construction) | full — first compiled code | [#3](https://github.com/pedrobtz/zuint/issues/3) | | |
 | 2 | [Arithmetic and the promotion order](#stage-2--arithmetic-and-the-promotion-order) | quick | [#4](https://github.com/pedrobtz/zuint/issues/4) | | |
 | 3 | [Parsing, formatting and bit operations](#stage-3--parsing-formatting-and-bit-operations) | quick | [#5](https://github.com/pedrobtz/zuint/issues/5) | | |
