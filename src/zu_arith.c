@@ -123,14 +123,21 @@ SEXP zu_arith_c(SEXP op_, SEXP x, SEXP kx_, SEXP y, SEXP ky_, SEXP type_, SEXP p
             sb = zu_raw128(y, ky, t, pol, iy, &b);
             if (sa == ZU_RAW_NA || sb == ZU_RAW_NA) zu_set_na(out, t, i);
             else if (sa == ZU_RAW_LOST || sb == ZU_RAW_LOST) { zu_set_na(out, t, i); ovf++; }
-            else ovf += zu_store128(COMPLEX(out), i, zu_op128(op, t, a, b, &r), r, t, pol);
+            else {
+                /* status first: r must be written before it is read */
+                zu_status s = zu_op128(op, t, a, b, &r);
+                ovf += zu_store128(COMPLEX(out), i, s, r, t, pol);
+            }
         } else {
             uint64_t a, b, r;
             sa = zu_raw64(x, kx, t, pol, ix, &a);
             sb = zu_raw64(y, ky, t, pol, iy, &b);
             if (sa == ZU_RAW_NA || sb == ZU_RAW_NA) zu_set_na(out, t, i);
             else if (sa == ZU_RAW_LOST || sb == ZU_RAW_LOST) { zu_set_na(out, t, i); ovf++; }
-            else ovf += zu_store64(REAL(out), i, zu_op64(op, t, a, b, &r), r, t, pol);
+            else {
+                zu_status s = zu_op64(op, t, a, b, &r);
+                ovf += zu_store64(REAL(out), i, s, r, t, pol);
+            }
         }
         if (++ix == nx) ix = 0;
         if (++iy == ny) iy = 0;
