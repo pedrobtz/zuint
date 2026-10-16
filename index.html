@@ -51,22 +51,145 @@
 </h1></div>
 <!-- badges: start -->
 
-<p>The goal of zuint is to …</p>
+<div class="section level2">
+<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
+</h2>
+<p>R has 32-bit integers and doubles, and a double is exact only up to 2<sup>53</sup>. Databases and data files have more: Arrow and Parquet have signed and unsigned 64-bit integers, and DuckDB adds 128-bit ones. Read into R, an unsigned ID or a <code>HUGEINT</code> becomes a double and quietly loses its low digits, and writing it back loses the column’s type as well.</p>
+<p>zuint gives R the four integer types those engines use, <code>int64</code>, <code>uint64</code>, <code>int128</code> and <code>uint128</code>, and moves them in and out of Arrow, Parquet and DuckDB with every value and every column type intact.</p>
+<ul>
+<li>
+<strong>Exact or explicit.</strong> A result is exact, or it is <code>NA</code> with a warning, or an error. Nothing is rounded, truncated or clamped without saying so, and nothing is compared through a double.</li>
+<li>
+<strong>Overflow is a choice.</strong> Operators give <code>NA</code> with a warning, as R’s integers do; <code>checked_*()</code> functions raise an error and <code>wrapping_*()</code> functions compute modulo 2<sup>64</sup> or 2<sup>128</sup>.</li>
+<li>
+<strong>Types mix without loss.</strong> Combining two types gives the smallest type that holds both, so <code>int64</code> and <code>uint64</code> meet in <code>int128</code>; where there is no such type, it is an error.</li>
+<li>
+<strong>Compatible with bit64.</strong> <code>int64</code> is a bit64 <code>integer64</code> underneath, so data.table, arrow, duckdb and the database drivers read it as they read <code>integer64</code>.</li>
+<li>
+<strong>One bridge to the engines.</strong> Data moves through the <a href="https://arrow.apache.org/docs/format/CDataInterface.html" class="external-link">Arrow C Data Interface</a>, in C, with no R package in between; nanoarrow, arrow and duckdb are only needed for their own conveniences.</li>
+</ul>
+<table class="table">
+<colgroup>
+<col width="33%">
+<col width="33%">
+<col width="33%">
+</colgroup>
+<thead><tr>
+<th>Engine type</th>
+<th>R today</th>
+<th>zuint</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Arrow <code>int64</code>, DuckDB <code>BIGINT</code>
+</td>
+<td>a double by default, or bit64 <code>integer64</code>
+</td>
+<td><code>int64</code></td>
+</tr>
+<tr>
+<td>Arrow <code>uint64</code>, DuckDB <code>UBIGINT</code>
+</td>
+<td>a double, rounded beyond 2<sup>53</sup>
+</td>
+<td><code>uint64</code></td>
+</tr>
+<tr>
+<td>DuckDB <code>HUGEINT</code>
+</td>
+<td>a double</td>
+<td><code>int128</code></td>
+</tr>
+<tr>
+<td>DuckDB <code>UHUGEINT</code>
+</td>
+<td>a double</td>
+<td><code>uint128</code></td>
+</tr>
+</tbody>
+</table>
+</div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>You can install the development version of zuint from <a href="https://github.com/" class="external-link">GitHub</a> with:</p>
+<p>zuint is not on CRAN yet. Install the development version from GitHub:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"pedrobtz/zuint"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
+<h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
 </h2>
-<p>This is a basic example which shows you how to solve a common problem:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://pedrobtz.github.io/zuint/">zuint</a></span><span class="op">)</span></span>
-<span><span class="co">## basic example code</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://pedrobtz.github.io/zuint/">zuint</a></span><span class="op">)</span></span></code></pre></div>
+<p>A number beyond 2<sup>53</sup> is exact, where a double has already rounded it:</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/zuint-types.html">uint64</a></span><span class="op">(</span><span class="st">"18446744073709551614"</span><span class="op">)</span></span>
+<span><span class="va">x</span></span>
+<span><span class="co">#&gt; &lt;uint64[1]&gt;</span></span>
+<span><span class="co">#&gt; [1] 18446744073709551614</span></span>
+<span><span class="va">x</span> <span class="op">-</span> <span class="fl">1L</span></span>
+<span><span class="co">#&gt; &lt;uint64[1]&gt;</span></span>
+<span><span class="co">#&gt; [1] 18446744073709551613</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%.0f"</span>, <span class="fl">18446744073709551614</span> <span class="op">-</span> <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "18446744073709551616"</span></span></code></pre></div>
+<p>An out-of-range result is <code>NA</code> with a warning, unless you choose another overflow policy:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">big</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/zuint-types.html">int64</a></span><span class="op">(</span><span class="st">"9223372036854775807"</span><span class="op">)</span></span>
+<span><span class="va">big</span> <span class="op">+</span> <span class="fl">1L</span></span>
+<span><span class="co">#&gt; Warning in Ops.zu_int64(big, 1L): 1 result is out of range. NA produced.</span></span>
+<span><span class="co">#&gt; &lt;int64[1]&gt;</span></span>
+<span><span class="co">#&gt; [1] NA</span></span>
+<span><span class="kw"><a href="https://rdrr.io/r/base/try.html" class="external-link">try</a></span><span class="op">(</span><span class="fu"><a href="reference/zuint-arith.html">checked_add</a></span><span class="op">(</span><span class="va">big</span>, <span class="fl">1L</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Error in checked_add(big, 1L) : 1 result is out of range.</span></span>
+<span><span class="fu"><a href="reference/zuint-arith.html">wrapping_mul</a></span><span class="op">(</span><span class="va">x</span>, <span class="fl">31L</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;uint64[1]&gt;</span></span>
+<span><span class="co">#&gt; [1] 18446744073709551554</span></span></code></pre></div>
+<p>Mixing types never loses a value: an <code>int64</code> and a <code>uint64</code> give an <code>int128</code>, and a product too large for <code>int64</code> fits in <code>int128</code>:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/zuint-types.html">int64</a></span><span class="op">(</span><span class="op">-</span><span class="fl">1</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="reference/zuint-types.html">uint64</a></span><span class="op">(</span><span class="st">"18446744073709551614"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;int128[1]&gt;</span></span>
+<span><span class="co">#&gt; [1] 18446744073709551613</span></span>
+<span><span class="fu"><a href="reference/zuint-types.html">int128</a></span><span class="op">(</span><span class="va">big</span><span class="op">)</span> <span class="op">*</span> <span class="fl">4L</span></span>
+<span><span class="co">#&gt; &lt;int128[1]&gt;</span></span>
+<span><span class="co">#&gt; [1] 36893488147419103228</span></span></code></pre></div>
+<p>Values come out of DuckDB as they are stored, and go back with their types. Here a <code>UHUGEINT</code> near the top of its range makes the round trip:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">con</span> <span class="op">&lt;-</span> <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbConnect.html" class="external-link">dbConnect</a></span><span class="op">(</span><span class="fu">duckdb</span><span class="fu">::</span><span class="fu"><a href="https://r.duckdb.org/reference/duckdb.html" class="external-link">duckdb</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="va">ids</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/zu_duckdb_query.html">zu_duckdb_query</a></span><span class="op">(</span></span>
+<span>  <span class="va">con</span>,</span>
+<span>  <span class="st">"SELECT 340282366920938463463374607431768211454::UHUGEINT AS id"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="va">ids</span><span class="op">$</span><span class="va">id</span></span>
+<span><span class="co">#&gt; &lt;uint128[1]&gt;</span></span>
+<span><span class="co">#&gt; [1] 340282366920938463463374607431768211454</span></span>
+<span></span>
+<span><span class="fu"><a href="reference/zu_duckdb_query.html">zu_duckdb_register</a></span><span class="op">(</span><span class="va">con</span>, <span class="st">"ids_back"</span>, <span class="va">ids</span><span class="op">)</span></span>
+<span><span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbGetQuery.html" class="external-link">dbGetQuery</a></span><span class="op">(</span><span class="va">con</span>, <span class="st">"SELECT typeof(id) AS type, id::VARCHAR AS id FROM ids_back"</span><span class="op">)</span></span>
+<span><span class="co">#&gt;       type                                      id</span></span>
+<span><span class="co">#&gt; 1 UHUGEINT 340282366920938463463374607431768211454</span></span>
+<span><span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbDisconnect.html" class="external-link">dbDisconnect</a></span><span class="op">(</span><span class="va">con</span><span class="op">)</span></span></code></pre></div>
+<p>Text goes both ways in decimal, hexadecimal and binary:</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/format_hex.html">format_hex</a></span><span class="op">(</span><span class="fu"><a href="reference/zuint-types.html">uint64</a></span><span class="op">(</span><span class="st">"0xdead_beef"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "0xdeadbeef"</span></span>
+<span><span class="fu"><a href="reference/format_hex.html">format_bin</a></span><span class="op">(</span><span class="fu"><a href="reference/zuint-types.html">int64</a></span><span class="op">(</span><span class="op">-</span><span class="fl">5</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "-0b101"</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/format.html" class="external-link">format</a></span><span class="op">(</span><span class="fu"><a href="reference/zuint-types.html">int64</a></span><span class="op">(</span><span class="fl">1234567890123</span><span class="op">)</span>, big.mark <span class="op">=</span> <span class="st">","</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "1,234,567,890,123"</span></span></code></pre></div>
+<p>The constructors are named after the types, and every conversion into a type, from a double, a string or another type, follows the same rule: exact, or <code>NA</code> with a warning.</p>
+</div>
+<div class="section level2">
+<h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
+</h2>
+<ul>
+<li>The <a href="https://pedrobtz.github.io/zuint/reference/">reference index</a> lists every function, with the type ranges in <code><a href="reference/zuint-types.html">?int64</a></code>, the overflow policies in <code><a href="reference/zuint-arith.html">?checked_add</a></code> and the Arrow bridge in <code><a href="reference/zuint-arrow.html">?zu_from_arrow</a></code>.</li>
+</ul>
+</div>
+<div class="section level2">
+<h2 id="related-work">Related work<a class="anchor" aria-label="anchor" href="#related-work"></a>
+</h2>
+<p><a href="https://CRAN.R-project.org/package=bit64" class="external-link">bit64</a> gave R its 64-bit integers and the <code>integer64</code> layout that zuint’s <code>int64</code> keeps. The 128-bit arithmetic, parsing and formatting come from <a href="https://github.com/pedrobtz/zufast" class="external-link">zufast</a>. Arrow arrays move through the Arrow C Data Interface, and the 128-bit types through DuckDB’s <code>arrow.opaque</code> extension types. The tests check values against <a href="https://CRAN.R-project.org/package=gmp" class="external-link">gmp</a>.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
@@ -104,6 +227,7 @@
 <div class="dev-status">
 <h2 data-toc-skip>Dev status</h2>
 <ul class="list-unstyled">
+<li><a href="https://lifecycle.r-lib.org/articles/stages.html#experimental" class="external-link"><img src="https://img.shields.io/badge/lifecycle-experimental-orange.svg" alt="Lifecycle: experimental"></a></li>
 <li><a href="https://github.com/pedrobtz/zuint/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/pedrobtz/zuint/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
 <li><a href="https://github.com/pedrobtz/zuint/actions/workflows/coverage.yaml" class="external-link"><img src="https://raw.githubusercontent.com/pedrobtz/zuint/gh-pages/badges/coverage.svg" alt="coverage"></a></li>
 </ul>

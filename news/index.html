@@ -55,6 +55,12 @@
 <li>
 <code><a href="../reference/zuint-arrow.html">zu_from_arrow()</a></code> and <code><a href="../reference/zuint-arrow.html">zu_to_arrow()</a></code> convert through the Arrow C Data Interface with no R package in between: <code>int64</code>, <code>uint64</code>, DuckDB’s <code>arrow.opaque</code> <code>hugeint</code>/<code>uhugeint</code>, and <code>decimal128(p, 0)</code>. <code><a href="../reference/zuint-arrow.html">zu_sentinel_check()</a></code> counts engine values that would import as <code>NA</code>.</li>
 <li>With nanoarrow installed, <code>nanoarrow::convert_array(array, int64())</code> and the other prototypes import through the bridge, and <code><a href="https://arrow.apache.org/nanoarrow/latest/r/reference/as_nanoarrow_array.html" class="external-link">nanoarrow::as_nanoarrow_array()</a></code> exports zuint vectors.</li>
+<li>
+<code><a href="../reference/zu_duckdb_query.html">zu_duckdb_query()</a></code> reads DuckDB results with <code>BIGINT</code>, <code>UBIGINT</code>, <code>HUGEINT</code> and <code>UHUGEINT</code> columns as zuint vectors, exactly, and <code><a href="../reference/zu_duckdb_query.html">zu_duckdb_register()</a></code> writes them back with their types.</li>
+<li>
+<code><a href="../reference/zu_arrow_table.html">zu_arrow_table()</a></code> and <code><a href="../reference/zu_arrow_table.html">zu_from_arrow_table()</a></code> carry zuint columns through Arrow Tables, and so through Parquet files. With arrow loaded, <code><a href="https://arrow.apache.org/docs/r/reference/as_arrow_array.html" class="external-link">arrow::as_arrow_array()</a></code> and <code><a href="https://arrow.apache.org/docs/r/reference/infer_type.html" class="external-link">arrow::infer_type()</a></code> work for <code>int64</code> and <code>uint64</code>.</li>
+<li>
+<code><a href="../reference/as_integer64.html">as_integer64()</a></code> returns a plain bit64 <code>integer64</code>.</li>
 </ul></div>
   </main></div>
 

@@ -98,6 +98,8 @@
 <li>
 <a href="src/zu_arrow.c"><code>src/zu_arrow.c</code></a> is the Arrow C Data Interface bridge, and <a href="R/arrow.R"><code>R/arrow.R</code></a> its R surface. <a href="R/nanoarrow.R"><code>R/nanoarrow.R</code></a> holds the nanoarrow methods, which <a href="R/zzz.R"><code>R/zzz.R</code></a> registers when nanoarrow loads; nothing else touches a Suggests package.</li>
 <li>
+<a href="R/engines.R"><code>R/engines.R</code></a> is the engine glue: <code><a href="reference/as_integer64.html">as_integer64()</a></code>, <code><a href="reference/zu_duckdb_query.html">zu_duckdb_query()</a></code> and <code><a href="reference/zu_duckdb_query.html">zu_duckdb_register()</a></code>, <code><a href="reference/zu_arrow_table.html">zu_arrow_table()</a></code> and <code><a href="reference/zu_arrow_table.html">zu_from_arrow_table()</a></code>, and the arrow methods <code>R/zzz.R</code> registers when arrow loads. Each function checks for the Suggests packages it needs.</li>
+<li>
 <a href="R/types.R"><code>R/types.R</code></a> has the constructors, the <code>NA_*_</code> constants and <code><a href="reference/zu_storage.html">zu_storage()</a></code>; <a href="R/cast.R"><code>R/cast.R</code></a> is the one conversion path every method uses; <a href="R/conditions.R"><code>R/conditions.R</code></a> lists the condition classes.</li>
 <li>
 <a href="R/vector.R"><code>R/vector.R</code></a> holds the base vector methods, written once and registered for all four classes from the <code>zu_methods</code> table through <code>@evalNamespace</code>. To add a method, add it to that table.</li>
@@ -127,6 +129,8 @@
 <li><p><strong>An exported Arrow struct must never call into R.</strong> A consumer may call <code>release</code> from any thread, so <code>zu_to_arrow_c()</code> allocates the structs and buffers with <code>malloc</code>, and the release callbacks only <code>free</code>.</p></li>
 <li><p><strong>Import borrows; it never releases the caller’s structs.</strong> The struct owner (nanoarrow, an engine) releases them. Our own exported structs are released by their external pointer’s finalizer unless a consumer moved them out, which sets <code>release</code> to NULL; <code>test-arrow.R</code> counts the calls.</p></li>
 <li><p><strong>A decimal128 imports as its bits, with no 38-digit range check.</strong> DuckDB’s default export writes HUGEINT values beyond 38 digits that way.</p></li>
+<li><p><strong>arrow 24.0.0 aborts R on the <code>arrow.opaque</code> type as an R object.</strong> <code><a href="https://arrow.apache.org/docs/r/reference/as_arrow_array.html" class="external-link">arrow::as_arrow_array()</a></code>, <code>infer_type()</code> and <code>as_data_type()</code> crash on it, with or without zuint. So the arrow methods exist for int64 and uint64 only (the 128-bit ones raise <code>zuint_unsupported_error</code>), and tables go through nanoarrow (<code><a href="reference/zu_arrow_table.html">zu_arrow_table()</a></code>), which never makes that R object.</p></li>
+<li><p><strong>Register an Arrow Table with DuckDB, not a record batch reader.</strong> A registered reader is consumed by the first query and is empty after.</p></li>
 <li><p><strong>Native routines are called through their registered symbols.</strong> <code>init.c</code> calls <code>R_forceSymbols()</code>, so <code>.Call("name", ...)</code> with a string fails; use the symbol <code>useDynLib(.registration = TRUE)</code> defines.</p></li>
 </ul><p>Add each new one when a stage establishes it.</p>
 </div>
@@ -147,7 +151,9 @@
 <li>
 <strong>Helpers live in <code>tests/testthat/helper-*.R</code>.</strong> <code>helper-oracle.R</code> gives each type’s range, edge values, out-of-range values and random fills, computed with gmp (and skips without it). <code>helper-bit64.R</code> runs a string of R code in two fresh Rscript processes, one with bit64 attached and one where it never loaded, because S3 methods stay registered once a namespace has loaded; it skips on CRAN.</li>
 <li>
-<strong>Keep the suite inside the CRAN time budget.</strong> About 5 seconds locally (2026-10-16), most of it the two bit64 processes.</li>
+<strong>The round-trip matrix is <code>test-roundtrip.R</code></strong> (design §12): DuckDB, Arrow and Parquet paths for BIGINT, UBIGINT, HUGEINT and UHUGEINT, with the values of <code>matrix_values()</code> in <code>helper-arrow.R</code>. It skips without duckdb, DBI, arrow and nanoarrow; CI installs them.</li>
+<li>
+<strong>Keep the suite inside the CRAN time budget.</strong> About 10 seconds locally (2026-10-16), most of it the bit64 processes and DuckDB.</li>
 </ul></div>
 <div class="section level2">
 <h2 id="definition-of-done">Definition of done<a class="anchor" aria-label="anchor" href="#definition-of-done"></a></h2>
@@ -179,7 +185,8 @@
 <div class="section level2">
 <h2 id="continuous-integration">Continuous integration<a class="anchor" aria-label="anchor" href="#continuous-integration"></a></h2>
 <p>Workflows come from <code>pedrobtz/r-actions</code>. Call those reusable workflows instead of writing bespoke ones, and pin a released tag rather than <code>main</code>. Pin a workflow that holds a write token, such as <code>coverage.yml</code>, to a commit, with the tag in a comment. The <code>R-CMD-check</code> workflow must call <code>r-cmd-check.yml</code>, because a hand-rolled one does not count as the pre-submission check.</p>
-<p>This package calls <code>r-cmd-check.yml@v1</code> with <code>nosuggests</code> and <code>nold</code> on (from <code>R-CMD-check.yaml</code>); <code>valgrind.yml</code>, <code>lto.yml</code>, <code>gctorture.yml</code>, <code>rchk.yml</code>, <code>analyzers.yml</code> and <code>cran-special.yml</code> (from <code>native-checks.yml</code>); and <code>coverage.yml</code>, pinned to the v1 commit, with its badge on <code>gh-pages</code> because <code>main</code> takes no direct pushes (from <code>coverage.yaml</code>). <code>pkgdown.yaml</code> is the r-lib example workflow, not a shared one; its deploy uses <code>force: false</code> so it cannot overwrite a badge commit. <code>sanitizers.yml</code> with <code>asan: true</code> joins in Stage 1. Until zufast 0.1.1 is on CRAN, <code>rchk.yml</code> installs it through <code>github-packages</code>.</p>
+<p>This package calls <code>r-cmd-check.yml@v1</code> with <code>nosuggests</code> and <code>nold</code> on (from <code>R-CMD-check.yaml</code>); <code>valgrind.yml</code>, <code>lto.yml</code>, <code>gctorture.yml</code>, <code>rchk.yml</code>, <code>analyzers.yml</code> and <code>cran-special.yml</code> (from <code>native-checks.yml</code>); and <code>coverage.yml</code>, pinned to the v1 commit, with its badge on <code>gh-pages</code> because <code>main</code> takes no direct pushes (from <code>coverage.yaml</code>). <code>pkgdown.yaml</code> is the r-lib example workflow, not a shared one; its deploy uses <code>force: false</code> so it cannot overwrite a badge commit. Until zufast 0.1.1 is on CRAN, <code>rchk.yml</code> installs it through <code>github-packages</code>.</p>
+<p>The engine Suggests (arrow, duckdb) have no R-devel binaries, and building them from source takes about half an hour. So the quick profile runs UBSan on R-release and no container; the full profile keeps CRAN’s R-devel flavours, and pays that cost when the dependency cache is cold.</p>
 <p>Small edits get a small run. The shared workflows look at the files a pull request changes, compared with its merge base:</p>
 <ul><li>
 <strong>Markdown only</strong>, such as <code>README.md</code>, <code>NEWS.md</code> or <code>cran-comments.md</code>, skips every check. Only coverage and the pkgdown site run.</li>

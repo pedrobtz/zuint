@@ -2,11 +2,19 @@
 
 ## All functions
 
+- [`as_integer64()`](https://pedrobtz.github.io/zuint/reference/as_integer64.md)
+  : Convert to bit64's integer64
 - [`format_hex()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
   [`format_bin()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
   : Hexadecimal and binary text
+- [`zu_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)
+  [`zu_from_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)
+  : Arrow tables with zuint columns
 - [`zu_common_type()`](https://pedrobtz.github.io/zuint/reference/zu_common_type.md)
   : The common type of zuint vectors
+- [`zu_duckdb_query()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
+  [`zu_duckdb_register()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
+  : Query DuckDB into zuint columns
 - [`zu_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
   [`zu_from_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
   : Raw storage of a zuint vector

@@ -145,6 +145,17 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   holds the nanoarrow methods, which
   [`R/zzz.R`](https://pedrobtz.github.io/zuint/R/zzz.R) registers when
   nanoarrow loads; nothing else touches a Suggests package.
+- [`R/engines.R`](https://pedrobtz.github.io/zuint/R/engines.R) is the
+  engine glue:
+  [`as_integer64()`](https://pedrobtz.github.io/zuint/reference/as_integer64.md),
+  [`zu_duckdb_query()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
+  and
+  [`zu_duckdb_register()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md),
+  [`zu_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)
+  and
+  [`zu_from_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md),
+  and the arrow methods `R/zzz.R` registers when arrow loads. Each
+  function checks for the Suggests packages it needs.
 - [`R/types.R`](https://pedrobtz.github.io/zuint/R/types.R) has the
   constructors, the `NA_*_` constants and
   [`zu_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md);
@@ -266,6 +277,18 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   DuckDB’s default export writes HUGEINT values beyond 38 digits that
   way.
 
+- **arrow 24.0.0 aborts R on the `arrow.opaque` type as an R object.**
+  [`arrow::as_arrow_array()`](https://arrow.apache.org/docs/r/reference/as_arrow_array.html),
+  `infer_type()` and `as_data_type()` crash on it, with or without
+  zuint. So the arrow methods exist for int64 and uint64 only (the
+  128-bit ones raise `zuint_unsupported_error`), and tables go through
+  nanoarrow
+  ([`zu_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)),
+  which never makes that R object.
+
+- **Register an Arrow Table with DuckDB, not a record batch reader.** A
+  registered reader is consumed by the first query and is empty after.
+
 - **Native routines are called through their registered symbols.**
   `init.c` calls `R_forceSymbols()`, so `.Call("name", ...)` with a
   string fails; use the symbol `useDynLib(.registration = TRUE)`
@@ -302,8 +325,12 @@ Add each new one when a stage establishes it.
   a string of R code in two fresh Rscript processes, one with bit64
   attached and one where it never loaded, because S3 methods stay
   registered once a namespace has loaded; it skips on CRAN.
-- **Keep the suite inside the CRAN time budget.** About 5 seconds
-  locally (2026-10-16), most of it the two bit64 processes.
+- **The round-trip matrix is `test-roundtrip.R`** (design §12): DuckDB,
+  Arrow and Parquet paths for BIGINT, UBIGINT, HUGEINT and UHUGEINT,
+  with the values of `matrix_values()` in `helper-arrow.R`. It skips
+  without duckdb, DBI, arrow and nanoarrow; CI installs them.
+- **Keep the suite inside the CRAN time budget.** About 10 seconds
+  locally (2026-10-16), most of it the bit64 processes and DuckDB.
 
 ## Definition of done
 
@@ -364,9 +391,13 @@ This package calls `r-cmd-check.yml@v1` with `nosuggests` and `nold` on
 its badge on `gh-pages` because `main` takes no direct pushes (from
 `coverage.yaml`). `pkgdown.yaml` is the r-lib example workflow, not a
 shared one; its deploy uses `force: false` so it cannot overwrite a
-badge commit. `sanitizers.yml` with `asan: true` joins in Stage 1. Until
-zufast 0.1.1 is on CRAN, `rchk.yml` installs it through
-`github-packages`.
+badge commit. Until zufast 0.1.1 is on CRAN, `rchk.yml` installs it
+through `github-packages`.
+
+The engine Suggests (arrow, duckdb) have no R-devel binaries, and
+building them from source takes about half an hour. So the quick profile
+runs UBSan on R-release and no container; the full profile keeps CRAN’s
+R-devel flavours, and pays that cost when the dependency cache is cold.
 
 Small edits get a small run. The shared workflows look at the files a
 pull request changes, compared with its merge base:

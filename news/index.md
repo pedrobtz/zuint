@@ -95,3 +95,19 @@
   and the other prototypes import through the bridge, and
   [`nanoarrow::as_nanoarrow_array()`](https://arrow.apache.org/nanoarrow/latest/r/reference/as_nanoarrow_array.html)
   exports zuint vectors.
+- [`zu_duckdb_query()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
+  reads DuckDB results with `BIGINT`, `UBIGINT`, `HUGEINT` and
+  `UHUGEINT` columns as zuint vectors, exactly, and
+  [`zu_duckdb_register()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
+  writes them back with their types.
+- [`zu_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)
+  and
+  [`zu_from_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)
+  carry zuint columns through Arrow Tables, and so through Parquet
+  files. With arrow loaded,
+  [`arrow::as_arrow_array()`](https://arrow.apache.org/docs/r/reference/as_arrow_array.html)
+  and
+  [`arrow::infer_type()`](https://arrow.apache.org/docs/r/reference/infer_type.html)
+  work for `int64` and `uint64`.
+- [`as_integer64()`](https://pedrobtz.github.io/zuint/reference/as_integer64.md)
+  returns a plain bit64 `integer64`.
