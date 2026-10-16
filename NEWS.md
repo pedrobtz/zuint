@@ -60,3 +60,9 @@
   `min()`, `max()` and `range()` are exact; `mean()` and `median()` are
   doubles from the exact values; `diff()` and `seq_zu()`.
 * `summary()` adds the median and the mean.
+* With vctrs, dplyr and tibble: zuint columns combine by the promotion order,
+  cast exactly, arrange, group, summarise, bind and print. data.table keys
+  on `int64` natively.
+* `zu_ifelse()` and `zu_vapply()` keep the type where `ifelse()` and
+  `vapply()` would read raw bits.
+* A getting-started vignette, and benchmarks against bit64 in the README.
