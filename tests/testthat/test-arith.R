@@ -228,7 +228,7 @@ test_that("abs and sign stay in the type; other Math functions use doubles", {
   }
   expect_identical(sqrt(int64(16)), 4)
   expect_warning(log(int64("9007199254740993")), class = "zuint_precision_warning")
-  expect_error(cumsum(int64(1:3)), class = "zuint_unsupported_error")
+  expect_identical(cumsum(int64(1:3)), int64(c(1, 3, 6)))
 })
 
 test_that("!, & and | work on the logical values", {

@@ -33,6 +33,10 @@
     Output
                                           Min. 
       -170141183460469231731687303715884105727 
+                                        Median 
+                         -8.50705917302346e+37 
+                                          Mean 
+                         -8.50705917302346e+37 
                                           Max. 
                                              5 
                                           NA's 
@@ -40,6 +44,6 @@
     Code
       summary(uint64(1:3))
     Output
-      Min. Max. 
-         1    3 
+        Min. Median   Mean   Max. 
+           1      2      2      3 
 

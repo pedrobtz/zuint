@@ -173,3 +173,25 @@ oracle_bitop <- function(a, b, f) {
   y <- strsplit(b, "")
   vapply(seq_along(x), function(i) paste(f(x[[i]], y[[i]]), collapse = ""), character(1))
 }
+
+# Fixed-width keys whose string order is numeric order, for an exact
+# reference order of decimal strings (NA stays NA).
+oracle_keys <- function(v) {
+  b <- gmp::as.bigz(v)
+  shifted <- b + gmp::as.bigz(2)^128
+  out <- formatC(as.character(shifted), width = 45, flag = " ")
+  out <- gsub(" ", "0", out)
+  out[is.na(b)] <- NA_character_
+  out
+}
+
+# Values whose 128-bit words collide: pairs sharing the low word or the
+# high word.
+oracle_collisions <- function(type) {
+  two64 <- gmp::as.bigz(2)^64
+  lows <- gmp::as.bigz(c("1", "12345", "18446744073709551614"))
+  highs <- gmp::as.bigz(c("0", "1", "7", "123456789"))
+  v <- as.character(c(outer(seq_along(highs), seq_along(lows), function(i, j) as.character(highs[i] * two64 + lows[j]))))
+  v <- v[oracle_fits(type, v)]
+  c(v, rev(v), v[1:3])
+}

@@ -102,7 +102,7 @@ SEXP zu_cast_c(SEXP x, SEXP from_, SEXP to_)
 }
 
 /* The magnitude rounded to the nearest double, ties to even. */
-static double zu_mag_to_double(zuf_u128 m)
+double zu_mag_to_double(zuf_u128 m)
 {
     uint64_t high = zuf_u128_high(m), low = zuf_u128_low(m);
     unsigned k;

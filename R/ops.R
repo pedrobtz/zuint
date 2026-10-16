@@ -49,11 +49,14 @@ zu_math <- function(x, ...) {
     cumsum = ,
     cumprod = ,
     cummax = ,
-    cummin = zu_abort(
-      sprintf("%s() for zuint vectors is not implemented yet.", .Generic),
-      "unsupported",
-      call = sys.call()
-    ),
+    cummin = {
+      what <- match(.Generic, c("cumsum", "cumprod", "cummax", "cummin"))
+      res <- .Call(zu_cum_c, zu_bare(x), code, what)
+      zu_report_overflow(res[[2L]], zu_policy_default, sys.call())
+      out <- res[[1L]]
+      names(out) <- names(x)
+      zu_new(out, code)
+    },
     # everything else is a real function: compute it on the doubles
     do.call(.Generic, list(zu_as_double(x), ...))
   )

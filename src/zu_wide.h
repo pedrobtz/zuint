@@ -190,4 +190,7 @@ static inline int zu_val_cmp(zu_val a, zu_val b)
 
 SEXP zu_alloc(zu_type t, R_xlen_t n);
 
+/* A magnitude rounded to the nearest double, ties to even (zu_cast.c). */
+double zu_mag_to_double(zuf_u128 m);
+
 #endif /* ZUINT_WIDE_H */
