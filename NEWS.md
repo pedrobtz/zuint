@@ -43,3 +43,11 @@
 * With nanoarrow installed, `nanoarrow::convert_array(array, int64())` and
   the other prototypes import through the bridge, and
   `nanoarrow::as_nanoarrow_array()` exports zuint vectors.
+* `zu_duckdb_query()` reads DuckDB results with `BIGINT`, `UBIGINT`,
+  `HUGEINT` and `UHUGEINT` columns as zuint vectors, exactly, and
+  `zu_duckdb_register()` writes them back with their types.
+* `zu_arrow_table()` and `zu_from_arrow_table()` carry zuint columns
+  through Arrow Tables, and so through Parquet files. With arrow loaded,
+  `arrow::as_arrow_array()` and `arrow::infer_type()` work for `int64` and
+  `uint64`.
+* `as_integer64()` returns a plain bit64 `integer64`.
