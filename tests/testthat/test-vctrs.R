@@ -40,7 +40,7 @@ test_that("dplyr arranges, groups, summarises and binds every type", {
     expect_identical(dplyr::bind_rows(df, df)$k, c(k, k))
     expect_identical(nrow(dplyr::distinct(df, k)), 3L)
   }
-  expect_error(dplyr::bind_rows(tibble::tibble(x = int128(1)), tibble::tibble(x = uint128(1))))
+  expect_error(dplyr::bind_rows(tibble::tibble(x = int128(1)), tibble::tibble(x = uint128(1))), class = "vctrs_error_ptype2")
 })
 
 test_that("tibbles print exact values with short type names", {
@@ -78,4 +78,34 @@ test_that("zu_ifelse and zu_vapply keep the type", {
   expect_identical(zu_vapply(c(a = 1, b = 2), function(i) i, int64(0)), int64(c(a = 1, b = 2)))
   expect_error(zu_vapply(1:2, function(i) int64(1:2), int64(0)), class = "zuint_type_error")
   expect_error(zu_vapply(1:2, identity, 0), class = "zuint_type_error")
+})
+
+test_that("slots vctrs creates are the type's NA, never R's NA bits", {
+  skip_if_not_installed("vctrs")
+  for (type in zu_all_types) {
+    ctor <- zu_ctor(type)
+    expect_identical(vctrs::vec_init(ctor(), 2), ctor(c(NA, NA)), label = type)
+    expect_identical(vctrs::vec_slice(ctor(c(5, 6)), c(1, NA)), ctor(c(5, NA)))
+    expect_identical(vctrs::vec_c(ctor(1), NA), ctor(c(1, NA)))
+  }
+  # the genuine value whose bits are R's NA_real_ stays a value
+  nan_bits <- int64("9218868437227407266")
+  expect_false(is.na(vctrs::vec_slice(nan_bits, 1)))
+  expect_identical(vctrs::vec_c(nan_bits, NA), int64(c("9218868437227407266", NA)))
+})
+
+test_that("dplyr padding, unmatched joins, lag and if_else give NA", {
+  skip_if_not_installed("dplyr")
+  skip_if_not_installed("tibble")
+  for (type in zu_all_types) {
+    ctor <- zu_ctor(type)
+    padded <- dplyr::bind_rows(tibble::tibble(x = ctor(1)), tibble::tibble(y = 1))$x
+    expect_identical(padded, ctor(c(1, NA)), label = type)
+    a <- tibble::tibble(k = 1:3, v = ctor(c(7, 8, 9)))
+    joined <- dplyr::left_join(tibble::tibble(k = c(1L, 4L)), a, by = "k")
+    expect_identical(joined$v, ctor(c(7, NA)))
+    expect_identical(dplyr::lag(ctor(1:3)), ctor(c(NA, 1, 2)))
+    expect_identical(dplyr::if_else(c(TRUE, NA, FALSE), ctor(1), ctor(2)), ctor(c(1, NA, 2)))
+    expect_identical(dplyr::case_when(c(TRUE, FALSE) ~ ctor(3)), ctor(c(3, NA)))
+  }
 })

@@ -35,9 +35,30 @@ zu_register_pillar <- function(...) {
   }
 }
 
-zu_vec_proxy <- function(x, ...) zu_unclass(x)
+# The proxy is the payload beside a flag that is TRUE for every real row.
+# vctrs fills the slots it creates (vec_init(), padding, unmatched join rows,
+# an NA index) with its own NA in every column; the payload's NA_real_ or
+# NA_complex_ bits are a valid value here, so the flag, which is never NA for
+# a real row, is what says the slot is missing.
+# vctrs takes a data-frame proxy's names from its row names, which cannot
+# hold repeated or empty names, so vctrs operations drop the names of a zuint
+# vector, as they do for vctrs' own records. Every proxy must have the same
+# columns, so names cannot ride along as a column either.
+zu_vec_proxy <- function(x, ...) {
+  structure(
+    list(bits = zu_bare(x), real = rep(TRUE, length(x))),
+    row.names = c(NA, -length(x)),
+    class = "data.frame"
+  )
+}
 
-zu_vec_restore <- function(x, to, ...) zu_new(x, zu_code(to))
+zu_vec_restore <- function(x, to, ...) {
+  code <- zu_code(to)
+  if (!is.data.frame(x)) {
+    return(zu_new(x, code))
+  }
+  zu_new(zu_fill_na(x$bits, code, is.na(x$real)), code)
+}
 
 zu_vec_proxy_pieces <- function(x, ...) {
   cols <- .Call(zu_pieces_c, x, zu_code(x))
