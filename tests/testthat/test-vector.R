@@ -222,3 +222,44 @@ test_that("each class claims mixed Ops calls", {
     expect_true(chooseOpsMethod(x, 1, NULL, NULL, NULL, FALSE))
   }
 })
+
+test_that("is.nan, is.finite and is.infinite read values, not raw bits", {
+  for (type in zu_all_types) {
+    x <- zu_ctor(type)(c(a = "1", b = NA, c = "0"))
+    expect_identical(is.nan(x), c(a = FALSE, b = FALSE, c = FALSE))
+    expect_identical(is.finite(x), c(a = TRUE, b = FALSE, c = TRUE))
+    expect_identical(is.infinite(x), c(a = FALSE, b = FALSE, c = FALSE))
+    expect_true(is.numeric(x))
+  }
+  # -1 is a NaN bit pattern as a double
+  expect_false(is.nan(int64(-1)))
+  expect_true(is.finite(int64(-1)))
+})
+
+test_that("conversions to complex, raw and dates go through the values", {
+  expect_identical(as.complex(int128(c(-5, NA))), c(-5 + 0i, NA))
+  expect_identical(as.raw(uint64(c(5, 255))), as.raw(c(5, 255)))
+  expect_identical(as.Date(int64(1)), as.Date(1))
+  expect_identical(as.POSIXct(int64(0), tz = "UTC"), as.POSIXct(0, tz = "UTC"))
+})
+
+test_that("seq() on a zuint from is seq_zu()", {
+  expect_identical(seq(int64(1), int64(5)), int64(1:5))
+  expect_identical(seq(uint64(2), by = 3L, length.out = 3), uint64(c(2, 5, 8)))
+  expect_identical(seq(int128(4), along.with = 1:3), int128(4:6))
+  expect_error(seq(int64(1), int64(5), length.out = 3), class = "zuint_unsupported_error")
+})
+
+test_that("all.equal compares exactly", {
+  expect_true(all.equal(int64(1:3), int64(1:3)))
+  expect_identical(all.equal(int64(1:3), int64(c(1, 2, 4))), "1 of 3 values differ")
+  expect_identical(all.equal(int64(1), uint64(1)), "Types differ: int64 vs uint64")
+  expect_match(all.equal(int64(1), 1), "target is int64")
+})
+
+test_that("quantile and matrices are unsupported rather than computed on bits", {
+  expect_error(quantile(int64(1:4)), class = "zuint_unsupported_error")
+  expect_error(cbind(int64(1:2), 1:2), class = "zuint_unsupported_error")
+  expect_error(rbind(uint128(1)), class = "zuint_unsupported_error")
+  expect_error(as.matrix(int64(1)), class = "zuint_unsupported_error")
+})

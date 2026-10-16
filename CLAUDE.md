@@ -179,7 +179,14 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   `chooseOpsMethod.integer64()` returning TRUE as well, and R asks the left
   operand first, so `integer64 + zu_int64` runs bit64's (exact) method and
   returns an `integer64`. Changing that would need a method on bare
-  `integer64`, which the rule above forbids.
+  `integer64`, which the rule above forbids. For the wider types bit64 asks
+  `is.numeric()` (TRUE for every zuint type) and then `as.integer64()`,
+  whose zuint methods (`R/bit64.R`, registered when bit64 loads) convert
+  exactly or give NA with a `zuint_cast_warning`; without them bit64
+  converted an int128 operand through double.
+- **`test-bit64-parity.R` diffs bit64's method list against ours.** A base
+  generic bit64 gives an `integer64` method needs a `zu_int64` method, or an
+  entry in that test's allowlist (group generics, functions bit64 masks).
 - **128-bit values cross the Arrow bridge as the `arrow.opaque`
   hugeint/uhugeint extension**, not as `decimal128(38, 0)`: DuckDB reads the
   decimal back as DECIMAL, and the decimal form reads UHUGEINT ≥ 2¹²⁷ as

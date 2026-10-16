@@ -38,7 +38,25 @@ zu_methods <- c(
   anyDuplicated = "zu_any_duplicated",
   mtfrm = "zu_mtfrm",
   diff = "zu_diff",
-  chooseOpsMethod = "zu_choose_ops_method"
+  chooseOpsMethod = "zu_choose_ops_method",
+  # R/bit64.R
+  is.numeric = "zu_is_numeric",
+  is.nan = "zu_is_nan",
+  is.finite = "zu_is_finite",
+  is.infinite = "zu_is_infinite",
+  as.complex = "zu_as_complex",
+  as.raw = "zu_as_raw",
+  as.Date = "zu_as_date",
+  as.POSIXct = "zu_as_posixct",
+  as.POSIXlt = "zu_as_posixlt",
+  seq = "zu_seq",
+  all.equal = "zu_all_equal",
+  quantile = "zu_quantile",
+  cbind = "zu_matrix_unsupported",
+  rbind = "zu_matrix_unsupported",
+  as.matrix = "zu_matrix_unsupported",
+  aperm = "zu_matrix_unsupported",
+  scale = "zu_matrix_unsupported"
 )
 
 # NAMESPACE lines, written by roxygen through @evalNamespace.
