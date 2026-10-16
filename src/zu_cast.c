@@ -1,11 +1,12 @@
 /*
- * zu_cast.c -- construction and conversion (design 8, decimal only).
+ * zu_cast.c -- construction and conversion (design 8).
  *
  * Every entry point that can lose a value returns list(result, n_lost) and
  * leaves the warning to R, which knows the condition classes and the
  * calling function. A lost value becomes NA; it is never clamped.
  */
 #include "zu_wide.h"
+#include "zu_parse.h"
 #include <math.h>
 
 /* Source kinds for zu_cast_c(); positive values are zu_type codes. */
@@ -39,29 +40,21 @@ static zu_val zu_val_from_double(double d, bool *lost)
     return zu_val_na();
 }
 
-/* Decimal digits with an optional leading '-'; the whole string. */
+/* Text through zu_parse(); "NA" and blanks are NA without a loss. */
 static zu_val zu_val_from_string(SEXP s, bool *lost)
 {
-    const char *p, *end;
-    zuf_result r;
+    zu_val v = zu_val_na();
     *lost = false;
-    if (s == NA_STRING) return zu_val_na();
-    p = CHAR(s);
-    end = p + strlen(p);
-    if (p < end && *p == '-') {
-        zuf_i128 v;
-        r = zuf_parse_i128(p, end, &v);
-        if (r.status == ZUF_OK && r.ptr == end) {
-            zuf_u128 b = zuf_u128_from_i128(v);
-            return zu_val_make(true, zu_negate_bits(b));
-        }
-    } else {
-        zuf_u128 v;
-        r = zuf_parse_u128(p, end, &v);
-        if (r.status == ZUF_OK && r.ptr == end) return zu_val_make(false, v);
+    if (s == NA_STRING) return v;
+    switch (zu_parse(CHAR(s), (size_t)LENGTH(s), &v)) {
+    case ZU_PARSE_OK:
+        return v;
+    case ZU_PARSE_NA:
+        return zu_val_na();
+    default:
+        *lost = true;
+        return zu_val_na();
     }
-    *lost = true;
-    return zu_val_na();
 }
 
 SEXP zu_cast_c(SEXP x, SEXP from_, SEXP to_)
@@ -157,25 +150,6 @@ SEXP zu_to_integer_c(SEXP x, SEXP type_)
         p[i] = v.neg ? -(int)zuf_u128_low(v.mag) : (int)zuf_u128_low(v.mag);
     }
     out = zu_pair(out, lost);
-    UNPROTECT(1);
-    return out;
-}
-
-SEXP zu_to_character_c(SEXP x, SEXP type_)
-{
-    zu_type t = zu_type_arg(type_);
-    zu_check_payload(x, t);
-    R_xlen_t n = XLENGTH(x);
-    SEXP out = PROTECT(Rf_allocVector(STRSXP, n));
-    char buf[ZUF_I128_MAX_CHARS + 1];
-    for (R_xlen_t i = 0; i < n; i++) {
-        zu_val v = zu_val_get(x, t, i);
-        char *p = buf;
-        if (v.na) { SET_STRING_ELT(out, i, NA_STRING); continue; }
-        if (v.neg) *p++ = '-';
-        p = zuf_write_u128(p, v.mag);
-        SET_STRING_ELT(out, i, Rf_mkCharLenCE(buf, (int)(p - buf), CE_UTF8));
-    }
     UNPROTECT(1);
     return out;
 }
