@@ -4,6 +4,7 @@ zu_lazy_methods <- list(
   nanoarrow = "zu_register_nanoarrow",
   arrow = "zu_register_arrow",
   vctrs = "zu_register_vctrs",
+  bit64 = "zu_register_bit64",
   pillar = "zu_register_pillar"
 )
 
