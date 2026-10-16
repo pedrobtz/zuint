@@ -353,7 +353,8 @@ README.
 **Deviations (2026-10-16).**
 - arrow 24.0.0 aborts R when it makes an R object for the `arrow.opaque`
   type (`as_arrow_array()`, `infer_type()`, `as_data_type()`), whatever
-  built the type. The arrow methods are registered for int64 and uint64;
+  built the type; 25.0.1 too. Reported 2026-10-16 as
+  [apache/arrow#53951](https://github.com/apache/arrow/issues/53951). The arrow methods are registered for int64 and uint64;
   for int128 and uint128 they raise `zuint_unsupported_error`.
   `zu_arrow_table()` and `zu_from_arrow_table()` go through nanoarrow
   instead and carry all four types through arrow, Parquet included.

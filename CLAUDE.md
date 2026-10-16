@@ -230,11 +230,15 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   them out, which sets `release` to NULL; `test-arrow.R` counts the calls.
 - **A decimal128 imports as its bits, with no 38-digit range check.**
   DuckDB's default export writes HUGEINT values beyond 38 digits that way.
-- **arrow 24.0.0 aborts R on the `arrow.opaque` type as an R object.**
+- **arrow aborts R on the `arrow.opaque` type as an R object.**
   `arrow::as_arrow_array()`, `infer_type()` and `as_data_type()` crash on
-  it, with or without zuint. So the arrow methods exist for int64 and uint64
-  only (the 128-bit ones raise `zuint_unsupported_error`), and tables go
-  through nanoarrow (`zu_arrow_table()`), which never makes that R object.
+  it in arrow 24.0.0 and 25.0.1, with or without zuint: an unchecked cast in
+  `ExtensionType__r6_class()`, reported as
+  [apache/arrow#53951](https://github.com/apache/arrow/issues/53951). So the
+  arrow methods exist for int64 and uint64 only (the 128-bit ones raise
+  `zuint_unsupported_error`), and tables go through nanoarrow
+  (`zu_arrow_table()`), which never makes that R object. When a fixed arrow
+  is released, register the 128-bit methods for it.
 - **Register an Arrow Table with DuckDB, not a record batch reader.** A
   registered reader is consumed by the first query and is empty after.
 - **`xtfrm()` must return exact integer ranks.** Base `order()`, `rank()`
