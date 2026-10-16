@@ -134,6 +134,7 @@ zu_ifelse <- function(test, yes, no) {
   kinds <- c(zu_kind(yes), zu_kind(no))
   zu_check_operands(kinds, list(yes, no), call)
   code <- zu_common_code(kinds, call)
+  nm <- names(test)
   test <- as.logical(test)
   n <- length(test)
   out <- rep(zu_cast(yes, code, call = call), length.out = n)
@@ -141,7 +142,7 @@ zu_ifelse <- function(test, yes, no) {
   f <- !is.na(test) & !test
   out[f] <- no[f]
   out[is.na(test)] <- NA
-  names(out) <- names(test)
+  names(out) <- nm
   out
 }
 

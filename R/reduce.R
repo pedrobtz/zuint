@@ -34,9 +34,9 @@ zu_extreme <- function(x, code, na.rm, which, call) {
     return(zu_new(zu_bare(zu_cast(NA, code)), code))
   }
   if (length(x) == 0L || all(zu_is_na(x))) {
-    warning(
+    zu_warn(
       sprintf("no non-missing arguments to %s; returning %s", c("min", "max")[[which]], c("Inf", "-Inf")[[which]]),
-      call. = FALSE
+      "empty"
     )
     return(c(Inf, -Inf)[[which]])
   }
@@ -168,33 +168,36 @@ seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
   args <- list(from, to, by)
   kinds <- vapply(args, function(a) if (is.null(a)) 0L else zu_kind(a), integer(1))
   zu_check_operands(kinds, args, call)
-  code <- zu_common_code(kinds, call)
-  wide <- if (code %in% c(1L, 3L)) 3L else 4L
+  # the elements' type comes from `from` and `to`; `by` only steps, and may be
+  # negative for an unsigned type
+  code <- zu_common_code(kinds[1:2], call)
+  if (code == 0L) {
+    code <- zu_common_code(kinds, call)
+  }
   from <- zu_cast(from, code, call = call)
-  by <- zu_cast(by, code, call = call)
-  if (length(from) != 1L || length(by) != 1L || is.na(from) || is.na(by)) {
+  if (length(from) != 1L || is.na(from) || length(by) != 1L || is.na(by)) {
     zu_abort("`from` and `by` must be single non-missing values.", "type", call = call)
   }
   if (by == 0L) {
     zu_abort("`by` must not be zero.", "type", call = call)
   }
+  down <- by < 0L
+  # the step's magnitude, in the elements' type
+  step <- withCallingHandlers(
+    zu_cast(abs(by), code, call = call),
+    zuint_cast_warning = function(w) {
+      zu_abort("`by` is out of range of the sequence's type.", "type", call = call)
+    }
+  )
   if (is.null(length.out)) {
     to <- zu_cast(to, code, call = call)
     if (length(to) != 1L || is.na(to)) {
       zu_abort("`to` must be a single non-missing value.", "type", call = call)
     }
-    if ((to - from > 0L && by < 0L) || (to < from && by > 0L)) {
+    if ((to > from && down) || (to < from && !down)) {
       zu_abort("`by` goes the wrong way from `from` to `to`.", "type", call = call)
     }
-    # in a wider type, so to - from cannot overflow
-    span <- zu_cast(to, if (code == 4L) 4L else wide) - zu_cast(from, if (code == 4L) 4L else wide)
-    if (code == 2L || code == 4L) {
-      span <- if (to >= from) zu_cast(to, 4L) - zu_cast(from, 4L) else zu_cast(from, 4L) - zu_cast(to, 4L)
-      step <- if (by > 0L) zu_cast(by, 4L) else -zu_cast(by, 4L)
-    } else {
-      step <- zu_cast(by, 3L)
-    }
-    length.out <- as.double(span %/% step) + 1
+    length.out <- zu_seq_count(from, to, step, down, call)
   }
   if (length.out > .Machine$integer.max) {
     zu_abort("The sequence is too long.", "type", call = call)
@@ -203,5 +206,35 @@ seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
   if (n == 0L) {
     return(from[0L])
   }
-  from + by * zu_cast(seq_len(n) - 1L, code)
+  steps <- rep(step, n - 1L)
+  # Each partial sum is an element, so no intermediate value leaves the
+  # range. Downwards in an unsigned type, the offsets k * step are at most
+  # from - to and so fit too.
+  if (!down) {
+    cumsum(c(from, steps))
+  } else if (code == 1L || code == 3L) {
+    cumsum(c(from, -steps))
+  } else {
+    from - cumsum(c(step * 0L, steps))
+  }
 }
+
+# floor(|to - from| / step) + 1 without forming to - from, which may not fit:
+# with a = q_a * step + r_a (floor division, 0 <= r < step) for the larger
+# end and likewise for the smaller, the count is (q_a - q_b) - (r_a < r_b) + 1.
+# q_a - q_b only overflows when step is so small that the sequence would be
+# too long anyway.
+zu_seq_count <- function(from, to, step, down, call) {
+  hi <- if (down) from else to
+  lo <- if (down) to else from
+  dq <- withCallingHandlers(
+    zu_cast(hi %/% step, 3L) - zu_cast(lo %/% step, 3L),
+    zuint_overflow_warning = function(w) invokeRestart("muffleWarning"),
+    zuint_cast_warning = function(w) invokeRestart("muffleWarning")
+  )
+  if (is.na(dq)) {
+    return(Inf)
+  }
+  zu_dbl_quiet(dq) - as.double(hi %% step < lo %% step) + 1
+}
+

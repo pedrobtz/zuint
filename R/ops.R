@@ -43,9 +43,9 @@ zu_math <- function(x, ...) {
     sign = zu_new(.Call(zu_abs_sign_c, zu_unclass(x), code, TRUE), code),
     floor = ,
     ceiling = ,
-    trunc = ,
-    round = ,
-    signif = x,
+    trunc = x,
+    round = zu_round(x, ..., call = sys.call()),
+    signif = zu_signif(x, ..., call = sys.call()),
     cumsum = ,
     cumprod = ,
     cummax = ,
@@ -137,7 +137,7 @@ zu_check_recycling <- function(x, y) {
   nx <- length(x)
   ny <- length(y)
   if (nx > 0L && ny > 0L && max(nx, ny) %% min(nx, ny) != 0L) {
-    warning("longer object length is not a multiple of shorter object length", call. = FALSE)
+    zu_warn("longer object length is not a multiple of shorter object length", "recycling")
   }
 }
 
@@ -164,6 +164,10 @@ zu_arith <- function(op, x, y, policy, call) {
   kinds <- c(zu_kind(x), zu_kind(y))
   zu_check_operands(kinds, list(x, y), call)
   zu_check_recycling(x, y)
+  if (policy == zu_policy_checked && op %in% c("%/%", "%%") && length(x) > 0L &&
+    isTRUE(any(y == 0L, na.rm = TRUE))) {
+    zu_abort("Division by zero.", "division", call = call)
+  }
   code <- zu_common_code(kinds, call)
   ox <- zu_operand(x, kinds[[1L]], code)
   oy <- zu_operand(y, kinds[[2L]], code)
@@ -257,7 +261,8 @@ zu_compare <- function(op, x, y, call) {
 #'
 #' Operands take their common type first (see [zu_common_type()]). `%/%`
 #' rounds towards negative infinity and `%%` takes the sign of the divisor,
-#' as in R; division by zero is `NA`. `/` divides in double. `^` is exact
+#' as in R; division by zero is `NA`, except in `checked_idiv()` and
+#' `checked_mod()`, where it is an error of class `zuint_division_error`. `/` divides in double. `^` is exact
 #' for a non-negative integer exponent and computed in double otherwise.
 #' Comparison is exact across all the types and doubles.
 #'
@@ -288,6 +293,14 @@ checked_mul <- function(x, y) zu_arith("*", x, y, zu_policy_checked, sys.call())
 
 #' @rdname zuint-arith
 #' @export
+checked_idiv <- function(x, y) zu_arith("%/%", x, y, zu_policy_checked, sys.call())
+
+#' @rdname zuint-arith
+#' @export
+checked_mod <- function(x, y) zu_arith("%%", x, y, zu_policy_checked, sys.call())
+
+#' @rdname zuint-arith
+#' @export
 checked_pow <- function(x, y) zu_pow(x, y, zu_policy_checked, sys.call())
 
 #' @rdname zuint-arith
@@ -313,3 +326,80 @@ wrapping_pow <- function(x, y) zu_pow(x, y, zu_policy_wrap, sys.call())
 #' @rdname zuint-arith
 #' @export
 wrapping_neg <- function(x) zu_negate(x, zu_policy_wrap, sys.call())
+
+# ---- rounding to tens, hundreds, ... -----------------------------------------
+
+# round(x, digits): the identity for digits >= 0; for digits < 0, the nearest
+# multiple of 10^-digits, ties to the even multiple, on the exact value (as
+# base R rounds integers). A multiple beyond the type is NA with an overflow
+# warning, as in arithmetic.
+zu_round <- function(x, digits = 0, ..., call = NULL) {
+  digits <- zu_digits_arg(digits, call)
+  if (digits >= 0L) {
+    return(x)
+  }
+  zu_round_to(x, -digits, call)
+}
+
+# signif(x, digits): keep `digits` significant decimal digits (at least 1),
+# rounding as zu_round() does.
+zu_signif <- function(x, digits = 6L, ..., call = NULL) {
+  digits <- max(1L, zu_digits_arg(digits, call))
+  s <- zu_as_character(abs(x))
+  shift <- ifelse(is.na(s), 0L, pmax(0L, nchar(s) - digits))
+  out <- x
+  for (k in setdiff(unique(shift), 0L)) {
+    at <- shift == k
+    out[at] <- zu_round_to(x[at], k, call)
+  }
+  out
+}
+
+zu_digits_arg <- function(digits, call) {
+  if (length(digits) != 1L || is.na(digits) || !is.numeric(digits)) {
+    zu_abort("`digits` must be a single number.", "type", call = call)
+  }
+  as.integer(digits)
+}
+
+zu_round_to <- function(x, k, call) {
+  code <- zu_code(x)
+  # 10^k in the widest type of the same signedness. When it does not fit,
+  # it exceeds twice every value of the type, so every value rounds to 0
+  wide <- if (code %in% c(1L, 3L)) 3L else 4L
+  p <- withCallingHandlers(
+    zu_new(zu_bare(zu_cast(10L, wide)), wide)^k,
+    zuint_overflow_warning = function(w) invokeRestart("muffleWarning")
+  )
+  xw <- zu_cast(x, wide)
+  if (all(is.na(p))) {
+    out <- xw * 0L
+  } else {
+    q <- xw %/% p
+    r <- xw %% p
+    up <- r > p - r | (r == p - r & q %% 2L == 1L)
+    up[is.na(up)] <- FALSE
+    out <- (q + zu_ifelse_raw(up, 1L, 0L)) * p
+  }
+  zu_narrow(out, code, call)
+}
+
+zu_ifelse_raw <- function(test, yes, no) {
+  out <- rep(no, length(test))
+  out[test] <- yes
+  out
+}
+
+# A value computed in a wider type, back in `code`: exact, or NA with an
+# overflow warning.
+zu_narrow <- function(x, code, call) {
+  out <- withCallingHandlers(
+    zu_cast(x, code),
+    zuint_cast_warning = function(w) {
+      zu_warn("A rounded value is out of range. NA produced.", "overflow", call = call)
+      invokeRestart("muffleWarning")
+    }
+  )
+  names(out) <- names(x)
+  out
+}

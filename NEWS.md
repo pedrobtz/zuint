@@ -20,7 +20,9 @@
   `zuint_overflow_warning` per call. `/` and other `Math` functions compute
   in double.
 * `checked_add()`, `checked_sub()`, `checked_mul()`, `checked_pow()` and
-  `checked_neg()` raise a `zuint_overflow_error` instead;
+  `checked_neg()` raise a `zuint_overflow_error` instead, and
+  `checked_idiv()` and `checked_mod()` a `zuint_division_error` on a zero
+  divisor;
   `wrapping_add()`, `wrapping_sub()`, `wrapping_mul()`, `wrapping_pow()`
   and `wrapping_neg()` compute modulo 2^64 or 2^128.
 * Mixed types follow a lossless promotion order (`zu_common_type()`), in

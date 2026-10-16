@@ -58,9 +58,9 @@ test_that("min, max and range are exact, with base R's empty case", {
     expect_identical(as.character(max(x, na.rm = TRUE)), as.character(r$max))
     expect_identical(as.character(range(x, na.rm = TRUE)), as.character(c(r$min, r$max)))
     expect_true(is.na(max(x)))
-    expect_warning(m <- min(zu_ctor(type)()), "no non-missing")
+    expect_warning(m <- min(zu_ctor(type)()), class = "zuint_empty_warning")
     expect_identical(m, Inf)
-    expect_warning(m <- max(zu_ctor(type)(NA), na.rm = TRUE), "no non-missing")
+    expect_warning(m <- max(zu_ctor(type)(NA), na.rm = TRUE), class = "zuint_empty_warning")
     expect_identical(m, -Inf)
   }
   expect_identical(max(int64(1), int64(5), 3L), int64(5))
@@ -131,4 +131,23 @@ test_that("the 64-bit sum is exact at the edges of the range", {
     r <- suppressWarnings(sum(zu_ctor(type)(v)))
     expect_identical(as.character(r), if (fits) as.character(exact) else NA_character_)
   }
+})
+
+test_that("seq_zu runs downwards in unsigned types and across whole ranges", {
+  expect_identical(seq_zu(uint64(10), uint64(1), by = -3L), uint64(c(10, 7, 4, 1)))
+  expect_identical(seq_zu(uint128(9), uint128(0), by = int64(-3)), uint128(c(9, 6, 3, 0)))
+  for (type in zu_all_types) {
+    r <- oracle_range(type)
+    lo <- as.character(r$min)
+    hi <- as.character(r$max)
+    half <- as.character((r$max - r$min) %/% 2)
+    up <- seq_zu(zu_ctor(type)(lo), zu_ctor(type)(hi), by = zu_ctor(if (type %in% c("int64", "int128")) type else type)(half))
+    expect_identical(as.character(up), as.character(c(r$min, r$min + gmp::as.bigz(half), r$min + 2 * gmp::as.bigz(half))), label = type)
+    expect_identical(as.character(utils::tail(up, 1)), hi)
+    steps <- seq_zu(zu_ctor(type)(hi), zu_ctor(type)(lo), by = -2L, length.out = 3)
+    expect_identical(as.character(steps), as.character(r$max - c(0, 2, 4)))
+  }
+  expect_error(seq_zu(int64(1), int64(5), by = -1L), class = "zuint_type_error")
+  expect_error(seq_zu(uint64(0), uint64("18446744073709551614"), by = 1L), class = "zuint_type_error")
+  expect_error(seq_zu(int64(1), int64(5), by = int128("170141183460469231731687303715884105727")), class = "zuint_type_error")
 })
