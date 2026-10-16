@@ -86,8 +86,16 @@ test_that("NA and NaN convert to NA silently", {
 test_that("logical and integer convert exactly; negatives are lost in unsigned types", {
   for (type in zu_all_types) {
     ctor <- zu_ctor(type)
-    expect_identical(as.character(ctor(c(TRUE, FALSE))), c("1", "0"), label = type)
-    expect_identical(as.character(ctor(.Machine$integer.max)), "2147483647", label = type)
+    expect_identical(
+      as.character(ctor(c(TRUE, FALSE))),
+      c("1", "0"),
+      label = type
+    )
+    expect_identical(
+      as.character(ctor(.Machine$integer.max)),
+      "2147483647",
+      label = type
+    )
   }
   expect_identical(as.character(int64(-.Machine$integer.max)), "-2147483647")
   expect_identical(as.character(int128(-5L)), "-5")
@@ -152,6 +160,10 @@ test_that("the NA constants are NA of their type", {
   )
   for (type in names(nas)) {
     expect_identical(nas[[type]], zu_ctor(type)(NA), label = type)
-    expect_identical(zu_storage(nas[[type]]), zu_storage(zu_na(type)), label = type)
+    expect_identical(
+      zu_storage(nas[[type]]),
+      zu_storage(zu_na(type)),
+      label = type
+    )
   }
 })

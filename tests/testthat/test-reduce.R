@@ -1,11 +1,17 @@
 test_that("sum is type stable: exact, or NA with a warning when it does not fit", {
-  expect_warning(s <- sum(int64(c(2^62, 2^62))), class = "zuint_overflow_warning")
+  expect_warning(
+    s <- sum(int64(c(2^62, 2^62))),
+    class = "zuint_overflow_warning"
+  )
   expect_identical(s, NA_int64_)
   expect_identical(sum(int128(c(2^62, 2^62))), int128("9223372036854775808"))
   # a total that passes beyond the range and comes back is exact
   max128 <- "170141183460469231731687303715884105727"
   expect_identical(sum(int128(c(max128, "1", "-1"))), int128(max128))
-  expect_identical(sum(uint128(c("340282366920938463463374607431768211454", "1")) - 1L), uint128(NA))
+  expect_identical(
+    sum(uint128(c("340282366920938463463374607431768211454", "1")) - 1L),
+    uint128(NA)
+  )
   for (type in zu_all_types) {
     v <- oracle_random(type, 40, seed = 6)
     exact <- sum(gmp::as.bigz(v))
@@ -26,8 +32,14 @@ test_that("sum is type stable: exact, or NA with a warning when it does not fit"
 
 test_that("prod is exact, zero wins, and overflow is NA with a warning", {
   expect_identical(prod(int64(c(-3, 4, 5))), int64(-60))
-  expect_identical(prod(int64(c("9223372036854775807", "9223372036854775807", "0"))), int64(0))
-  expect_warning(p <- prod(uint64(c(2^40, 2^40))), class = "zuint_overflow_warning")
+  expect_identical(
+    prod(int64(c("9223372036854775807", "9223372036854775807", "0"))),
+    int64(0)
+  )
+  expect_warning(
+    p <- prod(uint64(c(2^40, 2^40))),
+    class = "zuint_overflow_warning"
+  )
   expect_identical(p, NA_uint64_)
   expect_identical(prod(int128(c(2, NA)), na.rm = TRUE), int128(2))
   expect_identical(prod(uint128()), uint128(1))
@@ -37,15 +49,33 @@ test_that("cumsum and cumprod are NA from the first NA or overflow on", {
   for (type in zu_all_types) {
     v <- c("5", "7", "11", "13")
     x <- zu_ctor(type)(v)
-    expect_identical(as.character(cumsum(x)), as.character(cumsum(gmp::as.bigz(v))), label = type)
-    cp <- vapply(seq_along(v), function(i) as.character(prod(gmp::as.bigz(v[seq_len(i)]))), character(1))
+    expect_identical(
+      as.character(cumsum(x)),
+      as.character(cumsum(gmp::as.bigz(v))),
+      label = type
+    )
+    cp <- vapply(
+      seq_along(v),
+      function(i) as.character(prod(gmp::as.bigz(v[seq_len(i)]))),
+      character(1)
+    )
     expect_identical(as.character(cumprod(x)), cp, label = type)
-    expect_identical(is.na(cumsum(zu_ctor(type)(c(1, NA, 2)))), c(FALSE, TRUE, TRUE), label = type)
+    expect_identical(
+      is.na(cumsum(zu_ctor(type)(c(1, NA, 2)))),
+      c(FALSE, TRUE, TRUE),
+      label = type
+    )
   }
-  expect_warning(r <- cumsum(int64(c("9223372036854775807", "1", "-1"))), class = "zuint_overflow_warning")
+  expect_warning(
+    r <- cumsum(int64(c("9223372036854775807", "1", "-1"))),
+    class = "zuint_overflow_warning"
+  )
   expect_identical(as.character(r), c("9223372036854775807", NA, NA))
   expect_identical(cummax(int128(c(3, 1, 5, 2))), int128(c(3, 3, 5, 5)))
-  expect_identical(cummin(uint64(c(3, 1, 5, NA, 0))), uint64(c(3, 1, 1, NA, NA)))
+  expect_identical(
+    cummin(uint64(c(3, 1, 5, NA, 0))),
+    uint64(c(3, 1, 1, NA, NA))
+  )
 })
 
 test_that("min, max and range are exact, with base R's empty case", {
@@ -53,13 +83,28 @@ test_that("min, max and range are exact, with base R's empty case", {
     v <- c(oracle_edges(type), NA)
     x <- zu_ctor(type)(v)
     r <- oracle_range(type)
-    expect_identical(as.character(min(x, na.rm = TRUE)), as.character(r$min), label = type)
-    expect_identical(as.character(max(x, na.rm = TRUE)), as.character(r$max), label = type)
-    expect_identical(as.character(range(x, na.rm = TRUE)), as.character(c(r$min, r$max)), label = type)
+    expect_identical(
+      as.character(min(x, na.rm = TRUE)),
+      as.character(r$min),
+      label = type
+    )
+    expect_identical(
+      as.character(max(x, na.rm = TRUE)),
+      as.character(r$max),
+      label = type
+    )
+    expect_identical(
+      as.character(range(x, na.rm = TRUE)),
+      as.character(c(r$min, r$max)),
+      label = type
+    )
     expect_identical(max(x), zu_na(type), label = type)
     expect_warning(m <- min(zu_ctor(type)()), class = "zuint_empty_warning")
     expect_identical(m, Inf, label = type)
-    expect_warning(m <- max(zu_ctor(type)(NA), na.rm = TRUE), class = "zuint_empty_warning")
+    expect_warning(
+      m <- max(zu_ctor(type)(NA), na.rm = TRUE),
+      class = "zuint_empty_warning"
+    )
     expect_identical(m, -Inf, label = type)
   }
   expect_identical(max(int64(1), int64(5), 3L), int64(5))
@@ -84,7 +129,10 @@ test_that("mean and median are doubles from the exact values", {
   expect_equal(mean(big), 2^128)
   max128 <- "170141183460469231731687303715884105727"
   expect_equal(mean(int128(c(max128, max128, paste0("-", max128)))), 2^127 / 3)
-  expect_equal(mean(int64(c("9223372036854775807", "9223372036854775807"))), 2^63)
+  expect_equal(
+    mean(int64(c("9223372036854775807", "9223372036854775807"))),
+    2^63
+  )
 })
 
 test_that("any and all use the logical values", {
@@ -94,30 +142,55 @@ test_that("any and all use the logical values", {
 
 test_that("diff and seq_zu are exact", {
   expect_identical(diff(int64(c(1, 4, 9, 16))), int64(c(3, 5, 7)))
-  expect_identical(diff(int64(c(1, 4, 9, 16)), differences = 2L), int64(c(2, 2)))
+  expect_identical(
+    diff(int64(c(1, 4, 9, 16)), differences = 2L),
+    int64(c(2, 2))
+  )
   expect_identical(diff(uint64(1)), uint64())
   expect_warning(diff(uint64(c(5, 3))), class = "zuint_overflow_warning")
   expect_identical(
-    seq_zu(uint64("18446744073709551600"), uint64("18446744073709551614"), by = 7L),
-    uint64(c("18446744073709551600", "18446744073709551607", "18446744073709551614"))
+    seq_zu(
+      uint64("18446744073709551600"),
+      uint64("18446744073709551614"),
+      by = 7L
+    ),
+    uint64(c(
+      "18446744073709551600",
+      "18446744073709551607",
+      "18446744073709551614"
+    ))
   )
   expect_identical(seq_zu(int64(10), int64(1), by = -3L), int64(c(10, 7, 4, 1)))
-  expect_identical(seq_zu(int128(-2), by = int128(5), length.out = 3), int128(c(-2, 3, 8)))
+  expect_identical(
+    seq_zu(int128(-2), by = int128(5), length.out = 3),
+    int128(c(-2, 3, 8))
+  )
   expect_error(seq_zu(int64(1), int64(5), by = -1L), class = "zuint_type_error")
   expect_error(seq_zu(int64(1), int64(5), by = 0L), class = "zuint_type_error")
 })
 
 test_that("summary reports the exact extremes", {
-  expect_snapshot(summary(int64(c("-9223372036854775807", "0", "9223372036854775807", NA))))
+  expect_snapshot(summary(int64(c(
+    "-9223372036854775807",
+    "0",
+    "9223372036854775807",
+    NA
+  ))))
 })
 
 test_that("the 64-bit sum is exact at the edges of the range", {
   max64 <- "9223372036854775807"
   expect_identical(sum(int64(c(max64, paste0("-", max64)))), int64(0))
   expect_identical(sum(int64(c(max64, "-1", "1"))), int64(max64))
-  expect_warning(s <- sum(int64(c(max64, max64))), class = "zuint_overflow_warning")
+  expect_warning(
+    s <- sum(int64(c(max64, max64))),
+    class = "zuint_overflow_warning"
+  )
   expect_identical(s, NA_int64_)
-  expect_warning(sum(int64(c(paste0("-", max64), "-1"))), class = "zuint_overflow_warning")
+  expect_warning(
+    sum(int64(c(paste0("-", max64), "-1"))),
+    class = "zuint_overflow_warning"
+  )
   expect_identical(sum(int64(rep("-4294967297", 3))), int64("-12884901891"))
   umax <- "18446744073709551614"
   expect_identical(sum(uint64(c(umax, "0"))), uint64(umax))
@@ -128,27 +201,68 @@ test_that("the 64-bit sum is exact at the edges of the range", {
     exact <- sum(gmp::as.bigz(v))
     fits <- oracle_fits(type, as.character(exact))
     r <- suppressWarnings(sum(zu_ctor(type)(v)))
-    expect_identical(as.character(r), if (fits) as.character(exact) else NA_character_, label = type)
+    expect_identical(
+      as.character(r),
+      if (fits) as.character(exact) else NA_character_,
+      label = type
+    )
   }
 })
 
 test_that("seq_zu runs downwards in unsigned types and across whole ranges", {
-  expect_identical(seq_zu(uint64(10), uint64(1), by = -3L), uint64(c(10, 7, 4, 1)))
-  expect_identical(seq_zu(uint128(9), uint128(0), by = int64(-3)), uint128(c(9, 6, 3, 0)))
+  expect_identical(
+    seq_zu(uint64(10), uint64(1), by = -3L),
+    uint64(c(10, 7, 4, 1))
+  )
+  expect_identical(
+    seq_zu(uint128(9), uint128(0), by = int64(-3)),
+    uint128(c(9, 6, 3, 0))
+  )
   for (type in zu_all_types) {
     r <- oracle_range(type)
     lo <- as.character(r$min)
     hi <- as.character(r$max)
     half <- as.character((r$max - r$min) %/% 2)
-    up <- seq_zu(zu_ctor(type)(lo), zu_ctor(type)(hi), by = zu_ctor(if (type %in% c("int64", "int128")) type else type)(half))
-    expect_identical(as.character(up), as.character(c(r$min, r$min + gmp::as.bigz(half), r$min + 2 * gmp::as.bigz(half))), label = type)
+    up <- seq_zu(
+      zu_ctor(type)(lo),
+      zu_ctor(type)(hi),
+      by = zu_ctor(if (type %in% c("int64", "int128")) type else type)(half)
+    )
+    expect_identical(
+      as.character(up),
+      as.character(c(
+        r$min,
+        r$min + gmp::as.bigz(half),
+        r$min + 2 * gmp::as.bigz(half)
+      )),
+      label = type
+    )
     expect_identical(as.character(utils::tail(up, 1)), hi, label = type)
-    steps <- seq_zu(zu_ctor(type)(hi), zu_ctor(type)(lo), by = -2L, length.out = 3)
-    expect_identical(as.character(steps), as.character(r$max - c(0, 2, 4)), label = type)
+    steps <- seq_zu(
+      zu_ctor(type)(hi),
+      zu_ctor(type)(lo),
+      by = -2L,
+      length.out = 3
+    )
+    expect_identical(
+      as.character(steps),
+      as.character(r$max - c(0, 2, 4)),
+      label = type
+    )
   }
   expect_error(seq_zu(int64(1), int64(5), by = -1L), class = "zuint_type_error")
-  expect_error(seq_zu(uint64(0), uint64("18446744073709551614"), by = 1L), class = "zuint_type_error")
-  expect_error(seq_zu(int64(1), int64(5), by = int128("170141183460469231731687303715884105727")), class = "zuint_type_error")
+  expect_error(
+    seq_zu(uint64(0), uint64("18446744073709551614"), by = 1L),
+    class = "zuint_type_error"
+  )
+  expect_error(
+    seq_zu(
+      int64(1),
+      int64(5),
+      by = int128("170141183460469231731687303715884105727")
+    ),
+    class = "zuint_type_error"
+  )
 })
 
 test_that("mean with trim is unsupported rather than ignored", {
@@ -161,5 +275,8 @@ test_that("short and long sorts agree", {
   v <- c(round(runif(70000, -2^52, 2^52)), NA)
   x <- int64(v)
   expect_identical(as.double(sort(x)), sort(v))
-  expect_identical(as.double(sort(x[1:50], decreasing = TRUE)), sort(v[1:50], decreasing = TRUE))
+  expect_identical(
+    as.double(sort(x[1:50], decreasing = TRUE)),
+    sort(v[1:50], decreasing = TRUE)
+  )
 })

@@ -9,7 +9,8 @@ test_that("[ keeps the class and pads out-of-range positions with the type's NA"
     y <- x[c(1, 5, NA)]
     expect_identical(
       is.na(y),
-      structure(c(FALSE, TRUE, TRUE), names = c("a", NA, NA)), label = type
+      structure(c(FALSE, TRUE, TRUE), names = c("a", NA, NA)),
+      label = type
     )
     expect_identical(as.character(y), c("1", NA, NA), label = type)
   }
@@ -95,7 +96,11 @@ test_that("c() converts every argument to the common type", {
 test_that("rep and rev keep the type and names", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(a = 1, b = NA))
-    expect_identical(rep(x, 2), zu_ctor(type)(c(a = 1, b = NA, a = 1, b = NA)), label = type)
+    expect_identical(
+      rep(x, 2),
+      zu_ctor(type)(c(a = 1, b = NA, a = 1, b = NA)),
+      label = type
+    )
     expect_identical(rep(x, each = 2), x[c(1, 1, 2, 2)], label = type)
     expect_identical(rep(x, length.out = 3), x[c(1, 2, 1)], label = type)
     expect_identical(rev(x), x[2:1], label = type)
@@ -226,9 +231,21 @@ test_that("each class claims mixed Ops calls", {
 test_that("is.nan, is.finite and is.infinite read values, not raw bits", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(a = "1", b = NA, c = "0"))
-    expect_identical(is.nan(x), c(a = FALSE, b = FALSE, c = FALSE), label = type)
-    expect_identical(is.finite(x), c(a = TRUE, b = FALSE, c = TRUE), label = type)
-    expect_identical(is.infinite(x), c(a = FALSE, b = FALSE, c = FALSE), label = type)
+    expect_identical(
+      is.nan(x),
+      c(a = FALSE, b = FALSE, c = FALSE),
+      label = type
+    )
+    expect_identical(
+      is.finite(x),
+      c(a = TRUE, b = FALSE, c = TRUE),
+      label = type
+    )
+    expect_identical(
+      is.infinite(x),
+      c(a = FALSE, b = FALSE, c = FALSE),
+      label = type
+    )
     expect_true(is.numeric(x), label = type)
   }
   # -1 is a NaN bit pattern as a double
@@ -241,20 +258,32 @@ test_that("conversions to complex, raw and dates go through the values", {
   expect_identical(as.raw(uint64(c(5, 255))), as.raw(c(5, 255)))
   expect_identical(as.Date(int64(1)), as.Date(1))
   expect_identical(as.POSIXct(int64(0), tz = "UTC"), as.POSIXct(0, tz = "UTC"))
-  expect_identical(as.POSIXlt(uint128(0), tz = "UTC"), as.POSIXlt(0, tz = "UTC"))
+  expect_identical(
+    as.POSIXlt(uint128(0), tz = "UTC"),
+    as.POSIXlt(0, tz = "UTC")
+  )
 })
 
 test_that("seq() on a zuint from is seq_zu()", {
   expect_identical(seq(int64(1), int64(5)), int64(1:5))
   expect_identical(seq(uint64(2), by = 3L, length.out = 3), uint64(c(2, 5, 8)))
   expect_identical(seq(int128(4), along.with = 1:3), int128(4:6))
-  expect_error(seq(int64(1), int64(5), length.out = 3), class = "zuint_unsupported_error")
+  expect_error(
+    seq(int64(1), int64(5), length.out = 3),
+    class = "zuint_unsupported_error"
+  )
 })
 
 test_that("all.equal compares exactly", {
   expect_true(all.equal(int64(1:3), int64(1:3)))
-  expect_identical(all.equal(int64(1:3), int64(c(1, 2, 4))), "1 of 3 values differ")
-  expect_identical(all.equal(int64(1), uint64(1)), "Types differ: int64 vs uint64")
+  expect_identical(
+    all.equal(int64(1:3), int64(c(1, 2, 4))),
+    "1 of 3 values differ"
+  )
+  expect_identical(
+    all.equal(int64(1), uint64(1)),
+    "Types differ: int64 vs uint64"
+  )
   expect_match(all.equal(int64(1), 1), "target is int64")
 })
 
@@ -276,6 +305,9 @@ test_that("a zuint vector used as an index is read as a number", {
   expect_identical(x, int64(c(10, 5, 30)))
   x[[int64(1)]] <- 9L
   expect_identical(x, int64(c(9, 5, 30)))
-  expect_warning(r <- x[int64("9007199254740993")], class = "zuint_cast_warning")
+  expect_warning(
+    r <- x[int64("9007199254740993")],
+    class = "zuint_cast_warning"
+  )
   expect_identical(r, NA_int64_)
 })
