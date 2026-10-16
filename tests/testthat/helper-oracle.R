@@ -195,3 +195,7 @@ oracle_collisions <- function(type) {
   v <- v[oracle_fits(type, v)]
   c(v, rev(v), v[1:3])
 }
+
+# n NAs of `type`: what an exact assertion on an NA result compares with, so
+# that a result that lost its class or came back as another type fails.
+zu_na <- function(type, n = 1L) zu_ctor(type)(rep(NA, n))

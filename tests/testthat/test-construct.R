@@ -4,7 +4,7 @@ test_that("each constructor round-trips its edge values through character", {
     x <- zu_ctor(type)(edges)
     expect_s3_class(x, paste0("zu_", type))
     expect_identical(as.character(x), edges, label = type)
-    expect_false(anyNA(x))
+    expect_false(anyNA(x), label = type)
   }
 })
 
@@ -19,7 +19,7 @@ test_that("values just outside each range become NA with a cast warning", {
   for (type in zu_all_types) {
     out <- oracle_outside(type)
     expect_warning(x <- zu_ctor(type)(out), class = "zuint_cast_warning")
-    expect_true(all(is.na(x)), label = type)
+    expect_identical(x, zu_na(type, length(out)), label = type)
   }
 })
 
@@ -36,7 +36,7 @@ test_that("the NA bit pattern is not a value of any type", {
       x <- zu_ctor(type)(sentinels[[type]]),
       class = "zuint_cast_warning"
     )
-    expect_true(is.na(x))
+    expect_identical(x, zu_na(type), label = type)
   }
 })
 
@@ -60,10 +60,10 @@ test_that("doubles convert when integral and in range, else NA with a warning", 
   )
   for (bad in list(1.5, -0.5, Inf, -Inf, 2^63, -2^63)) {
     expect_warning(x <- int64(bad), class = "zuint_cast_warning")
-    expect_true(is.na(x))
+    expect_identical(x, NA_int64_, label = format(bad))
   }
   expect_warning(x <- uint64(-1), class = "zuint_cast_warning")
-  expect_true(is.na(x))
+  expect_identical(x, NA_uint64_)
   expect_identical(as.character(int64(-0)), "0")
 })
 
@@ -79,15 +79,15 @@ test_that("NA and NaN convert to NA silently", {
         ctor(NA_character_)
       )
     )
-    expect_true(all(is.na(x)))
+    expect_identical(x, zu_na(type, 5), label = type)
   }
 })
 
 test_that("logical and integer convert exactly; negatives are lost in unsigned types", {
   for (type in zu_all_types) {
     ctor <- zu_ctor(type)
-    expect_identical(as.character(ctor(c(TRUE, FALSE))), c("1", "0"))
-    expect_identical(as.character(ctor(.Machine$integer.max)), "2147483647")
+    expect_identical(as.character(ctor(c(TRUE, FALSE))), c("1", "0"), label = type)
+    expect_identical(as.character(ctor(.Machine$integer.max)), "2147483647", label = type)
   }
   expect_identical(as.character(int64(-.Machine$integer.max)), "-2147483647")
   expect_identical(as.character(int128(-5L)), "-5")
@@ -100,7 +100,7 @@ test_that("malformed strings become NA with a warning", {
   bad <- c("-", "1e3", "1.0", "1 2", "+-1", "0x", "1__000", "abc", "--1")
   for (type in zu_all_types) {
     expect_warning(x <- zu_ctor(type)(bad), class = "zuint_cast_warning")
-    expect_true(all(is.na(x)), label = type)
+    expect_identical(x, zu_na(type, length(bad)), label = type)
   }
 })
 
@@ -124,9 +124,9 @@ test_that("conversion between the types is exact or NA with a warning", {
 test_that("constructors keep names and default to length zero", {
   for (type in zu_all_types) {
     ctor <- zu_ctor(type)
-    expect_identical(length(ctor()), 0L)
-    expect_identical(names(ctor(c(a = 1, b = 2))), c("a", "b"))
-    expect_identical(ctor(NULL), ctor())
+    expect_identical(length(ctor()), 0L, label = type)
+    expect_identical(names(ctor(c(a = 1, b = 2))), c("a", "b"), label = type)
+    expect_identical(ctor(NULL), ctor(), label = type)
   }
 })
 
@@ -151,7 +151,7 @@ test_that("the NA constants are NA of their type", {
     uint128 = NA_uint128_
   )
   for (type in names(nas)) {
-    expect_identical(nas[[type]], zu_ctor(type)(NA))
-    expect_true(is.na(nas[[type]]))
+    expect_identical(nas[[type]], zu_ctor(type)(NA), label = type)
+    expect_identical(zu_storage(nas[[type]]), zu_storage(zu_na(type)), label = type)
   }
 })

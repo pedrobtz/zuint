@@ -92,9 +92,9 @@ test_that("a plain integer64 on the left of a wider type is exact or NA, never t
   for (type in c("uint64", "int128", "uint128")) {
     ctor <- zu_ctor(type)
     expect_identical(as.character(big + ctor(0)), "9007199254740993", label = type)
-    expect_true(big == ctor("9007199254740993"))
-    expect_identical(as.character(c(bit64::as.integer64(1), ctor(2))), c("1", "2"))
+    expect_true(big == ctor("9007199254740993"), label = type)
+    expect_identical(as.character(c(bit64::as.integer64(1), ctor(2))), c("1", "2"), label = type)
     expect_warning(r <- bit64::as.integer64(1) + ctor("18446744073709551614"), class = "zuint_cast_warning")
-    expect_true(is.na(r))
+    expect_identical(r, bit64::NA_integer64_, label = type)
   }
 })

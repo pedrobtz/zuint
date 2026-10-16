@@ -7,11 +7,11 @@ test_that("every type round-trips through decimal, hex and binary text", {
     bin <- oracle_base(big, 2)
     expect_identical(format_hex(x), hex, label = type)
     expect_identical(format_bin(x), bin, label = type)
-    expect_identical(zu_ctor(type)(hex), x)
-    expect_identical(zu_ctor(type)(bin), x)
-    expect_identical(zu_ctor(type)(toupper(sub("0x", "0X", hex))), x)
-    expect_true(all(x == zu_ctor(type)(format(x))))
-    expect_true(all(x == zu_ctor(type)(format(x, big.mark = "_"))))
+    expect_identical(zu_ctor(type)(hex), x, label = type)
+    expect_identical(zu_ctor(type)(bin), x, label = type)
+    expect_identical(zu_ctor(type)(toupper(sub("0x", "0X", hex))), x, label = type)
+    expect_identical(zu_ctor(type)(format(x)), x, label = type)
+    expect_identical(zu_ctor(type)(format(x, big.mark = "_")), x, label = type)
   }
 })
 
@@ -33,7 +33,7 @@ test_that("the parser takes signs, separators and surrounding whitespace", {
 test_that("NA, empty and blank strings are NA without a warning", {
   for (type in zu_all_types) {
     expect_no_warning(x <- zu_ctor(type)(c("NA", "", "   ", " NA ", NA)))
-    expect_true(all(is.na(x)))
+    expect_identical(x, zu_na(type, 5), label = type)
   }
 })
 
@@ -51,13 +51,13 @@ test_that("every malformed string is NA with a warning, never a wrong value", {
 
 test_that("text beyond 128 bits or beyond the type's range is NA with a warning", {
   expect_warning(x <- uint128(paste0("0x1", strrep("0", 32))), class = "zuint_cast_warning")
-  expect_true(is.na(x))
+  expect_identical(x, NA_uint128_)
   expect_warning(x <- uint128(strrep("9", 60)), class = "zuint_cast_warning")
-  expect_true(is.na(x))
+  expect_identical(x, NA_uint128_)
   expect_warning(x <- uint64("0x1_0000_0000_0000_0000"), class = "zuint_cast_warning")
-  expect_true(is.na(x))
+  expect_identical(x, NA_uint64_)
   expect_warning(x <- int64("0x8000000000000000"), class = "zuint_cast_warning")
-  expect_true(is.na(x))
+  expect_identical(x, NA_int64_)
 })
 
 test_that("format() groups digits and pads to a width", {

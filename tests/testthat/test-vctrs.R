@@ -17,10 +17,10 @@ test_that("vctrs slices, compares and orders exactly, beyond 2^53 and NaN patter
   for (type in zu_all_types) {
     v <- c(oracle_edges(type), NA, oracle_edges(type)[1:3])
     x <- zu_ctor(type)(v)
-    expect_identical(vctrs::vec_slice(x, 2:3), x[2:3])
+    expect_identical(vctrs::vec_slice(x, 2:3), x[2:3], label = type)
     expect_identical(vctrs::vec_unique(x), unique(x), label = type)
     expect_identical(vctrs::vec_order(x), order(oracle_keys(v), method = "radix"), label = type)
-    expect_identical(vctrs::vec_equal(x, rev(x)), x == rev(x))
+    expect_identical(vctrs::vec_equal(x, rev(x)), x == rev(x), label = type)
   }
   # -1 and -2 are both NaN bit patterns as doubles
   expect_identical(vctrs::vec_unique_count(int64(c(-1, -2, -1))), 2L)
@@ -36,9 +36,9 @@ test_that("dplyr arranges, groups, summarises and binds every type", {
     arranged <- dplyr::arrange(df, k)
     expect_identical(arranged$k, k[c(3, 2, 4, 1)], label = type)
     s <- dplyr::summarise(dplyr::group_by(df, g), s = sum(k, na.rm = TRUE), .groups = "drop")
-    expect_identical(s$s[[2]], zu_ctor(type)(2))
-    expect_identical(dplyr::bind_rows(df, df)$k, c(k, k))
-    expect_identical(nrow(dplyr::distinct(df, k)), 3L)
+    expect_identical(s$s[[2]], zu_ctor(type)(2), label = type)
+    expect_identical(dplyr::bind_rows(df, df)$k, c(k, k), label = type)
+    expect_identical(nrow(dplyr::distinct(df, k)), 3L, label = type)
   }
   expect_error(dplyr::bind_rows(tibble::tibble(x = int128(1)), tibble::tibble(x = uint128(1))), class = "vctrs_error_ptype2")
 })
@@ -85,8 +85,8 @@ test_that("slots vctrs creates are the type's NA, never R's NA bits", {
   for (type in zu_all_types) {
     ctor <- zu_ctor(type)
     expect_identical(vctrs::vec_init(ctor(), 2), ctor(c(NA, NA)), label = type)
-    expect_identical(vctrs::vec_slice(ctor(c(5, 6)), c(1, NA)), ctor(c(5, NA)))
-    expect_identical(vctrs::vec_c(ctor(1), NA), ctor(c(1, NA)))
+    expect_identical(vctrs::vec_slice(ctor(c(5, 6)), c(1, NA)), ctor(c(5, NA)), label = type)
+    expect_identical(vctrs::vec_c(ctor(1), NA), ctor(c(1, NA)), label = type)
   }
   # the genuine value whose bits are R's NA_real_ stays a value
   nan_bits <- int64("9218868437227407266")
@@ -103,10 +103,10 @@ test_that("dplyr padding, unmatched joins, lag and if_else give NA", {
     expect_identical(padded, ctor(c(1, NA)), label = type)
     a <- tibble::tibble(k = 1:3, v = ctor(c(7, 8, 9)))
     joined <- dplyr::left_join(tibble::tibble(k = c(1L, 4L)), a, by = "k")
-    expect_identical(joined$v, ctor(c(7, NA)))
-    expect_identical(dplyr::lag(ctor(1:3)), ctor(c(NA, 1, 2)))
-    expect_identical(dplyr::if_else(c(TRUE, NA, FALSE), ctor(1), ctor(2)), ctor(c(1, NA, 2)))
-    expect_identical(dplyr::case_when(c(TRUE, FALSE) ~ ctor(3)), ctor(c(3, NA)))
+    expect_identical(joined$v, ctor(c(7, NA)), label = type)
+    expect_identical(dplyr::lag(ctor(1:3)), ctor(c(NA, 1, 2)), label = type)
+    expect_identical(dplyr::if_else(c(TRUE, NA, FALSE), ctor(1), ctor(2)), ctor(c(1, NA, 2)), label = type)
+    expect_identical(dplyr::case_when(c(TRUE, FALSE) ~ ctor(3)), ctor(c(3, NA)), label = type)
   }
 })
 

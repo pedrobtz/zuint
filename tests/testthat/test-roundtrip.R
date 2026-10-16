@@ -63,7 +63,7 @@ test_that("an engine value on the NA pattern reads as NA with a warning", {
   con <- DBI::dbConnect(duckdb::duckdb())
   withr::defer(DBI::dbDisconnect(con, shutdown = TRUE))
   expect_warning(df <- zu_duckdb_query(con, "SELECT (-9223372036854775807 - 1)::BIGINT AS m"), class = "zuint_cast_warning")
-  expect_true(is.na(df$m))
+  expect_identical(df$m, NA_int64_)
 })
 
 test_that("zu_duckdb_query() handles empty results and other column types", {
@@ -96,7 +96,7 @@ test_that("as_integer64() and int64() swap only the class", {
   expect_identical(names(y), c("a", "b"))
   expect_identical(int64(y), x)
   expect_warning(z <- as_integer64(uint64("18446744073709551614")), class = "zuint_cast_warning")
-  expect_true(is.na(int64(z)))
+  expect_identical(z, structure(NA_int64_, class = "integer64"))
 })
 
 test_that("zu_from_arrow_table warns once for sentinel values across batches", {

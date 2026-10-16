@@ -83,7 +83,7 @@ test_that("NA in gives NA out under every policy, silently", {
     y <- zu_ctor(type)(c(1, NA, NA))
     for (f in list(`+`, `-`, `*`, `%/%`, `%%`, checked_add, wrapping_mul, checked_pow, wrapping_pow)) {
       expect_no_warning(res <- f(x, y))
-      expect_true(all(is.na(res)))
+      expect_identical(res, zu_na(type, 3), label = type)
     }
   }
 })
@@ -92,25 +92,25 @@ test_that("division by zero is NA without a warning", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(5, 0))
     expect_no_warning(q <- x %/% 0L)
-    expect_identical(is.na(q), c(TRUE, TRUE))
-    expect_true(all(is.na(x %% zu_ctor(type)(0))))
+    expect_identical(is.na(q), c(TRUE, TRUE), label = type)
+    expect_identical(x %% zu_ctor(type)(0), zu_na(type, 2), label = type)
   }
 })
 
 test_that("unary minus negates, and an unsigned non-zero follows the policy", {
   for (type in c("int64", "int128")) {
     edges <- oracle_edges(type)
-    expect_identical(as.character(-zu_ctor(type)(edges)), oracle_chr(-gmp::as.bigz(edges)))
+    expect_identical(as.character(-zu_ctor(type)(edges)), oracle_chr(-gmp::as.bigz(edges)), label = type)
   }
   for (type in c("uint64", "uint128")) {
     x <- zu_ctor(type)(c(0, 1, 5))
     expect_warning(res <- -x, class = "zuint_overflow_warning")
-    expect_identical(as.character(res), c("0", NA, NA))
+    expect_identical(as.character(res), c("0", NA, NA), label = type)
     expect_error(checked_neg(x), class = "zuint_overflow_error")
-    expect_identical(as.character(checked_neg(x[1])), "0")
+    expect_identical(as.character(checked_neg(x[1])), "0", label = type)
     max <- oracle_range(type)$max
     # -1 wraps onto the NA pattern; -5 wraps to MAX - 3
-    expect_identical(as.character(wrapping_neg(x)), c("0", NA, as.character(max - 3)))
+    expect_identical(as.character(wrapping_neg(x)), c("0", NA, as.character(max - 3)), label = type)
   }
   expect_identical(+int64(3), int64(3))
 })
@@ -131,7 +131,7 @@ test_that("^ is exact for non-negative integer exponents", {
       res <- x^grid$e
     }
     expect_identical(as.character(res), ifelse(fits, oracle_chr(exact), NA_character_), label = type)
-    expect_identical(as.character(checked_pow(x[fits], grid$e[fits])), oracle_chr(exact[fits]))
+    expect_identical(as.character(checked_pow(x[fits], grid$e[fits])), oracle_chr(exact[fits]), label = type)
     expect_error(checked_pow(x[!fits], grid$e[!fits]), class = "zuint_overflow_error")
     expect_identical(as.character(wrapping_pow(x, grid$e)), oracle_chr(oracle_wrap(exact, type)), label = type)
   }
@@ -173,7 +173,7 @@ test_that("mixing types follows the promotion order", {
 
 test_that("a negative integer meeting an unsigned type follows the policy", {
   expect_warning(x <- uint64(5) + -1L, class = "zuint_overflow_warning")
-  expect_true(is.na(x))
+  expect_identical(x, NA_uint64_)
   expect_error(checked_add(uint64(5), -1L), class = "zuint_overflow_error")
   expect_identical(wrapping_add(uint64(5), -1L), uint64(4))
   expect_identical(wrapping_add(uint128(5), -6L), uint128(NA))
@@ -221,10 +221,10 @@ test_that("abs and sign stay in the type; other Math functions use doubles", {
   for (type in zu_all_types) {
     edges <- oracle_edges(type)
     x <- zu_ctor(type)(c(edges, NA))
-    expect_identical(as.character(abs(x)), c(oracle_chr(abs(gmp::as.bigz(edges))), NA))
-    expect_identical(as.character(sign(x)), c(as.character(sign(gmp::as.bigz(edges))), NA))
-    expect_identical(floor(x), x)
-    expect_identical(round(x), x)
+    expect_identical(as.character(abs(x)), c(oracle_chr(abs(gmp::as.bigz(edges))), NA), label = type)
+    expect_identical(as.character(sign(x)), c(as.character(sign(gmp::as.bigz(edges))), NA), label = type)
+    expect_identical(floor(x), x, label = type)
+    expect_identical(round(x), x, label = type)
   }
   expect_identical(sqrt(int64(16)), 4)
   expect_warning(log(int64("9007199254740993")), class = "zuint_precision_warning")
@@ -260,24 +260,24 @@ test_that("round and signif with negative digits round half to even, as base R",
     for (d in c(1, 2, 5)) {
       expect_identical(as.double(signif(x, d)), signif(v, d), label = paste(type, "signif", d))
     }
-    expect_identical(round(x, 2), x)
+    expect_identical(round(x, 2), x, label = type)
   }
   expect_identical(round(int64(1234), digits = -2), int64(1200))
   expect_identical(round(uint64(c(1250, 1350)), -2), uint64(c(1200, 1400)))
   expect_identical(round(uint128("340282366920938463463374607431768211454"), -40), uint128(0))
   expect_warning(r <- round(int64("9223372036854775807"), -1), class = "zuint_overflow_warning")
-  expect_true(is.na(r))
+  expect_identical(r, NA_int64_)
   expect_error(round(int64(1), c(1, 2)), class = "zuint_type_error")
 })
 
 test_that("checked_idiv and checked_mod error on a zero divisor", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(7, 9))
-    expect_identical(checked_idiv(x, 2L), zu_ctor(type)(c(3, 4)))
-    expect_identical(checked_mod(x, zu_ctor(type)(4)), zu_ctor(type)(c(3, 1)))
+    expect_identical(checked_idiv(x, 2L), zu_ctor(type)(c(3, 4)), label = type)
+    expect_identical(checked_mod(x, zu_ctor(type)(4)), zu_ctor(type)(c(3, 1)), label = type)
     expect_error(checked_idiv(x, 0L), class = "zuint_division_error")
     expect_error(checked_mod(x, zu_ctor(type)(c(1, 0))), class = "zuint_division_error")
-    expect_identical(checked_idiv(zu_ctor(type)(NA), 2L), zu_ctor(type)(NA))
+    expect_identical(checked_idiv(zu_ctor(type)(NA), 2L), zu_ctor(type)(NA), label = type)
   }
-  expect_true(is.na(int64(5) %/% 0L))
+  expect_identical(int64(5) %/% 0L, NA_int64_)
 })
