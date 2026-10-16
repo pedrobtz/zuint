@@ -1,0 +1,64 @@
+#!/bin/sh
+# Verify that src/vendor/arrow/ is the pinned upstream files, byte for byte,
+# with the checksums recorded in src/vendor/PROVENANCE. Run from the package
+# root. Exits non-zero on any difference.
+#
+#   tools/verify-vendor            the gate
+#   tools/verify-vendor --canary   corrupt a copy of the header and require
+#                                  verification to FAIL, so the gate is not
+#                                  vacuous
+set -eu
+
+PROV="src/vendor/PROVENANCE"
+[ -f "$PROV" ] || { echo "missing $PROV" >&2; exit 1; }
+
+field() { awk -v k="$1" 'index($0, "  " k ":") == 1 { print $NF; exit }' "$PROV"; }
+
+sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
+
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+FAIL=0
+
+check() {   # name, url, recorded sha, vendored file
+  # --retry, because this runs on every push in CI; the checksums decide
+  curl -fsSL --retry 3 --retry-delay 2 --retry-connrefused -o "$WORK/$1" "$2"
+  up=$(sha "$WORK/$1")
+  local_file="$4"
+  if [ "${CANARY:-0}" = 1 ] && [ "$1" = abi.h ]; then
+    cp "$4" "$WORK/canary.h"
+    printf '\n' >> "$WORK/canary.h"
+    local_file="$WORK/canary.h"
+  fi
+  ours=$(sha "$local_file")
+  if [ "$up" != "$3" ]; then
+    echo "FAIL: upstream $1 is $up, PROVENANCE records $3" >&2
+    FAIL=1
+  fi
+  if [ "$ours" != "$3" ]; then
+    echo "FAIL: $4 is $ours, PROVENANCE records $3" >&2
+    FAIL=1
+  fi
+  if [ "$FAIL" = 0 ]; then echo "ok: $4"; fi
+}
+
+CANARY=0
+[ "${1:-}" = "--canary" ] && CANARY=1
+
+check abi.h "$(field File)" "$(field SHA-256)" src/vendor/arrow/abi.h
+check NOTICE.txt "$(field Notice)" "$(field 'Notice SHA-256')" src/vendor/arrow/NOTICE.txt
+check LICENSE.txt "$(field Licence)" "$(field 'Licence SHA-256')" src/vendor/arrow/LICENSE.txt
+
+# Nothing in the vendor tree but what PROVENANCE accounts for.
+extra=$(cd src/vendor/arrow && ls | grep -v -x -e abi.h -e NOTICE.txt -e LICENSE.txt || true)
+if [ -n "$extra" ]; then
+  echo "FAIL: unexpected files in src/vendor/arrow: $extra" >&2
+  FAIL=1
+fi
+
+if [ "$CANARY" = 1 ]; then
+  if [ "$FAIL" = 1 ]; then echo "canary: verification failed, as it must"; exit 0; fi
+  echo "canary: a corrupted header passed verification" >&2
+  exit 1
+fi
+exit "$FAIL"

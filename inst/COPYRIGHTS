@@ -1,0 +1,9 @@
+zuint is copyright (c) 2026 Pedro Baltazar, under the MIT licence (see
+LICENSE), except as follows.
+
+src/vendor/arrow/abi.h
+  The Arrow C Data Interface header, from Apache Arrow 26.0.0.
+  Copyright The Apache Software Foundation.
+  Licensed under the Apache License, Version 2.0; see
+  src/vendor/arrow/LICENSE.txt and src/vendor/arrow/NOTICE.txt.
+  Provenance and update procedure: src/vendor/PROVENANCE.

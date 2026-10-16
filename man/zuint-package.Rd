@@ -25,5 +25,10 @@ Authors:
   \item Pedro Baltazar \email{pedrobtz@gmail.com} [copyright holder]
 }
 
+Other contributors:
+\itemize{
+  \item The Apache Software Foundation (Arrow C Data Interface header in src/vendor/arrow/abi.h) [copyright holder]
+}
+
 }
 \keyword{internal}
