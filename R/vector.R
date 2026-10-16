@@ -111,7 +111,14 @@ zu_fill_na <- function(payload, code, where) {
   .Call(zu_fill_na_c, payload, code, where)
 }
 
+# A zuint index is a number, not its raw bits: base `[` would read those.
+# Converted exactly to an integer, or NA with a warning beyond its range.
+zu_index <- function(i) {
+  if (is.na(zu_code(i))) i else zu_as_integer(i)
+}
+
 zu_subset <- function(x, i, ...) {
+  if (!missing(i)) i <- zu_index(i)
   code <- zu_code(x)
   s <- zu_unclass(x)
   if (missing(i)) {
@@ -124,6 +131,7 @@ zu_subset <- function(x, i, ...) {
 }
 
 zu_subset2 <- function(x, i, ...) {
+  if (!missing(i)) i <- zu_index(i)
   code <- zu_code(x)
   s <- zu_unclass(x)
   out <- s[[i, ...]]
@@ -146,6 +154,7 @@ zu_padded <- function(x, i, double = FALSE) {
 }
 
 zu_subassign <- function(x, i, ..., value) {
+  if (!missing(i)) i <- zu_index(i)
   code <- zu_code(x)
   if (...length() > 0L) {
     zu_abort("zuint vectors have one dimension.", "type", call = sys.call())
@@ -164,6 +173,7 @@ zu_subassign <- function(x, i, ..., value) {
 }
 
 zu_subassign2 <- function(x, i, ..., value) {
+  if (!missing(i)) i <- zu_index(i)
   code <- zu_code(x)
   value <- zu_unclass(zu_cast(value, code, call = sys.call()))
   s <- zu_unclass(x)

@@ -109,3 +109,7 @@ test_that("dplyr padding, unmatched joins, lag and if_else give NA", {
     expect_identical(dplyr::case_when(c(TRUE, FALSE) ~ ctor(3)), ctor(c(3, NA)))
   }
 })
+
+test_that("zu_ifelse keeps the names of test", {
+  expect_identical(zu_ifelse(c(a = TRUE, b = FALSE), int64(1), int64(2)), int64(c(a = 1, b = 2)))
+})

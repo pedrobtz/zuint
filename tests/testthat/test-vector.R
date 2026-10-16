@@ -20,7 +20,7 @@ test_that("[[ extracts one element without its name", {
     x <- zu_ctor(type)(c(a = 1, b = 2))
     expect_identical(x[[2]], zu_ctor(type)(2))
     expect_identical(x[["a"]], zu_ctor(type)(1))
-    expect_error(x[[3]])
+    expect_error(x[[3]], class = "subscriptOutOfBoundsError")
   }
 })
 
@@ -262,4 +262,17 @@ test_that("quantile and matrices are unsupported rather than computed on bits", 
   expect_error(cbind(int64(1:2), 1:2), class = "zuint_unsupported_error")
   expect_error(rbind(uint128(1)), class = "zuint_unsupported_error")
   expect_error(as.matrix(int64(1)), class = "zuint_unsupported_error")
+})
+
+test_that("a zuint vector used as an index is read as a number", {
+  x <- int64(c(10, 20, 30))
+  expect_identical(x[int64(2)], int64(20))
+  expect_identical(x[uint128(c(3, 1))], int64(c(30, 10)))
+  expect_identical(x[[int128(2)]], int64(20))
+  x[uint64(2)] <- 5L
+  expect_identical(x, int64(c(10, 5, 30)))
+  x[[int64(1)]] <- 9L
+  expect_identical(x, int64(c(9, 5, 30)))
+  expect_warning(r <- x[int64("9007199254740993")], class = "zuint_cast_warning")
+  expect_true(is.na(r))
 })

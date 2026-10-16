@@ -211,7 +211,7 @@ test_that("operands that are not numbers are type errors", {
 test_that("operands recycle, with base R's warning for uneven lengths", {
   expect_identical(int64(1:4) + 1L, int64(2:5))
   expect_identical(1L + int64(1:2) * int64(c(10, 20, 30, 40)), int64(c(11, 41, 31, 81)))
-  expect_warning(int64(1:3) + int64(1:2), "multiple")
+  expect_warning(int64(1:3) + int64(1:2), class = "zuint_recycling_warning")
   expect_identical(int64(1:3) + int64(), int64())
   expect_identical(names(int64(c(a = 1, b = 2)) + 1L), c("a", "b"))
   expect_identical(names(1L + int64(c(a = 1, b = 2))), c("a", "b"))
@@ -247,4 +247,37 @@ test_that("c() takes the common type", {
   expect_error(c(int64(1), list()), class = "zuint_type_error")
   expect_warning(y <- c(uint64(1), -1L), class = "zuint_cast_warning")
   expect_identical(is.na(y), c(FALSE, TRUE))
+})
+
+test_that("round and signif with negative digits round half to even, as base R", {
+  withr::local_seed(17)
+  v <- c(round(runif(200, -1e15, 1e15)), 1250, 1350, -1250, -1350, 1249, 15, 25, -15, 0, NA)
+  for (type in c("int64", "int128")) {
+    x <- zu_ctor(type)(v)
+    for (d in c(-1, -2, -3, -7)) {
+      expect_identical(as.double(round(x, d)), round(v, d), label = paste(type, d))
+    }
+    for (d in c(1, 2, 5)) {
+      expect_identical(as.double(signif(x, d)), signif(v, d), label = paste(type, "signif", d))
+    }
+    expect_identical(round(x, 2), x)
+  }
+  expect_identical(round(int64(1234), digits = -2), int64(1200))
+  expect_identical(round(uint64(c(1250, 1350)), -2), uint64(c(1200, 1400)))
+  expect_identical(round(uint128("340282366920938463463374607431768211454"), -40), uint128(0))
+  expect_warning(r <- round(int64("9223372036854775807"), -1), class = "zuint_overflow_warning")
+  expect_true(is.na(r))
+  expect_error(round(int64(1), c(1, 2)), class = "zuint_type_error")
+})
+
+test_that("checked_idiv and checked_mod error on a zero divisor", {
+  for (type in zu_all_types) {
+    x <- zu_ctor(type)(c(7, 9))
+    expect_identical(checked_idiv(x, 2L), zu_ctor(type)(c(3, 4)))
+    expect_identical(checked_mod(x, zu_ctor(type)(4)), zu_ctor(type)(c(3, 1)))
+    expect_error(checked_idiv(x, 0L), class = "zuint_division_error")
+    expect_error(checked_mod(x, zu_ctor(type)(c(1, 0))), class = "zuint_division_error")
+    expect_identical(checked_idiv(zu_ctor(type)(NA), 2L), zu_ctor(type)(NA))
+  }
+  expect_true(is.na(int64(5) %/% 0L))
 })

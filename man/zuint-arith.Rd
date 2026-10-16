@@ -5,6 +5,8 @@
 \alias{checked_add}
 \alias{checked_sub}
 \alias{checked_mul}
+\alias{checked_idiv}
+\alias{checked_mod}
 \alias{checked_pow}
 \alias{checked_neg}
 \alias{wrapping_add}
@@ -19,6 +21,10 @@ checked_add(x, y)
 checked_sub(x, y)
 
 checked_mul(x, y)
+
+checked_idiv(x, y)
+
+checked_mod(x, y)
 
 checked_pow(x, y)
 
@@ -57,7 +63,8 @@ of an unsigned type wraps too.
 
 Operands take their common type first (see \code{\link[=zu_common_type]{zu_common_type()}}). \code{\%/\%}
 rounds towards negative infinity and \code{\%\%} takes the sign of the divisor,
-as in R; division by zero is \code{NA}. \code{/} divides in double. \code{^} is exact
+as in R; division by zero is \code{NA}, except in \code{checked_idiv()} and
+\code{checked_mod()}, where it is an error of class \code{zuint_division_error}. \code{/} divides in double. \code{^} is exact
 for a non-negative integer exponent and computed in double otherwise.
 Comparison is exact across all the types and doubles.
 }
