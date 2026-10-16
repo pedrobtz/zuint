@@ -7,6 +7,8 @@
 - [`format_hex()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
   [`format_bin()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
   : Hexadecimal and binary text
+- [`seq_zu()`](https://pedrobtz.github.io/zuint/reference/seq_zu.md) :
+  Exact sequences
 - [`zu_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)
   [`zu_from_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)
   : Arrow tables with zuint columns
@@ -15,6 +17,9 @@
 - [`zu_duckdb_query()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
   [`zu_duckdb_register()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
   : Query DuckDB into zuint columns
+- [`zu_match()`](https://pedrobtz.github.io/zuint/reference/zu_match.md)
+  [`` `%zin%` ``](https://pedrobtz.github.io/zuint/reference/zu_match.md)
+  : Exact, fast matching
 - [`zu_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
   [`zu_from_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
   : Raw storage of a zuint vector

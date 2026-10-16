@@ -15,9 +15,11 @@ explicit, overflow as a policy, summaries in the right type (design
 §0.1). Dependencies outside the zu-\* family are allowed only in
 `Suggests` (design §2.1): zufast (\>= 0.1.1) is `LinkingTo` only, R (\>=
 4.3.0) is required for
-[`chooseOpsMethod()`](https://rdrr.io/r/base/chooseOpsMethod.html), and
-bit64, nanoarrow, arrow, duckdb, vctrs, pillar and gmp are Suggests used
-in tests and lazily registered methods. It does not fork bit64, do
+[`chooseOpsMethod()`](https://rdrr.io/r/base/chooseOpsMethod.html),
+stats (part of R) is imported for the
+[`median()`](https://rdrr.io/r/stats/median.html) generic, and bit64,
+nanoarrow, arrow, duckdb, vctrs, pillar and gmp are Suggests used in
+tests and lazily registered methods. It does not fork bit64, do
 arithmetic on small integer types, offer arbitrary precision, handle
 decimals (the companion `decimal` package does, and depends on zuint,
 never the reverse), or do matrix algebra.
@@ -145,6 +147,20 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   holds the nanoarrow methods, which
   [`R/zzz.R`](https://pedrobtz.github.io/zuint/R/zzz.R) registers when
   nanoarrow loads; nothing else touches a Suggests package.
+- [`src/zu_sort.c`](https://pedrobtz.github.io/zuint/src/zu_sort.c) is a
+  stable LSD radix sort on unsigned keys (sign bit flipped for the
+  signed types), behind [`sort()`](https://rdrr.io/r/base/sort.html) and
+  [`xtfrm()`](https://rdrr.io/r/base/xtfrm.html);
+  [`src/zu_hash.c`](https://pedrobtz.github.io/zuint/src/zu_hash.c) an
+  open-addressing hash on the raw words, behind
+  [`unique()`](https://rdrr.io/r/base/unique.html),
+  [`duplicated()`](https://rdrr.io/r/base/duplicated.html) and
+  [`zu_match()`](https://pedrobtz.github.io/zuint/reference/zu_match.md);
+  [`src/zu_reduce.c`](https://pedrobtz.github.io/zuint/src/zu_reduce.c)
+  the exact sums, products, cumulative functions and the mean.
+  [`R/reduce.R`](https://pedrobtz.github.io/zuint/R/reduce.R) holds
+  their methods and
+  [`seq_zu()`](https://pedrobtz.github.io/zuint/reference/seq_zu.md).
 - [`R/engines.R`](https://pedrobtz.github.io/zuint/R/engines.R) is the
   engine glue:
   [`as_integer64()`](https://pedrobtz.github.io/zuint/reference/as_integer64.md),
@@ -288,6 +304,32 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 
 - **Register an Arrow Table with DuckDB, not a record batch reader.** A
   registered reader is consumed by the first query and is empty after.
+
+- **[`xtfrm()`](https://rdrr.io/r/base/xtfrm.html) must return exact
+  integer ranks.** Base [`order()`](https://rdrr.io/r/base/order.html),
+  [`rank()`](https://rdrr.io/r/base/rank.html) and
+  [`sort()`](https://rdrr.io/r/base/sort.html) on several keys go
+  through it; a double proxy would tie values beyond 2^53.
+  [`match()`](https://rdrr.io/r/base/match.html), `%in%` and
+  [`table()`](https://rdrr.io/r/base/table.html) go through
+  [`mtfrm()`](https://rdrr.io/r/base/mtfrm.html), which returns the
+  exact decimal text, because
+  [`match()`](https://rdrr.io/r/base/match.html) is not generic and no
+  other atomic vector maps these values one to one.
+  [`zu_match()`](https://pedrobtz.github.io/zuint/reference/zu_match.md)
+  and `%zin%` are the fast, hash-based equivalents.
+
+- **A 128-bit sum counts its wrap-arounds.**
+  [`sum()`](https://rdrr.io/r/base/sum.html) of an int128 that passes
+  beyond the range and comes back is exact, so the accumulator wraps
+  modulo 2^128 and counts each wrap; only a non-zero count, or the NA
+  pattern, at the end is an overflow.
+
+- **bit64 masks `order`, `match`, `%in%`, `table` and `rank` as
+  functions,** not methods. For int64 they agree with base R except
+  [`rank()`](https://rdrr.io/r/base/rank.html), which keeps NA as NA
+  under bit64 and ranks it last under base R. The parity tests cover the
+  generics; these are bit64’s to define.
 
 - **Native routines are called through their registered symbols.**
   `init.c` calls `R_forceSymbols()`, so `.Call("name", ...)` with a

@@ -111,3 +111,31 @@
   work for `int64` and `uint64`.
 - [`as_integer64()`](https://pedrobtz.github.io/zuint/reference/as_integer64.md)
   returns a plain bit64 `integer64`.
+- [`sort()`](https://rdrr.io/r/base/sort.html), and base
+  [`order()`](https://rdrr.io/r/base/order.html) and
+  [`rank()`](https://rdrr.io/r/base/rank.html) through an exact
+  [`xtfrm()`](https://rdrr.io/r/base/xtfrm.html), with a stable radix
+  sort; [`unique()`](https://rdrr.io/r/base/unique.html),
+  [`duplicated()`](https://rdrr.io/r/base/duplicated.html) and
+  [`anyDuplicated()`](https://rdrr.io/r/base/duplicated.html) with an
+  exact hash; [`match()`](https://rdrr.io/r/base/match.html), `%in%` and
+  [`table()`](https://rdrr.io/r/base/table.html) compare exact values,
+  and
+  [`zu_match()`](https://pedrobtz.github.io/zuint/reference/zu_match.md)
+  and `%zin%` do it faster.
+- [`sum()`](https://rdrr.io/r/base/sum.html) is type stable and exact,
+  `NA` with a warning when the total does not fit;
+  [`prod()`](https://rdrr.io/r/base/prod.html),
+  [`cumsum()`](https://rdrr.io/r/base/cumsum.html),
+  [`cumprod()`](https://rdrr.io/r/base/cumsum.html),
+  [`cummax()`](https://rdrr.io/r/base/cumsum.html) and
+  [`cummin()`](https://rdrr.io/r/base/cumsum.html);
+  [`min()`](https://rdrr.io/r/base/Extremes.html),
+  [`max()`](https://rdrr.io/r/base/Extremes.html) and
+  [`range()`](https://rdrr.io/r/base/range.html) are exact;
+  [`mean()`](https://rdrr.io/r/base/mean.html) and
+  [`median()`](https://rdrr.io/r/stats/median.html) are doubles from the
+  exact values; [`diff()`](https://rdrr.io/r/base/diff.html) and
+  [`seq_zu()`](https://pedrobtz.github.io/zuint/reference/seq_zu.md).
+- [`summary()`](https://rdrr.io/r/base/summary.html) adds the median and
+  the mean.
