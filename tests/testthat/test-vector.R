@@ -241,6 +241,7 @@ test_that("conversions to complex, raw and dates go through the values", {
   expect_identical(as.raw(uint64(c(5, 255))), as.raw(c(5, 255)))
   expect_identical(as.Date(int64(1)), as.Date(1))
   expect_identical(as.POSIXct(int64(0), tz = "UTC"), as.POSIXct(0, tz = "UTC"))
+  expect_identical(as.POSIXlt(uint128(0), tz = "UTC"), as.POSIXlt(0, tz = "UTC"))
 })
 
 test_that("seq() on a zuint from is seq_zu()", {
@@ -262,6 +263,8 @@ test_that("quantile and matrices are unsupported rather than computed on bits", 
   expect_error(cbind(int64(1:2), 1:2), class = "zuint_unsupported_error")
   expect_error(rbind(uint128(1)), class = "zuint_unsupported_error")
   expect_error(as.matrix(int64(1)), class = "zuint_unsupported_error")
+  expect_error(aperm(int128(1)), class = "zuint_unsupported_error")
+  expect_error(scale(uint64(1:2)), class = "zuint_unsupported_error")
 })
 
 test_that("a zuint vector used as an index is read as a number", {
