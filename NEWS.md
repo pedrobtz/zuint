@@ -28,3 +28,11 @@
   `options(zuint.double = "allow")`.
 * Comparison is exact across all types and doubles: `int64(1) == 1.5` is
   `FALSE`, and nothing is compared through double.
+* The constructors read `0x` hex and `0b` binary as well as decimal, with an
+  optional sign, `_` between digits and surrounding whitespace; `"NA"` and
+  blank strings are `NA`. Exponents are not accepted.
+* `format_hex()` and `format_bin()`, with `pad = TRUE` for the full width;
+  `format()` takes `width` and `big.mark`; `print()` stops at
+  `getOption("max.print")`.
+* Bit operations: `bit_and()`, `bit_or()`, `bit_xor()`, `bit_not()`,
+  `shift_left()`, `shift_right()`, `popcount()`, `clz()` and `ctz()`.

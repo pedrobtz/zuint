@@ -25,7 +25,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 0 | [Package identity](#stage-0--package-identity) | quick | [#2](https://github.com/pedrobtz/zuint/issues/2) | [#15](https://github.com/pedrobtz/zuint/pull/15) | 2026-10-16 |
 | 1 | [Storage and construction](#stage-1--storage-and-construction) | full — first compiled code | [#3](https://github.com/pedrobtz/zuint/issues/3) | [#16](https://github.com/pedrobtz/zuint/pull/16) | 2026-10-16 |
 | 2 | [Arithmetic and the promotion order](#stage-2--arithmetic-and-the-promotion-order) | quick | [#4](https://github.com/pedrobtz/zuint/issues/4) | [#17](https://github.com/pedrobtz/zuint/pull/17) | 2026-10-16 |
-| 3 | [Parsing, formatting and bit operations](#stage-3--parsing-formatting-and-bit-operations) | quick | [#5](https://github.com/pedrobtz/zuint/issues/5) | | |
+| 3 | [Parsing, formatting and bit operations](#stage-3--parsing-formatting-and-bit-operations) | quick | [#5](https://github.com/pedrobtz/zuint/issues/5) | | 2026-10-16 |
 | 4 | [Arrow C Data Interface bridge](#stage-4--arrow-c-data-interface-bridge) | full — vendored header, external pointers and release callbacks | [#6](https://github.com/pedrobtz/zuint/issues/6) | | |
 | 5 | [Engine bridges and the round-trip matrix](#stage-5--engine-bridges-and-the-round-trip-matrix) | quick | [#7](https://github.com/pedrobtz/zuint/issues/7) | | |
 | 6 | [Sorting, hashing and reductions](#stage-6--sorting-hashing-and-reductions) | quick | [#8](https://github.com/pedrobtz/zuint/issues/8) | | |
@@ -236,6 +236,17 @@ operations exist for every type.
 - `R CMD check` passes with 0 errors, 0 warnings, 0 notes.
 
 **Design.** §6 (bit operations), §8 of design.md.
+
+**Deviations (2026-10-16).**
+- `format_hex()` and `format_bin()` write a negative value as a sign and
+  a magnitude (`-0x1`), so the round trip the exit criterion asks for
+  holds for the signed types; they take `pad = TRUE` for the full width.
+- A bit operation whose result is the NA bit pattern gives NA with a
+  `zuint_overflow_warning`, as arithmetic does; a shift by a negative
+  amount or by the width or more is NA without a warning, as division by
+  zero is.
+- Bit operations reject doubles (`zuint_type_error`) rather than applying
+  the double rule: a bit pattern has no sensible double form.
 
 ## Stage 4 — Arrow C Data Interface bridge
 
