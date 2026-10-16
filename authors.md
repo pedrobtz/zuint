@@ -4,6 +4,9 @@
 
 - **Pedro Baltazar**. Author, maintainer, copyright holder.
 
+- **The Apache Software Foundation**. Copyright holder.  
+  Arrow C Data Interface header in src/vendor/arrow/abi.h
+
 ## Citation
 
 Source:

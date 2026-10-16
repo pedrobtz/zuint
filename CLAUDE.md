@@ -112,6 +112,9 @@ Rscript -e 'devtools::clean_dll()'               # back to the native build
 CI runs this as the `no-int128` job of `R-CMD-check.yaml`, on every pull
 request.
 
+`tools/verify-vendor` checks the vendored Arrow header against upstream
+(see Vendored native code); run it after touching `src/vendor/`.
+
 ## Architecture
 
 Grows with the stages; `.agents/design.md` §10 has the planned C layout.
@@ -134,6 +137,14 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   [`format_hex()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
   and
   [`format_bin()`](https://pedrobtz.github.io/zuint/reference/format_hex.md).
+- [`src/zu_arrow.c`](https://pedrobtz.github.io/zuint/src/zu_arrow.c) is
+  the Arrow C Data Interface bridge, and
+  [`R/arrow.R`](https://pedrobtz.github.io/zuint/R/arrow.R) its R
+  surface.
+  [`R/nanoarrow.R`](https://pedrobtz.github.io/zuint/R/nanoarrow.R)
+  holds the nanoarrow methods, which
+  [`R/zzz.R`](https://pedrobtz.github.io/zuint/R/zzz.R) registers when
+  nanoarrow loads; nothing else touches a Suggests package.
 - [`R/types.R`](https://pedrobtz.github.io/zuint/R/types.R) has the
   constructors, the `NA_*_` constants and
   [`zu_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md);
@@ -239,6 +250,21 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 - **Shifts by the full width are undefined.** `x >> 64` on a `uint64_t`
   is UB, and UBSan caught one in Stage 1; shift 128-bit values with
   zufast’s `zuf_int_u128_shr()`/`shl()`, which take 0..127.
+
+- **An exported Arrow struct must never call into R.** A consumer may
+  call `release` from any thread, so `zu_to_arrow_c()` allocates the
+  structs and buffers with `malloc`, and the release callbacks only
+  `free`.
+
+- **Import borrows; it never releases the caller’s structs.** The struct
+  owner (nanoarrow, an engine) releases them. Our own exported structs
+  are released by their external pointer’s finalizer unless a consumer
+  moved them out, which sets `release` to NULL; `test-arrow.R` counts
+  the calls.
+
+- **A decimal128 imports as its bits, with no 38-digit range check.**
+  DuckDB’s default export writes HUGEINT values beyond 38 digits that
+  way.
 
 - **Native routines are called through their registered symbols.**
   `init.c` calls `R_forceSymbols()`, so `.Call("name", ...)` with a
@@ -381,9 +407,16 @@ the main thing slowing roadmaps down, so:
 
 ## Vendored native code
 
-The design plans to vendor the Arrow C Data Interface header (`abi.h`)
-for `zu_arrow.c`. Nothing is vendored yet; record its licence, pinned
-version and provenance here when it is.
+[`src/vendor/arrow/abi.h`](https://pedrobtz.github.io/zuint/src/vendor/arrow/abi.h)
+is the Arrow C Data Interface header from Apache Arrow 26.0.0
+(Apache-2.0), byte for byte, with its `LICENSE.txt` and `NOTICE.txt`. It
+declares structs only; only `src/zu_arrow.c` includes it.
+[`src/vendor/PROVENANCE`](https://pedrobtz.github.io/zuint/src/vendor/PROVENANCE)
+records the tag, commit, URLs, checksums and update procedure, and
+`tools/verify-vendor` re-downloads and compares them (`--canary` proves
+the check can fail). CI runs it through `vendor.yml`, which also fails a
+pull request that changes the vendor tree without changing `PROVENANCE`.
+There are no local patches.
 
 - Pin a stable upstream release, never `master` or a release candidate.
 - Record the tag, the commit and the checksums, and write down the

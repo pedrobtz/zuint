@@ -46,6 +46,10 @@ library(zuint)
   [`wrapping_pow()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   [`wrapping_neg()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   : Arithmetic with an explicit overflow policy
+- [`zu_from_arrow()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
+  [`zu_to_arrow()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
+  [`zu_sentinel_check()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
+  : Arrow C Data Interface
 - [`bit_and()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
   [`bit_or()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
   [`bit_xor()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)

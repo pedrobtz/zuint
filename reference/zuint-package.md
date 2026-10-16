@@ -24,3 +24,8 @@ Useful links:
 Authors:
 
 - Pedro Baltazar <pedrobtz@gmail.com> \[copyright holder\]
+
+Other contributors:
+
+- The Apache Software Foundation (Arrow C Data Interface header in
+  src/vendor/arrow/abi.h) \[copyright holder\]

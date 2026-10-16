@@ -83,3 +83,15 @@
   [`clz()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
   and
   [`ctz()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md).
+- [`zu_from_arrow()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
+  and
+  [`zu_to_arrow()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
+  convert through the Arrow C Data Interface with no R package in
+  between: `int64`, `uint64`, DuckDB’s `arrow.opaque`
+  `hugeint`/`uhugeint`, and `decimal128(p, 0)`.
+  [`zu_sentinel_check()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
+  counts engine values that would import as `NA`.
+- With nanoarrow installed, `nanoarrow::convert_array(array, int64())`
+  and the other prototypes import through the bridge, and
+  [`nanoarrow::as_nanoarrow_array()`](https://arrow.apache.org/nanoarrow/latest/r/reference/as_nanoarrow_array.html)
+  exports zuint vectors.
