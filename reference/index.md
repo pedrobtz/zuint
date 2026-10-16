@@ -29,6 +29,8 @@
 - [`checked_add()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   [`checked_sub()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   [`checked_mul()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
+  [`checked_idiv()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
+  [`checked_mod()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   [`checked_pow()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   [`checked_neg()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   [`wrapping_add()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)

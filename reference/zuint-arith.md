@@ -13,6 +13,10 @@ checked_sub(x, y)
 
 checked_mul(x, y)
 
+checked_idiv(x, y)
+
+checked_mod(x, y)
+
 checked_pow(x, y)
 
 checked_neg(x)
@@ -51,9 +55,11 @@ A zuint vector of the common type.
 Operands take their common type first (see
 [`zu_common_type()`](https://pedrobtz.github.io/zuint/reference/zu_common_type.md)).
 `%/%` rounds towards negative infinity and `%%` takes the sign of the
-divisor, as in R; division by zero is `NA`. `/` divides in double. `^`
-is exact for a non-negative integer exponent and computed in double
-otherwise. Comparison is exact across all the types and doubles.
+divisor, as in R; division by zero is `NA`, except in `checked_idiv()`
+and `checked_mod()`, where it is an error of class
+`zuint_division_error`. `/` divides in double. `^` is exact for a
+non-negative integer exponent and computed in double otherwise.
+Comparison is exact across all the types and doubles.
 
 ## Examples
 

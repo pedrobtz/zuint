@@ -52,6 +52,10 @@ is out of range. These functions choose differently:</p>
 <span></span>
 <span><span class="fu">checked_mul</span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span><span class="op">)</span></span>
 <span></span>
+<span><span class="fu">checked_idiv</span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu">checked_mod</span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span><span class="op">)</span></span>
+<span></span>
 <span><span class="fu">checked_pow</span><span class="op">(</span><span class="va">x</span>, <span class="va">y</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu">checked_neg</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
@@ -90,7 +94,8 @@ and checksums. A result that wraps onto the type's <code>NA</code> bit pattern i
 of an unsigned type wraps too.</p></li>
 </ul><p>Operands take their common type first (see <code><a href="zu_common_type.html">zu_common_type()</a></code>). <code>%/%</code>
 rounds towards negative infinity and <code>%%</code> takes the sign of the divisor,
-as in R; division by zero is <code>NA</code>. <code>/</code> divides in double. <code>^</code> is exact
+as in R; division by zero is <code>NA</code>, except in <code>checked_idiv()</code> and
+<code>checked_mod()</code>, where it is an error of class <code>zuint_division_error</code>. <code>/</code> divides in double. <code>^</code> is exact
 for a non-negative integer exponent and computed in double otherwise.
 Comparison is exact across all the types and doubles.</p>
     </div>

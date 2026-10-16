@@ -47,7 +47,11 @@
   [`checked_pow()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   and
   [`checked_neg()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
-  raise a `zuint_overflow_error` instead;
+  raise a `zuint_overflow_error` instead, and
+  [`checked_idiv()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
+  and
+  [`checked_mod()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
+  a `zuint_division_error` on a zero divisor;
   [`wrapping_add()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md),
   [`wrapping_sub()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md),
   [`wrapping_mul()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md),
