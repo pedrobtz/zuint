@@ -227,7 +227,17 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   `chooseOpsMethod.integer64()` returning TRUE as well, and R asks the
   left operand first, so `integer64 + zu_int64` runs bit64’s (exact)
   method and returns an `integer64`. Changing that would need a method
-  on bare `integer64`, which the rule above forbids.
+  on bare `integer64`, which the rule above forbids. For the wider types
+  bit64 asks [`is.numeric()`](https://rdrr.io/r/base/numeric.html) (TRUE
+  for every zuint type) and then `as.integer64()`, whose zuint methods
+  (`R/bit64.R`, registered when bit64 loads) convert exactly or give NA
+  with a `zuint_cast_warning`; without them bit64 converted an int128
+  operand through double.
+
+- **`test-bit64-parity.R` diffs bit64’s method list against ours.** A
+  base generic bit64 gives an `integer64` method needs a `zu_int64`
+  method, or an entry in that test’s allowlist (group generics,
+  functions bit64 masks).
 
 - **128-bit values cross the Arrow bridge as the `arrow.opaque`
   hugeint/uhugeint extension**, not as `decimal128(38, 0)`: DuckDB reads
@@ -299,6 +309,13 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 - **A decimal128 imports as its bits, with no 38-digit range check.**
   DuckDB’s default export writes HUGEINT values beyond 38 digits that
   way.
+
+- **The Arrow import refuses what it cannot read as values.** A
+  dictionary-encoded array has its indices’ format (`l` for int64
+  indices) and a schema with children is nested; both are
+  `zuint_arrow_error`. The binary metadata has no total length, so its
+  parser rejects negative counts and lengths and caps the entries;
+  `zu_metadata_get_c()` tests it bounded.
 
 - **arrow aborts R on the `arrow.opaque` type as an R object.**
   [`arrow::as_arrow_array()`](https://arrow.apache.org/docs/r/reference/as_arrow_array.html),
