@@ -1,0 +1,26 @@
+# Valgrind suppressions for the valgrind job in native-checks.yml. tools/ is
+# .Rbuildignore'd, so nothing here reaches the tarball.
+#
+# Both entries are the arrow package's, not zuint's. Loading arrow (a
+# Suggests, for the engine tests) starts worker threads whose stacks and
+# thread-local storage glibc still holds at exit, which valgrind reports as
+# "possibly lost". Matched on arrow's own frames, so a leak anywhere else is
+# still reported.
+{
+   arrow-worker-thread-stack
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   ...
+   fun:pthread_create*
+   obj:*/arrow.so
+}
+{
+   arrow-worker-thread-tls
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:malloc
+   ...
+   fun:__tls_get_addr
+   obj:*/arrow.so
+}

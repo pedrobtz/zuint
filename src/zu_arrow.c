@@ -373,3 +373,18 @@ SEXP zu_to_arrow_c(SEXP x, SEXP type_, SEXP decimal_)
 }
 
 SEXP zu_arrow_releases_c(void) { return Rf_ScalarReal((double)zu_arrow_releases); }
+
+/* For the tests: has the ArrowArray behind an external pointer been
+   released, and release it now (once; a second call does nothing). */
+SEXP zu_arrow_released_c(SEXP xp)
+{
+    struct ArrowArray *a = (struct ArrowArray *)R_ExternalPtrAddr(xp);
+    return Rf_ScalarLogical(a == NULL || a->release == NULL);
+}
+
+SEXP zu_arrow_release_c(SEXP xp)
+{
+    struct ArrowArray *a = (struct ArrowArray *)R_ExternalPtrAddr(xp);
+    if (a && a->release) a->release(a);
+    return R_NilValue;
+}

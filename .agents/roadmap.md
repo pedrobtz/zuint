@@ -303,8 +303,13 @@ every type in design §0 without any R package in between.
   them).
 - Import borrows the caller's structs and copies; it never releases them.
   "The release callback runs exactly once" is tested on the arrays zuint
-  exports: never during import, once at collection, and not at all when a
-  consumer moved the struct out and released it itself.
+  exports, through two internal test hooks so that no other collection can
+  change the count: never during import, exactly once when released, a
+  second release does nothing, and a struct moved into nanoarrow is
+  released once by its new owner. A collected array is checked to be
+  released; a double release on collection is what ASan and valgrind catch.
+- `tools/valgrind.supp` suppresses two "possibly lost" blocks from the
+  arrow package's worker threads, which the engine tests load.
 - The vendor gate is `vendor.yml` from r-actions calling
   `tools/verify-vendor`; abi.h is a header of structs, so there is no
   vendored object for the `nm -u` guard beyond `zu_arrow.o`, which

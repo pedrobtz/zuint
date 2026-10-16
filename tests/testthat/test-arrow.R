@@ -74,26 +74,31 @@ test_that("an array with an offset imports from the offset", {
 })
 
 test_that("import borrows the structs and the release callback runs once", {
-  invisible(gc())
-  before <- .Call(zu_arrow_releases_c)
   a <- zu_to_arrow(uint128(1:3))
   zu_from_arrow(a$array, a$schema)
   zu_from_arrow(a$array, a$schema)
-  expect_identical(.Call(zu_arrow_releases_c), before)
-  rm(a)
-  invisible(gc())
+  expect_false(.Call(zu_arrow_released_c, a$array))
+  # counted around the call itself, so no other collection can interfere
+  before <- .Call(zu_arrow_releases_c)
+  .Call(zu_arrow_release_c, a$array)
   expect_identical(.Call(zu_arrow_releases_c) - before, 1)
+  expect_true(.Call(zu_arrow_released_c, a$array))
+  .Call(zu_arrow_release_c, a$array)
+  expect_identical(.Call(zu_arrow_releases_c) - before, 1)
+})
+
+test_that("an exported array is released when collected", {
+  before <- settled_releases()
+  a <- zu_to_arrow(int64(1:3))
+  rm(a)
+  expect_gte(settled_releases() - before, 1)
 })
 
 test_that("a struct moved out is released by its new owner, not twice", {
   skip_if_not_installed("nanoarrow")
-  invisible(gc())
-  before <- .Call(zu_arrow_releases_c)
   na <- nanoarrow::as_nanoarrow_array(int64(1:3))
-  invisible(gc())
-  expect_identical(.Call(zu_arrow_releases_c), before)
+  before <- .Call(zu_arrow_releases_c)
   nanoarrow::nanoarrow_pointer_release(na)
-  invisible(gc())
   expect_identical(.Call(zu_arrow_releases_c) - before, 1)
 })
 

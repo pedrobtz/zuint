@@ -16,3 +16,16 @@ duckdb_column <- function(sql, lossless = FALSE) {
   col <- batch$children[[1L]]
   list(array = col, schema = nanoarrow::infer_nanoarrow_schema(col))
 }
+
+# Collect until the Arrow release count stops moving, so that a count taken
+# afterwards sees no finalizers from earlier tests.
+settled_releases <- function() {
+  repeat {
+    before <- .Call(zu_arrow_releases_c)
+    invisible(gc(full = TRUE))
+    after <- .Call(zu_arrow_releases_c)
+    if (after == before) {
+      return(after)
+    }
+  }
+}

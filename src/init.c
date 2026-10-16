@@ -24,6 +24,8 @@ SEXP zu_from_arrow_c(SEXP array, SEXP schema);
 SEXP zu_sentinel_check_c(SEXP array, SEXP schema);
 SEXP zu_to_arrow_c(SEXP x, SEXP type, SEXP decimal);
 SEXP zu_arrow_releases_c(void);
+SEXP zu_arrow_released_c(SEXP xp);
+SEXP zu_arrow_release_c(SEXP xp);
 
 static const R_CallMethodDef call_methods[] = {
   {"zu_cast_c", (DL_FUNC) &zu_cast_c, 3},
@@ -47,6 +49,8 @@ static const R_CallMethodDef call_methods[] = {
   {"zu_sentinel_check_c", (DL_FUNC) &zu_sentinel_check_c, 2},
   {"zu_to_arrow_c", (DL_FUNC) &zu_to_arrow_c, 3},
   {"zu_arrow_releases_c", (DL_FUNC) &zu_arrow_releases_c, 0},
+  {"zu_arrow_released_c", (DL_FUNC) &zu_arrow_released_c, 1},
+  {"zu_arrow_release_c", (DL_FUNC) &zu_arrow_release_c, 1},
   {NULL, NULL, 0}
 };
 
