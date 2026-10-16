@@ -309,7 +309,8 @@ Add each new one when a stage establishes it.
   computed with gmp (and skips without it). `helper-bit64.R` runs a string
   of R code in two fresh Rscript processes, one with bit64 attached and one
   where it never loaded, because S3 methods stay registered once a
-  namespace has loaded; it skips on CRAN.
+  namespace has loaded; it skips on CRAN. The code it compares is the named
+  list `bit64_parity_code`, evaluated once per run for every test.
 - **The round-trip matrix is `test-roundtrip.R`** (design §12): DuckDB,
   Arrow and Parquet paths for BIGINT, UBIGINT, HUGEINT and UHUGEINT, with
   the values of `matrix_values()` in `helper-arrow.R`. It skips without

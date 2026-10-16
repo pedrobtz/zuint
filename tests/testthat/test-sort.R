@@ -60,6 +60,12 @@ test_that("unique, duplicated and match agree with exact references, with word c
   expect_error(zu_match(int128(1), uint128(1)), class = "zuint_incompatible_error")
 })
 
+test_that("mtfrm() is the exact decimal text, so match() cannot tie wide values", {
+  x <- int64(c("9007199254740993", "9007199254740992", NA))
+  expect_identical(mtfrm(x), c("9007199254740993", "9007199254740992", NA))
+  expect_identical(match(int64("9007199254740993"), x), 1L)
+})
+
 test_that("table counts exact values", {
   x <- uint64(c("18446744073709551614", "18446744073709551613", "18446744073709551614"))
   tab <- table(x)
