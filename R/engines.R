@@ -98,8 +98,9 @@ zu_duckdb_register <- function(con, name, data) {
 #' anything arrow writes and reads, such as Parquet files.
 #'
 #' They go through nanoarrow rather than arrow's own conversion. arrow
-#' 24.0.0 aborts R when it makes an R object for the `arrow.opaque`
-#' extension type that `int128` and `uint128` use, so
+#' (24.0.0 and 25.0.1) aborts R when it makes an R object for the
+#' `arrow.opaque` extension type that `int128` and `uint128` use
+#' (<https://github.com/apache/arrow/issues/53951>), so
 #' `arrow::as_arrow_array()` and `arrow::infer_type()` work for `int64` and
 #' `uint64` only, and give an error for the 128-bit types.
 #'
@@ -171,8 +172,9 @@ zu_df_to_nanoarrow <- function(data) {
 }
 
 # arrow methods, registered when arrow loads. The 128-bit types get an
-# error instead: arrow 24.0.0 aborts R when it wraps their arrow.opaque
-# type in an R object (see zu_arrow_table()).
+# error instead: arrow (24.0.0 and 25.0.1) aborts R when it wraps their
+# arrow.opaque type in an R object, apache/arrow#53951 (see
+# zu_arrow_table()). Register real methods once a fixed arrow is required.
 zu_register_arrow <- function(...) {
   ns <- asNamespace("arrow")
   for (cl in c("zu_int64", "zu_uint64")) {

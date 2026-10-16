@@ -27,8 +27,9 @@ anything arrow writes and reads, such as Parquet files.
 }
 \details{
 They go through nanoarrow rather than arrow's own conversion. arrow
-24.0.0 aborts R when it makes an R object for the \code{arrow.opaque}
-extension type that \code{int128} and \code{uint128} use, so
+(24.0.0 and 25.0.1) aborts R when it makes an R object for the
+\code{arrow.opaque} extension type that \code{int128} and \code{uint128} use
+(\url{https://github.com/apache/arrow/issues/53951}), so
 \code{arrow::as_arrow_array()} and \code{arrow::infer_type()} work for \code{int64} and
 \code{uint64} only, and give an error for the 128-bit types.
 
