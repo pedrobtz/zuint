@@ -35,3 +35,30 @@
   and
   [`zu_from_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
   expose the raw payload.
+- Exact arithmetic: `+`, `-`, `*`, `%/%` (floor), `%%` (sign of the
+  divisor), `^` with a non-negative integer exponent, unary minus,
+  [`abs()`](https://rdrr.io/r/base/MathFun.html) and
+  [`sign()`](https://rdrr.io/r/base/sign.html). An out-of-range result
+  is `NA` with one `zuint_overflow_warning` per call. `/` and other
+  `Math` functions compute in double.
+- [`checked_add()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md),
+  [`checked_sub()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md),
+  [`checked_mul()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md),
+  [`checked_pow()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
+  and
+  [`checked_neg()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
+  raise a `zuint_overflow_error` instead;
+  [`wrapping_add()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md),
+  [`wrapping_sub()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md),
+  [`wrapping_mul()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md),
+  [`wrapping_pow()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
+  and
+  [`wrapping_neg()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
+  compute modulo 2^64 or 2^128.
+- Mixed types follow a lossless promotion order
+  ([`zu_common_type()`](https://pedrobtz.github.io/zuint/reference/zu_common_type.md)),
+  in arithmetic and in [`c()`](https://rdrr.io/r/base/c.html). A double
+  must be integral and in range, unless
+  `options(zuint.double = "allow")`.
+- Comparison is exact across all types and doubles: `int64(1) == 1.5` is
+  `FALSE`, and nothing is compared through double.
