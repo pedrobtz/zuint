@@ -31,6 +31,7 @@
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto">
+<li class="nav-item"><a class="nav-link" href="articles/zuint.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="reference/index.html">Reference</a></li>
 <li class="nav-item"><a class="nav-link" href="news/index.html">Changelog</a></li>
       </ul>
@@ -180,9 +181,136 @@
 <p>The constructors are named after the types, and every conversion into a type, from a double, a string or another type, follows the same rule: exact, or <code>NA</code> with a warning.</p>
 </div>
 <div class="section level2">
+<h2 id="performance">Performance<a class="anchor" aria-label="anchor" href="#performance"></a>
+</h2>
+<p>zuint’s <code>int64</code> against bit64’s <code>integer64</code> on random values across the whole range, in milliseconds (median of five runs; R 4.6.1, bit64 4.8.2, an Apple M-series laptop, 2026-10-16). <code>match</code> is <code><a href="reference/zu_match.html">zu_match()</a></code>, the fast counterpart of base <code><a href="https://rdrr.io/r/base/match.html" class="external-link">match()</a></code>. The script is <code>inst/bench/bench.R</code>.</p>
+<table class="table">
+<thead><tr>
+<th>Elements</th>
+<th>Operation</th>
+<th align="right">zuint</th>
+<th align="right">bit64</th>
+<th align="right">zuint / bit64</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>10<sup>6</sup>
+</td>
+<td><code>+</code></td>
+<td align="right">2.9</td>
+<td align="right">11.1</td>
+<td align="right">0.26</td>
+</tr>
+<tr>
+<td></td>
+<td><code>sum</code></td>
+<td align="right">0.5</td>
+<td align="right">0.6</td>
+<td align="right">0.83</td>
+</tr>
+<tr>
+<td></td>
+<td><code>sort</code></td>
+<td align="right">13.7</td>
+<td align="right">14.8</td>
+<td align="right">0.93</td>
+</tr>
+<tr>
+<td></td>
+<td><code>match</code></td>
+<td align="right">11.9</td>
+<td align="right">10.5</td>
+<td align="right">1.13</td>
+</tr>
+<tr>
+<td></td>
+<td><code>unique</code></td>
+<td align="right">10.8</td>
+<td align="right">10.5</td>
+<td align="right">1.03</td>
+</tr>
+<tr>
+<td>10<sup>7</sup>
+</td>
+<td><code>+</code></td>
+<td align="right">27</td>
+<td align="right">78</td>
+<td align="right">0.35</td>
+</tr>
+<tr>
+<td></td>
+<td><code>sum</code></td>
+<td align="right">5</td>
+<td align="right">6</td>
+<td align="right">0.83</td>
+</tr>
+<tr>
+<td></td>
+<td><code>sort</code></td>
+<td align="right">141</td>
+<td align="right">158</td>
+<td align="right">0.89</td>
+</tr>
+<tr>
+<td></td>
+<td><code>match</code></td>
+<td align="right">148</td>
+<td align="right">295</td>
+<td align="right">0.50</td>
+</tr>
+<tr>
+<td></td>
+<td><code>unique</code></td>
+<td align="right">147</td>
+<td align="right">283</td>
+<td align="right">0.52</td>
+</tr>
+<tr>
+<td>10<sup>8</sup>
+</td>
+<td><code>+</code></td>
+<td align="right">266</td>
+<td align="right">781</td>
+<td align="right">0.34</td>
+</tr>
+<tr>
+<td></td>
+<td><code>sum</code></td>
+<td align="right">51</td>
+<td align="right">58</td>
+<td align="right">0.88</td>
+</tr>
+<tr>
+<td></td>
+<td><code>sort</code></td>
+<td align="right">2364</td>
+<td align="right">2339</td>
+<td align="right">1.01</td>
+</tr>
+<tr>
+<td></td>
+<td><code>match</code></td>
+<td align="right">3056</td>
+<td align="right">1579</td>
+<td align="right">1.94</td>
+</tr>
+<tr>
+<td></td>
+<td><code>unique</code></td>
+<td align="right">4148</td>
+<td align="right">1556</td>
+<td align="right">2.67</td>
+</tr>
+</tbody>
+</table>
+<p>zuint is faster or level on most of them. It is slower for <code>match</code> and <code>unique</code> at 10<sup>8</sup> values, where its hash table outgrows memory caches, and slightly slower for <code>match</code> at 10<sup>6</sup>.</p>
+</div>
+<div class="section level2">
 <h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
 </h2>
 <ul>
+<li>
+<code><a href="articles/zuint.html">vignette("zuint")</a></code> walks through the types, the promotion order, the overflow policies and the engine round trip.</li>
 <li>The <a href="https://pedrobtz.github.io/zuint/reference/">reference index</a> lists every function, with the type ranges in <code><a href="reference/zuint-types.html">?int64</a></code>, the overflow policies in <code><a href="reference/zuint-arith.html">?checked_add</a></code> and the Arrow bridge in <code><a href="reference/zuint-arrow.html">?zu_from_arrow</a></code>.</li>
 </ul>
 </div>

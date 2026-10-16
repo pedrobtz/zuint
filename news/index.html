@@ -15,7 +15,8 @@
     </button>
 
     <div id="navbar" class="collapse navbar-collapse ms-3">
-      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+      <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/zuint.html">Get started</a></li>
+<li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
@@ -67,6 +68,10 @@
 <code><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum()</a></code> is type stable and exact, <code>NA</code> with a warning when the total does not fit; <code><a href="https://rdrr.io/r/base/prod.html" class="external-link">prod()</a></code>, <code><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cumsum()</a></code>, <code><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cumprod()</a></code>, <code><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cummax()</a></code> and <code><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cummin()</a></code>; <code><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min()</a></code>, <code><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max()</a></code> and <code><a href="https://rdrr.io/r/base/range.html" class="external-link">range()</a></code> are exact; <code><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean()</a></code> and <code><a href="https://rdrr.io/r/stats/median.html" class="external-link">median()</a></code> are doubles from the exact values; <code><a href="https://rdrr.io/r/base/diff.html" class="external-link">diff()</a></code> and <code><a href="../reference/seq_zu.html">seq_zu()</a></code>.</li>
 <li>
 <code><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary()</a></code> adds the median and the mean.</li>
+<li>With vctrs, dplyr and tibble: zuint columns combine by the promotion order, cast exactly, arrange, group, summarise, bind and print. data.table keys on <code>int64</code> natively.</li>
+<li>
+<code><a href="../reference/zu_ifelse.html">zu_ifelse()</a></code> and <code><a href="../reference/zu_ifelse.html">zu_vapply()</a></code> keep the type where <code><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse()</a></code> and <code><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply()</a></code> would read raw bits.</li>
+<li>A getting-started vignette, and benchmarks against bit64 in the README.</li>
 </ul></div>
   </main></div>
 

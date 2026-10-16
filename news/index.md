@@ -139,3 +139,14 @@
   [`seq_zu()`](https://pedrobtz.github.io/zuint/reference/seq_zu.md).
 - [`summary()`](https://rdrr.io/r/base/summary.html) adds the median and
   the mean.
+- With vctrs, dplyr and tibble: zuint columns combine by the promotion
+  order, cast exactly, arrange, group, summarise, bind and print.
+  data.table keys on `int64` natively.
+- [`zu_ifelse()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
+  and
+  [`zu_vapply()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
+  keep the type where [`ifelse()`](https://rdrr.io/r/base/ifelse.html)
+  and [`vapply()`](https://rdrr.io/r/base/lapply.html) would read raw
+  bits.
+- A getting-started vignette, and benchmarks against bit64 in the
+  README.

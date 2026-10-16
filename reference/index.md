@@ -17,6 +17,9 @@
 - [`zu_duckdb_query()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
   [`zu_duckdb_register()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
   : Query DuckDB into zuint columns
+- [`zu_ifelse()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
+  [`zu_vapply()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
+  : Helpers for code that drops the class
 - [`zu_match()`](https://pedrobtz.github.io/zuint/reference/zu_match.md)
   [`` `%zin%` ``](https://pedrobtz.github.io/zuint/reference/zu_match.md)
   : Exact, fast matching
