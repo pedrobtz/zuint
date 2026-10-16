@@ -3,6 +3,8 @@
 test_that("the shared object links no forbidden symbols", {
   skip_on_cran()
   skip_on_os("windows")
+  # covr builds with --coverage, which links gcov's own stdio and exit
+  skip_if(identical(Sys.getenv("R_COVR"), "true"), "coverage build")
   nm <- Sys.which("nm")
   skip_if(nm == "", "nm is not available")
   # load_all() loads a temporary copy and may have removed it; the build in
