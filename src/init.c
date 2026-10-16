@@ -26,6 +26,14 @@ SEXP zu_to_arrow_c(SEXP x, SEXP type, SEXP decimal);
 SEXP zu_arrow_releases_c(void);
 SEXP zu_arrow_released_c(SEXP xp);
 SEXP zu_arrow_release_c(SEXP xp);
+SEXP zu_order_c(SEXP x, SEXP type, SEXP decreasing, SEXP na_last);
+SEXP zu_rank_c(SEXP x, SEXP type);
+SEXP zu_duplicated_c(SEXP x, SEXP type, SEXP from_last);
+SEXP zu_match_c(SEXP x, SEXP table, SEXP type, SEXP nomatch);
+SEXP zu_sum_c(SEXP x, SEXP type, SEXP na_rm);
+SEXP zu_prod_c(SEXP x, SEXP type, SEXP na_rm);
+SEXP zu_cum_c(SEXP x, SEXP type, SEXP what);
+SEXP zu_mean_c(SEXP x, SEXP type, SEXP na_rm);
 
 static const R_CallMethodDef call_methods[] = {
   {"zu_cast_c", (DL_FUNC) &zu_cast_c, 3},
@@ -51,6 +59,14 @@ static const R_CallMethodDef call_methods[] = {
   {"zu_arrow_releases_c", (DL_FUNC) &zu_arrow_releases_c, 0},
   {"zu_arrow_released_c", (DL_FUNC) &zu_arrow_released_c, 1},
   {"zu_arrow_release_c", (DL_FUNC) &zu_arrow_release_c, 1},
+  {"zu_order_c", (DL_FUNC) &zu_order_c, 4},
+  {"zu_rank_c", (DL_FUNC) &zu_rank_c, 2},
+  {"zu_duplicated_c", (DL_FUNC) &zu_duplicated_c, 3},
+  {"zu_match_c", (DL_FUNC) &zu_match_c, 4},
+  {"zu_sum_c", (DL_FUNC) &zu_sum_c, 3},
+  {"zu_prod_c", (DL_FUNC) &zu_prod_c, 3},
+  {"zu_cum_c", (DL_FUNC) &zu_cum_c, 3},
+  {"zu_mean_c", (DL_FUNC) &zu_mean_c, 3},
   {NULL, NULL, 0}
 };
 
