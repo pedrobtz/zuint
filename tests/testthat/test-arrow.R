@@ -78,13 +78,10 @@ test_that("import borrows the structs and the release callback runs once", {
   zu_from_arrow(a$array, a$schema)
   zu_from_arrow(a$array, a$schema)
   expect_false(.Call(zu_arrow_released_c, a$array))
-  # counted around the call itself, so no other collection can interfere
-  before <- .Call(zu_arrow_releases_c)
-  .Call(zu_arrow_release_c, a$array)
-  expect_identical(.Call(zu_arrow_releases_c) - before, 1)
+  # the hook counts inside C, so no collection can add to the count
+  expect_identical(.Call(zu_arrow_release_c, a$array), 1L)
   expect_true(.Call(zu_arrow_released_c, a$array))
-  .Call(zu_arrow_release_c, a$array)
-  expect_identical(.Call(zu_arrow_releases_c) - before, 1)
+  expect_identical(.Call(zu_arrow_release_c, a$array), 0L)
 })
 
 test_that("an exported array is released when collected", {
@@ -97,9 +94,10 @@ test_that("an exported array is released when collected", {
 test_that("a struct moved out is released by its new owner, not twice", {
   skip_if_not_installed("nanoarrow")
   na <- nanoarrow::as_nanoarrow_array(int64(1:3))
-  before <- .Call(zu_arrow_releases_c)
-  nanoarrow::nanoarrow_pointer_release(na)
-  expect_identical(.Call(zu_arrow_releases_c) - before, 1)
+  # the struct nanoarrow now owns still has zuint's callback, once
+  expect_identical(.Call(zu_arrow_release_c, na), 1L)
+  expect_identical(.Call(zu_arrow_release_c, na), 0L)
+  expect_false(nanoarrow::nanoarrow_pointer_is_valid(na))
 })
 
 test_that("unsupported or released structs are arrow errors", {
