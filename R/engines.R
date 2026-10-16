@@ -152,7 +152,11 @@ zu_stream_to_df <- function(stream) {
     } else if (length(parts) == 0L) {
       zu_new(zu_alloc_empty(code), code)
     } else {
-      do.call(c, lapply(parts, zu_from_arrow, schema = child))
+      lost <- sum(vapply(parts, zu_sentinel_check, integer(1), schema = child))
+      zu_warn_lost(lost, zu_types[[code]])
+      do.call(c, lapply(parts, function(p) {
+        withCallingHandlers(zu_from_arrow(p, child), zuint_cast_warning = function(w) invokeRestart("muffleWarning"))
+      }))
     }
   })
   names(cols) <- names(schema$children)

@@ -142,26 +142,38 @@ SEXP zu_sort_values_c(SEXP x, SEXP type_, SEXP decreasing_)
         const uint64_t na = zu_na64(t), flip = (t == ZU_INT64 ? ZU_SIGN64 : 0) ^ (decreasing ? ~UINT64_C(0) : 0);
         uint64_t *a = (uint64_t *)R_alloc((size_t)(n ? n : 1), sizeof(uint64_t));
         uint64_t *b = (uint64_t *)R_alloc((size_t)(n ? n : 1), sizeof(uint64_t));
-        /* four 16-bit digits, all histograms in one read pass */
-        R_xlen_t *count = (R_xlen_t *)R_alloc(4 * 65536, sizeof(R_xlen_t));
-        memset(count, 0, 4 * 65536 * sizeof(R_xlen_t));
         for (R_xlen_t i = 0; i < n; i++) {
             uint64_t v = zu_get64(p, i);
-            if (v == na) continue;
-            v ^= flip;
-            a[m++] = v;
-            count[v & 0xFFFF]++;
-            count[65536 + ((v >> 16) & 0xFFFF)]++;
-            count[2 * 65536 + ((v >> 32) & 0xFFFF)]++;
-            count[3 * 65536 + (v >> 48)]++;
+            if (v != na) a[m++] = v ^ flip;
         }
-        for (unsigned d = 0; d < 4; d++) {
-            R_xlen_t *c = count + (size_t)d * 65536;
-            unsigned sh = 16 * d;
-            if (m == 0 || c[(a[0] >> sh) & 0xFFFF] == m) continue;   /* constant digit */
+        /* Long vectors: four 16-bit digits, all histograms in one read pass,
+           written out so the loop unrolls. Short ones: eight 8-bit digits,
+           without the 2 MB histogram the long path needs. */
+        const bool wide = m >= 65536;
+        const unsigned bits = wide ? 16 : 8, digits = wide ? 4 : 8;
+        const size_t buckets = (size_t)1 << bits;
+        const uint64_t mask = buckets - 1;
+        R_xlen_t *count = (R_xlen_t *)R_alloc(buckets * digits, sizeof(R_xlen_t));
+        memset(count, 0, buckets * digits * sizeof(R_xlen_t));
+        if (wide) {
+            for (R_xlen_t i = 0; i < m; i++) {
+                uint64_t v = a[i];
+                count[v & 0xFFFF]++;
+                count[65536 + ((v >> 16) & 0xFFFF)]++;
+                count[2 * 65536 + ((v >> 32) & 0xFFFF)]++;
+                count[3 * 65536 + (v >> 48)]++;
+            }
+        } else {
+            for (R_xlen_t i = 0; i < m; i++)
+                for (unsigned d = 0; d < 8; d++) count[d * 256 + ((a[i] >> (8 * d)) & 0xFF)]++;
+        }
+        for (unsigned d = 0; d < digits; d++) {
+            R_xlen_t *c = count + (size_t)d * buckets;
+            unsigned sh = bits * d;
+            if (m == 0 || c[(a[0] >> sh) & mask] == m) continue;   /* constant digit */
             R_xlen_t pos = 0;
-            for (unsigned v = 0; v < 65536; v++) { R_xlen_t k = c[v]; c[v] = pos; pos += k; }
-            for (R_xlen_t i = 0; i < m; i++) b[c[(a[i] >> sh) & 0xFFFF]++] = a[i];
+            for (size_t v = 0; v < buckets; v++) { R_xlen_t k = c[v]; c[v] = pos; pos += k; }
+            for (R_xlen_t i = 0; i < m; i++) b[c[(a[i] >> sh) & mask]++] = a[i];
             uint64_t *tmp = a; a = b; b = tmp;
         }
         SEXP out = PROTECT(zu_alloc(t, m));

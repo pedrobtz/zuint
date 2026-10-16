@@ -151,3 +151,16 @@ test_that("seq_zu runs downwards in unsigned types and across whole ranges", {
   expect_error(seq_zu(uint64(0), uint64("18446744073709551614"), by = 1L), class = "zuint_type_error")
   expect_error(seq_zu(int64(1), int64(5), by = int128("170141183460469231731687303715884105727")), class = "zuint_type_error")
 })
+
+test_that("mean with trim is unsupported rather than ignored", {
+  expect_error(mean(int64(1:4), trim = 0.1), class = "zuint_unsupported_error")
+  expect_identical(mean(int64(1:4), trim = 0), 2.5)
+})
+
+test_that("short and long sorts agree", {
+  withr::local_seed(3)
+  v <- c(round(runif(70000, -2^52, 2^52)), NA)
+  x <- int64(v)
+  expect_identical(as.double(sort(x)), sort(v))
+  expect_identical(as.double(sort(x[1:50], decreasing = TRUE)), sort(v[1:50], decreasing = TRUE))
+})

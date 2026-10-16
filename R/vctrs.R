@@ -10,6 +10,8 @@ zu_register_vctrs <- function(...) {
   reg <- function(generic, cls, fun) registerS3method(generic, cls, fun, envir = ns)
   others <- c("integer", "logical", "double", "integer64")
   for (cl in zu_classes_all) {
+    reg("vec_cast", paste0("double.", cl), zu_vec_cast_base)
+    reg("vec_cast", paste0("integer.", cl), zu_vec_cast_base)
     reg("vec_proxy", cl, zu_vec_proxy)
     reg("vec_restore", cl, zu_vec_restore)
     reg("vec_proxy_equal", cl, zu_vec_proxy_pieces)
@@ -99,6 +101,23 @@ zu_vec_cast <- function(x, to, ..., x_arg = "", to_arg = "") {
   out
 }
 
+# A zuint vector to double or integer: exact, or vctrs' lossy-cast error.
+zu_vec_cast_base <- function(x, to, ..., x_arg = "", to_arg = "") {
+  res <- if (is.double(to)) {
+    .Call(zu_to_double_c, x, zu_code(x))
+  } else {
+    .Call(zu_to_integer_c, x, zu_code(x))
+  }
+  out <- res[[1L]]
+  if (res[[2L]] > 0) {
+    # a rounded double casts back to a different value; a lost integer is NA
+    back <- suppressWarnings(zu_cast(out, zu_code(x)))
+    lossy <- !zu_is_na(x) & (is.na(out) | !(back == x) %in% TRUE)
+    return(vctrs::maybe_lossy_cast(out, x, to, lossy = lossy, x_arg = x_arg, to_arg = to_arg))
+  }
+  out
+}
+
 zu_pillar_shaft <- function(x, ...) {
   out <- zu_as_character(x)
   out[is.na(out)] <- NA
@@ -137,6 +156,14 @@ zu_ifelse <- function(test, yes, no) {
   nm <- names(test)
   test <- as.logical(test)
   n <- length(test)
+  # a double follows the rule of c() and the operators: integral and in
+  # range, or a zuint_double_error
+  for (v in list(yes, no)) {
+    if (zu_kind(v) == zu_kind_dbl && zu_convert(v, zu_kind_dbl, code)[[2L]] > 0) {
+      zu_double_problem(zu_types[[code]], call)
+      return(ifelse(test, zu_dbl_quiet(yes), zu_dbl_quiet(no)))
+    }
+  }
   out <- rep(zu_cast(yes, code, call = call), length.out = n)
   no <- rep(zu_cast(no, code, call = call), length.out = n)
   f <- !is.na(test) & !test

@@ -44,7 +44,10 @@ zu_extreme <- function(x, code, na.rm, which, call) {
   zu_new(r[which], code)
 }
 
-zu_mean <- function(x, ..., na.rm = FALSE) {
+zu_mean <- function(x, trim = 0, na.rm = FALSE, ...) {
+  if (!identical(trim, 0) && !identical(trim, 0L)) {
+    zu_abort("mean() with `trim` is not supported for zuint vectors.", "unsupported", call = sys.call())
+  }
   .Call(zu_mean_c, x, zu_code(x), isTRUE(na.rm))
 }
 
