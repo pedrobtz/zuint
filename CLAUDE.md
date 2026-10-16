@@ -124,6 +124,16 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 - [`R/vector.R`](R/vector.R) holds the base vector methods, written once and
   registered for all four classes from the `zu_methods` table through
   `@evalNamespace`. To add a method, add it to that table.
+- [`R/promote.R`](R/promote.R) is the promotion order (`zu_common2()`), and
+  [`R/ops.R`](R/ops.R) the `Ops` and `Math` group methods and the
+  `checked_*` / `wrapping_*` functions. R picks the common type and
+  converts zuint and double operands to it; integer operands go to C as
+  they are.
+- [`src/zu_ops.h`](src/zu_ops.h) is the policy layer over zufast's checked
+  and wrapping primitives: each operation reports OK, NA or overflow, and
+  the caller applies the policy. [`src/zu_arith.c`](src/zu_arith.c) holds
+  the vectorised loops, `^` by squaring, and exact comparison of any two
+  operand kinds, doubles included.
 
 ## Invariants that are easy to break
 
@@ -138,7 +148,11 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   depend on what else is attached.
 - **`chooseOpsMethod()` must return TRUE for every `zu_*` class.** Without
   it, `zu_int64 + integer64` warns "incompatible methods" and R does double
-  arithmetic on the bits. This is why `R (>= 4.3.0)`.
+  arithmetic on the bits. This is why `R (>= 4.3.0)`. bit64 4.8 defines
+  `chooseOpsMethod.integer64()` returning TRUE as well, and R asks the left
+  operand first, so `integer64 + zu_int64` runs bit64's (exact) method and
+  returns an `integer64`. Changing that would need a method on bare
+  `integer64`, which the rule above forbids.
 - **128-bit values cross the Arrow bridge as the `arrow.opaque`
   hugeint/uhugeint extension**, not as `decimal128(38, 0)`: DuckDB reads the
   decimal back as DECIMAL, and the decimal form reads UHUGEINT ≥ 2¹²⁷ as
@@ -163,6 +177,20 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 - **The `NA_*_` constants are built in pure R at install time**, from bit
   patterns (`-0` is INT64_MIN), because the shared object is not loaded
   when the package's R code is evaluated.
+- **Integer operands reach the C arithmetic unconverted.** A negative
+  integer meeting an unsigned type is part of the operation (an overflow,
+  or under wrapping its value modulo 2^width). Converted to a payload
+  first, -1 would wrap onto the unsigned NA pattern and read as NA.
+- **A wrapped result on the NA pattern is NA, but an exact result on it is
+  an overflow.** `zu_ops.h` reports both as overflow; only the wrapping
+  policy stores the bits, which then read as NA (design §6).
+- **Never write and read one variable in the arguments of a single call.**
+  `f(g(&r), r)` reads `r` before or after `g()` writes it, as the compiler
+  pleases: gcc at `-O0` read it first and stored garbage, which only the
+  coverage build (gcc, `-O0`, Linux) showed. Compute into a local first.
+- **Shifts by the full width are undefined.** `x >> 64` on a `uint64_t`
+  is UB, and UBSan caught one in Stage 1; shift 128-bit values with
+  zufast's `zuf_int_u128_shr()`/`shl()`, which take 0..127.
 - **Native routines are called through their registered symbols.**
   `init.c` calls `R_forceSymbols()`, so `.Call("name", ...)` with a string
   fails; use the symbol `useDynLib(.registration = TRUE)` defines.

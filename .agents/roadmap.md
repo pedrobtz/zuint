@@ -24,7 +24,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | --- | --- | --- | --- | --- | --- |
 | 0 | [Package identity](#stage-0--package-identity) | quick | [#2](https://github.com/pedrobtz/zuint/issues/2) | [#15](https://github.com/pedrobtz/zuint/pull/15) | 2026-10-16 |
 | 1 | [Storage and construction](#stage-1--storage-and-construction) | full — first compiled code | [#3](https://github.com/pedrobtz/zuint/issues/3) | [#16](https://github.com/pedrobtz/zuint/pull/16) | 2026-10-16 |
-| 2 | [Arithmetic and the promotion order](#stage-2--arithmetic-and-the-promotion-order) | quick | [#4](https://github.com/pedrobtz/zuint/issues/4) | | |
+| 2 | [Arithmetic and the promotion order](#stage-2--arithmetic-and-the-promotion-order) | quick | [#4](https://github.com/pedrobtz/zuint/issues/4) | [#17](https://github.com/pedrobtz/zuint/pull/17) | 2026-10-16 |
 | 3 | [Parsing, formatting and bit operations](#stage-3--parsing-formatting-and-bit-operations) | quick | [#5](https://github.com/pedrobtz/zuint/issues/5) | | |
 | 4 | [Arrow C Data Interface bridge](#stage-4--arrow-c-data-interface-bridge) | full — vendored header, external pointers and release callbacks | [#6](https://github.com/pedrobtz/zuint/issues/6) | | |
 | 5 | [Engine bridges and the round-trip matrix](#stage-5--engine-bridges-and-the-round-trip-matrix) | quick | [#7](https://github.com/pedrobtz/zuint/issues/7) | | |
@@ -188,6 +188,21 @@ signed overflow reaching C.
 - `R CMD check` passes with 0 errors, 0 warnings, 0 notes.
 
 **Design.** §5, §6, §10 of design.md.
+
+**Deviations (2026-10-16).**
+- `integer64 + zu_int64`, with the bit64 object on the left, runs bit64's
+  method: bit64 4.8.2 defines `chooseOpsMethod.integer64()` returning TRUE,
+  and R asks the left operand first. The result is exact and there is no
+  warning, as the exit criterion asks, but its class is `integer64`.
+  Claiming it would need a method on bare `integer64`, which design §4.1
+  rules out. `zu_int64 + integer64` is zuint's.
+- `abs()` and `sign()` are exact; `floor()`, `ceiling()`, `trunc()`,
+  `round()` and `signif()` return the value; `cumsum()`, `cumprod()`,
+  `cummax()` and `cummin()` are an error of class
+  `zuint_unsupported_error` until Stage 6; the rest of the `Math` group
+  computes in double. `!`, `&` and `|` work on the logical values.
+- `NA ^ 0` is `NA`, not 1 as in base R: NA in, NA out, under every
+  operator.
 
 ## Stage 3 — Parsing, formatting and bit operations
 
