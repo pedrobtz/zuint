@@ -7,3 +7,5 @@
 ^CLAUDE\.md$
 ^tools$
 ^README\.Rmd$
+^doc$
+^Meta$
