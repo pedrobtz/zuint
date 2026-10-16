@@ -30,8 +30,11 @@ A vector of the requested type, the same length as `x`.
 
 `x` can be a logical, integer, double or character vector, another zuint
 vector, or a bit64 `integer64`. A double must be integral and in range.
-A string is decimal digits with an optional leading `-`. `NA` stays `NA`
-without a warning. Names are kept.
+A string is decimal, `0x` hex or `0b` binary digits, with an optional
+sign, `_` between digits and surrounding whitespace (see
+[`format_hex()`](https://pedrobtz.github.io/zuint/reference/format_hex.md));
+`"NA"` and blank strings are `NA`. `NA` stays `NA` without a warning.
+Names are kept.
 
 Each type reserves one bit pattern for `NA`, so its range is one value
 short of the full width: the most negative value for the signed types

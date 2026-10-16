@@ -124,7 +124,16 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 - [`src/zu_cast.c`](https://pedrobtz.github.io/zuint/src/zu_cast.c)
   holds construction and conversion. Entry points that can lose a value
   return `list(result, n_lost)` and R raises the warning, so condition
-  classes live only in R.
+  classes live only in R. Text goes through the one parser in
+  [`src/zu_parse.c`](https://pedrobtz.github.io/zuint/src/zu_parse.c),
+  and out through
+  [`src/zu_format.c`](https://pedrobtz.github.io/zuint/src/zu_format.c).
+- [`src/zu_bits.c`](https://pedrobtz.github.io/zuint/src/zu_bits.c) and
+  [`R/bits.R`](https://pedrobtz.github.io/zuint/R/bits.R) are the bit
+  operations; [`R/text.R`](https://pedrobtz.github.io/zuint/R/text.R) is
+  [`format_hex()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
+  and
+  [`format_bin()`](https://pedrobtz.github.io/zuint/reference/format_hex.md).
 - [`R/types.R`](https://pedrobtz.github.io/zuint/R/types.R) has the
   constructors, the `NA_*_` constants and
   [`zu_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md);
@@ -221,6 +230,11 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   the compiler pleases: gcc at `-O0` read it first and stored garbage,
   which only the coverage build (gcc, `-O0`, Linux) showed. Compute into
   a local first.
+
+- **Hex and binary text is sign and magnitude, never two’s complement.**
+  `format_hex(int64(-1))` is `"-0x1"`, so every string the package
+  writes reads back as the same value; `"0xffffffffffffffff"` is a
+  uint64.
 
 - **Shifts by the full width are undefined.** `x >> 64` on a `uint64_t`
   is UB, and UBSan caught one in Stage 1; shift 128-bit values with

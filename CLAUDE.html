@@ -91,7 +91,9 @@
 <ul><li>
 <a href="src/zu_wide.h"><code>src/zu_wide.h</code></a> is the type layer: the type codes, the NA sentinels, raw word access to the REALSXP and CPLXSXP payloads, and <code>zu_val</code>, a sign plus a 128-bit magnitude that slow paths use to move a value between types with one range check (<code>zu_val_fits()</code>).</li>
 <li>
-<a href="src/zu_cast.c"><code>src/zu_cast.c</code></a> holds construction and conversion. Entry points that can lose a value return <code>list(result, n_lost)</code> and R raises the warning, so condition classes live only in R.</li>
+<a href="src/zu_cast.c"><code>src/zu_cast.c</code></a> holds construction and conversion. Entry points that can lose a value return <code>list(result, n_lost)</code> and R raises the warning, so condition classes live only in R. Text goes through the one parser in <a href="src/zu_parse.c"><code>src/zu_parse.c</code></a>, and out through <a href="src/zu_format.c"><code>src/zu_format.c</code></a>.</li>
+<li>
+<a href="src/zu_bits.c"><code>src/zu_bits.c</code></a> and <a href="R/bits.R"><code>R/bits.R</code></a> are the bit operations; <a href="R/text.R"><code>R/text.R</code></a> is <code><a href="reference/format_hex.html">format_hex()</a></code> and <code><a href="reference/format_hex.html">format_bin()</a></code>.</li>
 <li>
 <a href="R/types.R"><code>R/types.R</code></a> has the constructors, the <code>NA_*_</code> constants and <code><a href="reference/zu_storage.html">zu_storage()</a></code>; <a href="R/cast.R"><code>R/cast.R</code></a> is the one conversion path every method uses; <a href="R/conditions.R"><code>R/conditions.R</code></a> lists the condition classes.</li>
 <li>
@@ -117,6 +119,7 @@
 <li><p><strong>Integer operands reach the C arithmetic unconverted.</strong> A negative integer meeting an unsigned type is part of the operation (an overflow, or under wrapping its value modulo 2^width). Converted to a payload first, -1 would wrap onto the unsigned NA pattern and read as NA.</p></li>
 <li><p><strong>A wrapped result on the NA pattern is NA, but an exact result on it is an overflow.</strong> <code>zu_ops.h</code> reports both as overflow; only the wrapping policy stores the bits, which then read as NA (design §6).</p></li>
 <li><p><strong>Never write and read one variable in the arguments of a single call.</strong> <code>f(g(&amp;r), r)</code> reads <code>r</code> before or after <code>g()</code> writes it, as the compiler pleases: gcc at <code>-O0</code> read it first and stored garbage, which only the coverage build (gcc, <code>-O0</code>, Linux) showed. Compute into a local first.</p></li>
+<li><p><strong>Hex and binary text is sign and magnitude, never two’s complement.</strong> <code>format_hex(int64(-1))</code> is <code>"-0x1"</code>, so every string the package writes reads back as the same value; <code>"0xffffffffffffffff"</code> is a uint64.</p></li>
 <li><p><strong>Shifts by the full width are undefined.</strong> <code>x &gt;&gt; 64</code> on a <code>uint64_t</code> is UB, and UBSan caught one in Stage 1; shift 128-bit values with zufast’s <code>zuf_int_u128_shr()</code>/<code>shl()</code>, which take 0..127.</p></li>
 <li><p><strong>Native routines are called through their registered symbols.</strong> <code>init.c</code> calls <code>R_forceSymbols()</code>, so <code>.Call("name", ...)</code> with a string fails; use the symbol <code>useDynLib(.registration = TRUE)</code> defines.</p></li>
 </ul><p>Add each new one when a stage establishes it.</p>

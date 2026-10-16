@@ -62,3 +62,24 @@
   `options(zuint.double = "allow")`.
 - Comparison is exact across all types and doubles: `int64(1) == 1.5` is
   `FALSE`, and nothing is compared through double.
+- The constructors read `0x` hex and `0b` binary as well as decimal,
+  with an optional sign, `_` between digits and surrounding whitespace;
+  `"NA"` and blank strings are `NA`. Exponents are not accepted.
+- [`format_hex()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
+  and
+  [`format_bin()`](https://pedrobtz.github.io/zuint/reference/format_hex.md),
+  with `pad = TRUE` for the full width;
+  [`format()`](https://rdrr.io/r/base/format.html) takes `width` and
+  `big.mark`; [`print()`](https://rdrr.io/r/base/print.html) stops at
+  `getOption("max.print")`.
+- Bit operations:
+  [`bit_and()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md),
+  [`bit_or()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md),
+  [`bit_xor()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md),
+  [`bit_not()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md),
+  [`shift_left()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md),
+  [`shift_right()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md),
+  [`popcount()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md),
+  [`clz()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
+  and
+  [`ctz()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md).

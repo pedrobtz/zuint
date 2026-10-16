@@ -27,6 +27,9 @@ library(zuint)
 
 ## All functions
 
+- [`format_hex()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
+  [`format_bin()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
+  : Hexadecimal and binary text
 - [`zu_common_type()`](https://pedrobtz.github.io/zuint/reference/zu_common_type.md)
   : The common type of zuint vectors
 - [`zu_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
@@ -43,6 +46,16 @@ library(zuint)
   [`wrapping_pow()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   [`wrapping_neg()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   : Arithmetic with an explicit overflow policy
+- [`bit_and()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
+  [`bit_or()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
+  [`bit_xor()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
+  [`bit_not()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
+  [`shift_left()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
+  [`shift_right()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
+  [`popcount()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
+  [`clz()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
+  [`ctz()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md) :
+  Bit operations
 - [`NA_int64_`](https://pedrobtz.github.io/zuint/reference/zuint-na.md)
   [`NA_uint64_`](https://pedrobtz.github.io/zuint/reference/zuint-na.md)
   [`NA_int128_`](https://pedrobtz.github.io/zuint/reference/zuint-na.md)

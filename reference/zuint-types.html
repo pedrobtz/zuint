@@ -70,8 +70,10 @@ to them. Conversion is exact or gives <code>NA</code> with a warning of class
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p><code>x</code> can be a logical, integer, double or character vector, another zuint
 vector, or a bit64 <code>integer64</code>. A double must be integral and in range.
-A string is decimal digits with an optional leading <code>-</code>. <code>NA</code> stays <code>NA</code>
-without a warning. Names are kept.</p>
+A string is decimal, <code>0x</code> hex or <code>0b</code> binary digits, with an optional
+sign, <code>_</code> between digits and surrounding whitespace (see <code><a href="format_hex.html">format_hex()</a></code>);
+<code>"NA"</code> and blank strings are <code>NA</code>. <code>NA</code> stays <code>NA</code> without a warning.
+Names are kept.</p>
 <p>Each type reserves one bit pattern for <code>NA</code>, so its range is one value
 short of the full width: the most negative value for the signed types and
 the largest for the unsigned ones.</p><table class="table table"><tr><td>Type</td><td>Range</td></tr><tr><td><code>int64</code></td><td>\(\pm(2^{63} - 1)\)</td></tr><tr><td><code>uint64</code></td><td>\([0, 2^{64} - 2]\)</td></tr><tr><td><code>int128</code></td><td>\(\pm(2^{127} - 1)\)</td></tr><tr><td><code>uint128</code></td><td>\([0, 2^{128} - 2]\)</td></tr></table><p><code>int64</code> has class <code>c("zu_int64", "integer64")</code> and the storage of bit64's
