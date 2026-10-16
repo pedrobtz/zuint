@@ -29,7 +29,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 4 | [Arrow C Data Interface bridge](#stage-4--arrow-c-data-interface-bridge) | full — vendored header, external pointers and release callbacks | [#6](https://github.com/pedrobtz/zuint/issues/6) | [#19](https://github.com/pedrobtz/zuint/pull/19) | 2026-10-16 |
 | 5 | [Engine bridges and the round-trip matrix](#stage-5--engine-bridges-and-the-round-trip-matrix) | quick | [#7](https://github.com/pedrobtz/zuint/issues/7) | [#20](https://github.com/pedrobtz/zuint/pull/20) | 2026-10-16 |
 | 6 | [Sorting, hashing and reductions](#stage-6--sorting-hashing-and-reductions) | quick | [#8](https://github.com/pedrobtz/zuint/issues/8) | [#21](https://github.com/pedrobtz/zuint/pull/21) | 2026-10-16 |
-| 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | | 2026-10-16 |
+| 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | [#22](https://github.com/pedrobtz/zuint/pull/22) | 2026-10-16 |
 | 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | | |
 | 9 | [v0.1.0 readiness](#stage-9--v010-readiness) | full | [#11](https://github.com/pedrobtz/zuint/issues/11) | | |
 
