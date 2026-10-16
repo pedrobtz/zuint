@@ -98,3 +98,17 @@ test_that("as_integer64() and int64() swap only the class", {
   expect_warning(z <- as_integer64(uint64("18446744073709551614")), class = "zuint_cast_warning")
   expect_true(is.na(int64(z)))
 })
+
+test_that("zu_from_arrow_table warns once for sentinel values across batches", {
+  skip_without_engines()
+  # two batches, each holding a valid UINT64_MAX
+  mk <- function() arrow::arrow_table(x = arrow::Array$create("18446744073709551615")$cast(arrow::uint64()))
+  rdr <- arrow::RecordBatchReader$create(batches = list(arrow::as_record_batch(mk()), arrow::as_record_batch(mk())))
+  w <- 0L
+  df <- withCallingHandlers(zu_from_arrow_table(rdr), zuint_cast_warning = function(cnd) {
+    w <<- w + 1L
+    invokeRestart("muffleWarning")
+  })
+  expect_identical(w, 1L)
+  expect_identical(sum(is.na(df$x)), 2L)
+})

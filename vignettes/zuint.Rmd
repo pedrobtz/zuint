@@ -119,9 +119,16 @@ when nanoarrow is installed.
 
 ## Where the class gets lost
 
-Base functions that build their result from bare values, such as `ifelse()`
-and `vapply()`, read the raw bits as numbers. `zu_ifelse()` and
-`zu_vapply()` keep the type:
+Base functions that build their result from the bare values read the raw
+bits as numbers. The ones you meet first:
+
+* `c(1L, x)` and `sum(2L, x)` dispatch on their first argument, so with a
+  base number first they never reach zuint: put the zuint vector first.
+* `sapply()`, `unlist()` and `tapply()` drop the class of what they
+  collect: use `zu_vapply()`, or `do.call(c, list)`.
+* `ifelse()` builds its answer from `yes` and `no` without their class.
+
+`zu_ifelse()` and `zu_vapply()` keep the type:
 
 ```{r}
 x <- int64(c("-9223372036854775807", "5"))

@@ -52,3 +52,8 @@ test_that("types without a common type still compare", {
   expect_true(int64(-1) != uint128("340282366920938463463374607431768211454"))
   expect_false(int128("170141183460469231731687303715884105727") >= uint128("170141183460469231731687303715884105728"))
 })
+
+test_that("comparing with NULL gives logical(0), as in base R", {
+  expect_identical(int64(1) == NULL, logical(0))
+  expect_identical(NULL < uint128(1:2), logical(0))
+})

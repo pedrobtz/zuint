@@ -237,6 +237,9 @@ zu_pow <- function(x, y, policy, call) {
 # Exact for any two kinds, doubles included, and never an error for being
 # out of range: 1.5 is compared as 1.5.
 zu_compare <- function(op, x, y, call) {
+  # NULL compares as a zero-length vector, as in base R
+  if (is.null(x)) x <- integer()
+  if (is.null(y)) y <- integer()
   kinds <- c(zu_kind(x), zu_kind(y))
   zu_check_operands(kinds, list(x, y), call)
   zu_check_recycling(x, y)

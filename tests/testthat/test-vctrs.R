@@ -113,3 +113,16 @@ test_that("dplyr padding, unmatched joins, lag and if_else give NA", {
 test_that("zu_ifelse keeps the names of test", {
   expect_identical(zu_ifelse(c(a = TRUE, b = FALSE), int64(1), int64(2)), int64(c(a = 1, b = 2)))
 })
+
+test_that("zu_ifelse applies the double rule of c() and the operators", {
+  expect_error(zu_ifelse(TRUE, 1.5, int64(2)), class = "zuint_double_error")
+  expect_identical(zu_ifelse(c(TRUE, FALSE), 2, int64(3)), int64(c(2, 3)))
+})
+
+test_that("vctrs casts zuint vectors to double and integer exactly or not at all", {
+  skip_if_not_installed("vctrs")
+  expect_identical(vctrs::vec_cast(int64(c(5, NA)), double()), c(5, NA))
+  expect_identical(vctrs::vec_cast(uint128(7), integer()), 7L)
+  expect_error(vctrs::vec_cast(int64("9007199254740993"), double()), class = "vctrs_error_cast_lossy")
+  expect_error(vctrs::vec_cast(int64(2^40), integer()), class = "vctrs_error_cast_lossy")
+})

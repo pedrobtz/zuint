@@ -22,7 +22,9 @@ A character vector the length of \code{x}, with its names.
 \code{format_hex()} and \code{format_bin()} write each value with a \verb{0x} or \verb{0b}
 prefix. A negative value is written as a sign and a magnitude, \code{-0x1},
 not as two's complement, so the constructors read every string back as
-the same value. \code{NA} gives \code{NA_character_}.
+the same value. (The two's complement pattern of a negative value would
+not do: the one for -1, \code{0xffffffffffffffff}, is \code{uint64}'s \code{NA}.) \code{NA}
+gives \code{NA_character_}.
 }
 \details{
 The constructors read the same forms: decimal, \verb{0x} hex or \verb{0b} binary
