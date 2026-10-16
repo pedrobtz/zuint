@@ -27,7 +27,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 2 | [Arithmetic and the promotion order](#stage-2--arithmetic-and-the-promotion-order) | quick | [#4](https://github.com/pedrobtz/zuint/issues/4) | [#17](https://github.com/pedrobtz/zuint/pull/17) | 2026-10-16 |
 | 3 | [Parsing, formatting and bit operations](#stage-3--parsing-formatting-and-bit-operations) | quick | [#5](https://github.com/pedrobtz/zuint/issues/5) | [#18](https://github.com/pedrobtz/zuint/pull/18) | 2026-10-16 |
 | 4 | [Arrow C Data Interface bridge](#stage-4--arrow-c-data-interface-bridge) | full — vendored header, external pointers and release callbacks | [#6](https://github.com/pedrobtz/zuint/issues/6) | [#19](https://github.com/pedrobtz/zuint/pull/19) | 2026-10-16 |
-| 5 | [Engine bridges and the round-trip matrix](#stage-5--engine-bridges-and-the-round-trip-matrix) | quick | [#7](https://github.com/pedrobtz/zuint/issues/7) | | |
+| 5 | [Engine bridges and the round-trip matrix](#stage-5--engine-bridges-and-the-round-trip-matrix) | quick | [#7](https://github.com/pedrobtz/zuint/issues/7) | [#20](https://github.com/pedrobtz/zuint/pull/20) | 2026-10-16 |
 | 6 | [Sorting, hashing and reductions](#stage-6--sorting-hashing-and-reductions) | quick | [#8](https://github.com/pedrobtz/zuint/issues/8) | | |
 | 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | | |
 | 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | | |
@@ -349,6 +349,23 @@ README.
 - `R CMD check` passes with 0 errors, 0 warnings, 0 notes.
 
 **Design.** §0, §9.2, §12 of design.md.
+
+**Deviations (2026-10-16).**
+- arrow 24.0.0 aborts R when it makes an R object for the `arrow.opaque`
+  type (`as_arrow_array()`, `infer_type()`, `as_data_type()`), whatever
+  built the type. The arrow methods are registered for int64 and uint64;
+  for int128 and uint128 they raise `zuint_unsupported_error`.
+  `zu_arrow_table()` and `zu_from_arrow_table()` go through nanoarrow
+  instead and carry all four types through arrow, Parquet included.
+- Write-back is `zu_duckdb_register(con, name, data)`, which registers an
+  Arrow Table: a registered record batch reader is empty after one query.
+- An engine value equal to a type's NA pattern (for example BIGINT's
+  minimum) reads as NA with a warning; the matrix values are each type's
+  representable range, and that edge has its own test.
+- The quick profile runs UBSan on R-release and no R CMD check container.
+  R-devel has no binaries for arrow and duckdb (Suggests since Stage 4), so
+  those legs spent about half an hour building them, against the policy's
+  five minutes. The full profile keeps CRAN's R-devel flavours.
 
 ## Stage 6 — Sorting, hashing and reductions
 

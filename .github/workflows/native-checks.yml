@@ -23,6 +23,10 @@ jobs:
     uses: pedrobtz/r-actions/.github/workflows/sanitizers.yml@v1
     with:
       asan: true
+      # R-devel has no binaries for the engine Suggests (arrow, duckdb), and
+      # building them from source takes half an hour; pull requests use
+      # R-release, the full profile CRAN's R-devel.
+      r-version: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'release' || 'devel' }}
       profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
 
   valgrind:

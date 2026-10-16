@@ -1,6 +1,13 @@
+# Methods on Suggests packages' generics, registered whenever those packages
+# load, before or after zuint.
+zu_lazy_methods <- list(nanoarrow = "zu_register_nanoarrow", arrow = "zu_register_arrow")
+
 .onLoad <- function(libname, pkgname) {
-  setHook(packageEvent("nanoarrow", "onLoad"), zu_register_nanoarrow)
-  if (isNamespaceLoaded("nanoarrow")) {
-    zu_register_nanoarrow()
+  for (pkg in names(zu_lazy_methods)) {
+    register <- get(zu_lazy_methods[[pkg]], mode = "function")
+    setHook(packageEvent(pkg, "onLoad"), register)
+    if (isNamespaceLoaded(pkg)) {
+      register()
+    }
   }
 }

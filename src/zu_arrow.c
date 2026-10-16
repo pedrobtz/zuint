@@ -382,9 +382,12 @@ SEXP zu_arrow_released_c(SEXP xp)
     return Rf_ScalarLogical(a == NULL || a->release == NULL);
 }
 
+/* Returns how many release callbacks ran, counted around the call with
+   nothing allocated in between, so no collection can add to it. */
 SEXP zu_arrow_release_c(SEXP xp)
 {
     struct ArrowArray *a = (struct ArrowArray *)R_ExternalPtrAddr(xp);
+    long before = zu_arrow_releases;
     if (a && a->release) a->release(a);
-    return R_NilValue;
+    return Rf_ScalarInteger((int)(zu_arrow_releases - before));
 }

@@ -6,3 +6,4 @@
 ^pkgdown$
 ^CLAUDE\.md$
 ^tools$
+^README\.Rmd$
