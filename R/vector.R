@@ -28,6 +28,16 @@ zu_methods <- c(
   summary = "zu_summary",
   Ops = "zu_ops",
   Math = "zu_math",
+  Summary = "zu_summary_group",
+  mean = "zu_mean",
+  median = "zu_median",
+  sort = "zu_sort",
+  xtfrm = "zu_xtfrm",
+  unique = "zu_unique",
+  duplicated = "zu_duplicated",
+  anyDuplicated = "zu_any_duplicated",
+  mtfrm = "zu_mtfrm",
+  diff = "zu_diff",
   chooseOpsMethod = "zu_choose_ops_method"
 )
 
@@ -310,15 +320,18 @@ zu_str <- function(object, ..., vec.len = 4) {
   invisible()
 }
 
-# Minimum, maximum and the NA count. Quartiles wait for sorting (Stage 6).
+# Minimum, median, mean, maximum and the NA count. Quartiles need
+# quantile(), which comes after 0.1.0.
 zu_summary <- function(object, ...) {
   code <- zu_code(object)
-  r <- zu_as_character(zu_new(
-    .Call(zu_range_c, zu_bare(object), code, TRUE),
-    code
-  ))
+  r <- zu_as_character(zu_new(.Call(zu_range_c, zu_bare(object), code, TRUE), code))
   n_na <- sum(zu_is_na(object))
-  out <- c("Min." = r[[1L]], "Max." = r[[2L]])
+  out <- c(
+    "Min." = r[[1L]],
+    "Median" = format(zu_median(object, na.rm = TRUE), digits = 15L),
+    "Mean" = format(zu_mean(object, na.rm = TRUE), digits = 15L),
+    "Max." = r[[2L]]
+  )
   if (n_na > 0L) {
     out <- c(out, "NA's" = as.character(n_na))
   }

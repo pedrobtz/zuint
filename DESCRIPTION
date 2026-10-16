@@ -19,6 +19,8 @@ URL: https://pedrobtz.github.io/zuint/, https://github.com/pedrobtz/zuint
 BugReports: https://github.com/pedrobtz/zuint/issues
 Depends: 
     R (>= 4.3.0)
+Imports: 
+    stats
 LinkingTo: 
     zufast (>= 0.1.0.9000)
 Suggests: 
