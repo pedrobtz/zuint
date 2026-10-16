@@ -53,6 +53,8 @@
   [`clz()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
   [`ctz()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md) :
   Bit operations
+- [`zuint-conditions`](https://pedrobtz.github.io/zuint/reference/zuint-conditions.md)
+  : Conditions zuint signals
 - [`NA_int64_`](https://pedrobtz.github.io/zuint/reference/zuint-na.md)
   [`NA_uint64_`](https://pedrobtz.github.io/zuint/reference/zuint-na.md)
   [`NA_int128_`](https://pedrobtz.github.io/zuint/reference/zuint-na.md)

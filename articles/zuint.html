@@ -189,7 +189,7 @@ to DuckDB with their types:</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">con</span> <span class="op">&lt;-</span> <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbConnect.html" class="external-link">dbConnect</a></span><span class="op">(</span><span class="fu">duckdb</span><span class="fu">::</span><span class="fu"><a href="https://r.duckdb.org/reference/duckdb.html" class="external-link">duckdb</a></span><span class="op">(</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; duckdb keeps downloaded extensions and secrets in a temporary directory:</span></span>
-<span><span class="co">#&gt; <span style="color: #0000BB;">ℹ</span> /tmp/Rtmpycs58W/duckdb</span></span>
+<span><span class="co">#&gt; <span style="color: #0000BB;">ℹ</span> /tmp/RtmpzmIbux/duckdb</span></span>
 <span><span class="co">#&gt; This is removed when the R session ends.</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Extensions are re-downloaded each session.</span></span>
 <span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> Secrets are lost.</span></span>
@@ -224,9 +224,22 @@ nanoarrow is installed.</p>
 <div class="section level2">
 <h2 id="where-the-class-gets-lost">Where the class gets lost<a class="anchor" aria-label="anchor" href="#where-the-class-gets-lost"></a>
 </h2>
-<p>Base functions that build their result from bare values, such as
-<code><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse()</a></code> and <code><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply()</a></code>, read the raw bits as
-numbers. <code><a href="../reference/zu_ifelse.html">zu_ifelse()</a></code> and <code><a href="../reference/zu_ifelse.html">zu_vapply()</a></code> keep the
+<p>Base functions that build their result from the bare values read the
+raw bits as numbers. The ones you meet first:</p>
+<ul>
+<li>
+<code>c(1L, x)</code> and <code>sum(2L, x)</code> dispatch on their
+first argument, so with a base number first they never reach zuint: put
+the zuint vector first.</li>
+<li>
+<code><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply()</a></code>, <code><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist()</a></code> and
+<code><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply()</a></code> drop the class of what they collect: use
+<code><a href="../reference/zu_ifelse.html">zu_vapply()</a></code>, or <code>do.call(c, list)</code>.</li>
+<li>
+<code><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse()</a></code> builds its answer from <code>yes</code> and
+<code>no</code> without their class.</li>
+</ul>
+<p><code><a href="../reference/zu_ifelse.html">zu_ifelse()</a></code> and <code><a href="../reference/zu_ifelse.html">zu_vapply()</a></code> keep the
 type:</p>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/zuint-types.html">int64</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"-9223372036854775807"</span>, <span class="st">"5"</span><span class="op">)</span><span class="op">)</span></span>

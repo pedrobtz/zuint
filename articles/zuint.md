@@ -119,7 +119,7 @@ hands a data frame back to DuckDB with their types:
 
 con <- DBI::dbConnect(duckdb::duckdb())
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/Rtmpycs58W/duckdb
+#> ℹ /tmp/RtmpzmIbux/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
@@ -161,10 +161,21 @@ installed.
 
 ## Where the class gets lost
 
-Base functions that build their result from bare values, such as
-[`ifelse()`](https://rdrr.io/r/base/ifelse.html) and
-[`vapply()`](https://rdrr.io/r/base/lapply.html), read the raw bits as
-numbers.
+Base functions that build their result from the bare values read the raw
+bits as numbers. The ones you meet first:
+
+- `c(1L, x)` and `sum(2L, x)` dispatch on their first argument, so with
+  a base number first they never reach zuint: put the zuint vector
+  first.
+- [`sapply()`](https://rdrr.io/r/base/lapply.html),
+  [`unlist()`](https://rdrr.io/r/base/unlist.html) and
+  [`tapply()`](https://rdrr.io/r/base/tapply.html) drop the class of
+  what they collect: use
+  [`zu_vapply()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md),
+  or `do.call(c, list)`.
+- [`ifelse()`](https://rdrr.io/r/base/ifelse.html) builds its answer
+  from `yes` and `no` without their class.
+
 [`zu_ifelse()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
 and
 [`zu_vapply()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)

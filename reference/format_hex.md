@@ -3,7 +3,9 @@
 `format_hex()` and `format_bin()` write each value with a `0x` or `0b`
 prefix. A negative value is written as a sign and a magnitude, `-0x1`,
 not as two's complement, so the constructors read every string back as
-the same value. `NA` gives `NA_character_`.
+the same value. (The two's complement pattern of a negative value would
+not do: the one for -1, `0xffffffffffffffff`, is `uint64`'s `NA`.) `NA`
+gives `NA_character_`.
 
 ## Usage
 
