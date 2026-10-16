@@ -28,6 +28,8 @@ jobs:
   valgrind:
     uses: pedrobtz/r-actions/.github/workflows/valgrind.yml@v1
     with:
+      # arrow's worker threads, loaded by the engine tests; see the file
+      suppressions: tools/valgrind.supp
       profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
 
   lto:
@@ -53,3 +55,13 @@ jobs:
     uses: pedrobtz/r-actions/.github/workflows/cran-special.yml@v1
     with:
       profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+
+  # src/vendor/arrow/abi.h is the pinned upstream file: tools/verify-vendor
+  # re-downloads it and compares checksums, and a pull request that changes
+  # the vendor tree must change PROVENANCE too.
+  vendor:
+    uses: pedrobtz/r-actions/.github/workflows/vendor.yml@v1
+    with:
+      verify: tools/verify-vendor
+      must-update: |
+        src/vendor/PROVENANCE

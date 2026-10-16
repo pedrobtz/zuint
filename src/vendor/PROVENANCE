@@ -1,0 +1,31 @@
+Vendored dependency: the Arrow C Data Interface header
+
+  Upstream:      https://github.com/apache/arrow
+  Version:       apache-arrow-26.0.0
+  Commit:        7a7f3a7686cd51992e194aae5c8a7c31b1706ebc
+  File:          https://raw.githubusercontent.com/apache/arrow/apache-arrow-26.0.0/cpp/src/arrow/c/abi.h
+  SHA-256:       1828f1ce60368cd590d19595910fa19db09b30728f8a43b5f89933623f7a7276
+  Notice:        https://raw.githubusercontent.com/apache/arrow/apache-arrow-26.0.0/NOTICE.txt
+  Notice SHA-256: afd895d61a00101f6d5a41cf518c83865d815e8109e956f512a0ce4ea9738c06
+  Licence:       https://www.apache.org/licenses/LICENSE-2.0.txt
+  Licence SHA-256: cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30
+  Imported:      2026-10-16
+  License:       Apache-2.0 (see src/vendor/arrow/LICENSE.txt and NOTICE.txt)
+  Local patches: none
+
+src/vendor/arrow/abi.h is the upstream file, byte for byte. It declares the
+ArrowSchema and ArrowArray structs of the Arrow C Data Interface, a stable
+ABI, and nothing else: no functions, no I/O, one #include <stdint.h>.
+src/zu_arrow.c includes it; nothing else in the package does.
+
+To update: set Version, Commit and the URLs to the new release tag, run
+
+  curl -fsSL -o src/vendor/arrow/abi.h <File URL>
+  curl -fsSL -o src/vendor/arrow/NOTICE.txt <Notice URL>
+
+record the new SHA-256 lines (shasum -a 256), and run tools/verify-vendor.
+The licence text only changes if Apache publishes a new one.
+
+The SHA-256 values were computed at import time from the tag's raw files;
+tools/verify-vendor downloads them again and fails on any difference, in
+the vendored copies or upstream.

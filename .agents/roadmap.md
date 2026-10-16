@@ -26,7 +26,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 1 | [Storage and construction](#stage-1--storage-and-construction) | full — first compiled code | [#3](https://github.com/pedrobtz/zuint/issues/3) | [#16](https://github.com/pedrobtz/zuint/pull/16) | 2026-10-16 |
 | 2 | [Arithmetic and the promotion order](#stage-2--arithmetic-and-the-promotion-order) | quick | [#4](https://github.com/pedrobtz/zuint/issues/4) | [#17](https://github.com/pedrobtz/zuint/pull/17) | 2026-10-16 |
 | 3 | [Parsing, formatting and bit operations](#stage-3--parsing-formatting-and-bit-operations) | quick | [#5](https://github.com/pedrobtz/zuint/issues/5) | [#18](https://github.com/pedrobtz/zuint/pull/18) | 2026-10-16 |
-| 4 | [Arrow C Data Interface bridge](#stage-4--arrow-c-data-interface-bridge) | full — vendored header, external pointers and release callbacks | [#6](https://github.com/pedrobtz/zuint/issues/6) | | |
+| 4 | [Arrow C Data Interface bridge](#stage-4--arrow-c-data-interface-bridge) | full — vendored header, external pointers and release callbacks | [#6](https://github.com/pedrobtz/zuint/issues/6) | [#19](https://github.com/pedrobtz/zuint/pull/19) | 2026-10-16 |
 | 5 | [Engine bridges and the round-trip matrix](#stage-5--engine-bridges-and-the-round-trip-matrix) | quick | [#7](https://github.com/pedrobtz/zuint/issues/7) | | |
 | 6 | [Sorting, hashing and reductions](#stage-6--sorting-hashing-and-reductions) | quick | [#8](https://github.com/pedrobtz/zuint/issues/8) | | |
 | 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | | |
@@ -291,6 +291,29 @@ every type in design §0 without any R package in between.
   warnings, 0 notes, including the `nosuggests` leg of the full profile.
 
 **Design.** §9.1, §10 of design.md; `CLAUDE.md`, Vendored native code.
+
+**Deviations (2026-10-16).**
+- UHUGEINT max, 2¹²⁸ − 1, is uint128's NA bit pattern, so it imports as NA
+  with a warning (design §9.1's one lossy edge). The test imports
+  2¹²⁸ − 2, uint128's largest value, through DuckDB's `arrow.opaque`
+  export, and checks the 2¹²⁸ − 1 case through `zu_sentinel_check()`
+  with UBIGINT's equivalent.
+- The DuckDB criteria are tested against live DuckDB, so arrow, DBI and
+  duckdb join `Suggests` here rather than in Stage 5 (tests skip without
+  them).
+- Import borrows the caller's structs and copies; it never releases them.
+  "The release callback runs exactly once" is tested on the arrays zuint
+  exports, through two internal test hooks so that no other collection can
+  change the count: never during import, exactly once when released, a
+  second release does nothing, and a struct moved into nanoarrow is
+  released once by its new owner. A collected array is checked to be
+  released; a double release on collection is what ASan and valgrind catch.
+- `tools/valgrind.supp` suppresses two "possibly lost" blocks from the
+  arrow package's worker threads, which the engine tests load.
+- The vendor gate is `vendor.yml` from r-actions calling
+  `tools/verify-vendor`; abi.h is a header of structs, so there is no
+  vendored object for the `nm -u` guard beyond `zu_arrow.o`, which
+  `test-symbols.R` already covers in the shared object.
 
 ## Stage 5 — Engine bridges and the round-trip matrix
 
