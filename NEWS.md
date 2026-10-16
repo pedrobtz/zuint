@@ -36,3 +36,10 @@
   `getOption("max.print")`.
 * Bit operations: `bit_and()`, `bit_or()`, `bit_xor()`, `bit_not()`,
   `shift_left()`, `shift_right()`, `popcount()`, `clz()` and `ctz()`.
+* `zu_from_arrow()` and `zu_to_arrow()` convert through the Arrow C Data
+  Interface with no R package in between: `int64`, `uint64`, DuckDB's
+  `arrow.opaque` `hugeint`/`uhugeint`, and `decimal128(p, 0)`.
+  `zu_sentinel_check()` counts engine values that would import as `NA`.
+* With nanoarrow installed, `nanoarrow::convert_array(array, int64())` and
+  the other prototypes import through the bridge, and
+  `nanoarrow::as_nanoarrow_array()` exports zuint vectors.
