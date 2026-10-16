@@ -30,8 +30,10 @@ to them. Conversion is exact or gives \code{NA} with a warning of class
 \details{
 \code{x} can be a logical, integer, double or character vector, another zuint
 vector, or a bit64 \code{integer64}. A double must be integral and in range.
-A string is decimal digits with an optional leading \code{-}. \code{NA} stays \code{NA}
-without a warning. Names are kept.
+A string is decimal, \verb{0x} hex or \verb{0b} binary digits, with an optional
+sign, \verb{_} between digits and surrounding whitespace (see \code{\link[=format_hex]{format_hex()}});
+\code{"NA"} and blank strings are \code{NA}. \code{NA} stays \code{NA} without a warning.
+Names are kept.
 
 Each type reserves one bit pattern for \code{NA}, so its range is one value
 short of the full width: the most negative value for the signed types and

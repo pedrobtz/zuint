@@ -116,7 +116,11 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   value between types with one range check (`zu_val_fits()`).
 - [`src/zu_cast.c`](src/zu_cast.c) holds construction and conversion. Entry
   points that can lose a value return `list(result, n_lost)` and R raises
-  the warning, so condition classes live only in R.
+  the warning, so condition classes live only in R. Text goes through the
+  one parser in [`src/zu_parse.c`](src/zu_parse.c), and out through
+  [`src/zu_format.c`](src/zu_format.c).
+- [`src/zu_bits.c`](src/zu_bits.c) and [`R/bits.R`](R/bits.R) are the bit
+  operations; [`R/text.R`](R/text.R) is `format_hex()` and `format_bin()`.
 - [`R/types.R`](R/types.R) has the constructors, the `NA_*_` constants and
   `zu_storage()`; [`R/cast.R`](R/cast.R) is the one conversion path every
   method uses; [`R/conditions.R`](R/conditions.R) lists the condition
@@ -188,6 +192,9 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   `f(g(&r), r)` reads `r` before or after `g()` writes it, as the compiler
   pleases: gcc at `-O0` read it first and stored garbage, which only the
   coverage build (gcc, `-O0`, Linux) showed. Compute into a local first.
+- **Hex and binary text is sign and magnitude, never two's complement.**
+  `format_hex(int64(-1))` is `"-0x1"`, so every string the package writes
+  reads back as the same value; `"0xffffffffffffffff"` is a uint64.
 - **Shifts by the full width are undefined.** `x >> 64` on a `uint64_t`
   is UB, and UBSan caught one in Stage 1; shift 128-bit values with
   zufast's `zuf_int_u128_shr()`/`shl()`, which take 0..127.

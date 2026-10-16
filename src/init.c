@@ -16,6 +16,9 @@ SEXP zu_is_na_c(SEXP x, SEXP type);
 SEXP zu_fill_na_c(SEXP x, SEXP type, SEXP where);
 SEXP zu_range_c(SEXP x, SEXP type, SEXP na_rm);
 SEXP zu_have_int128_c(void);
+SEXP zu_format_base_c(SEXP x, SEXP type, SEXP base, SEXP pad);
+SEXP zu_bitop_c(SEXP op, SEXP x, SEXP y, SEXP type);
+SEXP zu_bitcount_c(SEXP x, SEXP type, SEXP what);
 
 static const R_CallMethodDef call_methods[] = {
   {"zu_cast_c", (DL_FUNC) &zu_cast_c, 3},
@@ -31,6 +34,9 @@ static const R_CallMethodDef call_methods[] = {
   {"zu_fill_na_c", (DL_FUNC) &zu_fill_na_c, 3},
   {"zu_range_c", (DL_FUNC) &zu_range_c, 3},
   {"zu_have_int128_c", (DL_FUNC) &zu_have_int128_c, 0},
+  {"zu_format_base_c", (DL_FUNC) &zu_format_base_c, 4},
+  {"zu_bitop_c", (DL_FUNC) &zu_bitop_c, 4},
+  {"zu_bitcount_c", (DL_FUNC) &zu_bitcount_c, 3},
   {NULL, NULL, 0}
 };
 

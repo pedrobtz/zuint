@@ -97,19 +97,7 @@ test_that("logical and integer convert exactly; negatives are lost in unsigned t
 })
 
 test_that("malformed strings become NA with a warning", {
-  bad <- c(
-    "",
-    "-",
-    "1e3",
-    "1.0",
-    " 1",
-    "1 ",
-    "+1",
-    "0x10",
-    "1_000",
-    "abc",
-    "--1"
-  )
+  bad <- c("-", "1e3", "1.0", "1 2", "+-1", "0x", "1__000", "abc", "--1")
   for (type in zu_all_types) {
     expect_warning(x <- zu_ctor(type)(bad), class = "zuint_cast_warning")
     expect_true(all(is.na(x)), label = type)

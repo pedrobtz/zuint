@@ -136,3 +136,40 @@ oracle_chr <- function(v) {
   out[is.na(v)] <- NA_character_
   out
 }
+
+zu_width <- function(type) switch(type, int64 = , uint64 = 64L, int128 = , uint128 = 128L)
+
+# Text of a bigz in base 16 or 2, as format_hex() and format_bin() write it.
+oracle_base <- function(v, base) {
+  prefix <- if (base == 16) "0x" else "0b"
+  mag <- as.character(abs(v), b = base)
+  out <- paste0(ifelse(v < 0, "-", ""), prefix, mag)
+  out[is.na(v)] <- NA_character_
+  out
+}
+
+# Two's complement bit strings of the full width, and back.
+oracle_bits <- function(v, type) {
+  w <- zu_width(type)
+  m <- gmp::as.bigz(2)^w
+  u <- ifelse(v < 0, as.character(v + m), as.character(v))
+  b <- as.character(gmp::as.bigz(u), b = 2)
+  paste0(strrep("0", w - nchar(b)), b)
+}
+
+oracle_from_bits <- function(bits, type) {
+  w <- zu_width(type)
+  u <- gmp::as.bigz(paste0("0b", bits))
+  if (type %in% c("int64", "int128")) {
+    hi <- u >= gmp::as.bigz(2)^(w - 1)
+    u[hi] <- u[hi] - gmp::as.bigz(2)^w
+  }
+  u[!oracle_fits(type, as.character(u))] <- NA
+  u
+}
+
+oracle_bitop <- function(a, b, f) {
+  x <- strsplit(a, "")
+  y <- strsplit(b, "")
+  vapply(seq_along(x), function(i) paste(f(x[[i]], y[[i]]), collapse = ""), character(1))
+}
