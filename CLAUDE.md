@@ -184,6 +184,10 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 - **A wrapped result on the NA pattern is NA, but an exact result on it is
   an overflow.** `zu_ops.h` reports both as overflow; only the wrapping
   policy stores the bits, which then read as NA (design §6).
+- **Never write and read one variable in the arguments of a single call.**
+  `f(g(&r), r)` reads `r` before or after `g()` writes it, as the compiler
+  pleases: gcc at `-O0` read it first and stored garbage, which only the
+  coverage build (gcc, `-O0`, Linux) showed. Compute into a local first.
 - **Shifts by the full width are undefined.** `x >> 64` on a `uint64_t`
   is UB, and UBSan caught one in Stage 1; shift 128-bit values with
   zufast's `zuf_int_u128_shr()`/`shl()`, which take 0..127.
