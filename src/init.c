@@ -26,6 +26,7 @@ SEXP zu_to_arrow_c(SEXP x, SEXP type, SEXP decimal);
 SEXP zu_arrow_releases_c(void);
 SEXP zu_arrow_released_c(SEXP xp);
 SEXP zu_arrow_release_c(SEXP xp);
+SEXP zu_metadata_get_c(SEXP raw, SEXP key);
 SEXP zu_order_c(SEXP x, SEXP type, SEXP decreasing, SEXP na_last);
 SEXP zu_rank_c(SEXP x, SEXP type);
 SEXP zu_duplicated_c(SEXP x, SEXP type, SEXP from_last);
@@ -62,6 +63,7 @@ static const R_CallMethodDef call_methods[] = {
   {"zu_arrow_releases_c", (DL_FUNC) &zu_arrow_releases_c, 0},
   {"zu_arrow_released_c", (DL_FUNC) &zu_arrow_released_c, 1},
   {"zu_arrow_release_c", (DL_FUNC) &zu_arrow_release_c, 1},
+  {"zu_metadata_get_c", (DL_FUNC) &zu_metadata_get_c, 2},
   {"zu_order_c", (DL_FUNC) &zu_order_c, 4},
   {"zu_rank_c", (DL_FUNC) &zu_rank_c, 2},
   {"zu_duplicated_c", (DL_FUNC) &zu_duplicated_c, 3},

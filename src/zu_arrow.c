@@ -27,6 +27,7 @@
 #include "zu_wide.h"
 #include "vendor/arrow/abi.h"
 #include <stdlib.h>
+#include <stdatomic.h>
 
 #define ZU_ARROW_FLAG_NULLABLE 2
 
@@ -55,26 +56,55 @@ static void zu_write16(unsigned char *p, zuf_u128 v)
 
 /* ---- schema metadata ---------------------------------------------------- */
 
+/* More entries than any real schema carries: the metadata is corrupt. */
+#define ZU_METADATA_MAX_ENTRIES 4096
+
 /* Value of `key` in Arrow's binary metadata (int32 count, then int32-length
-   keys and values), or NULL; *len receives its length. */
-static const char *zu_metadata_get(const char *md, const char *key, int32_t *len)
+   keys and values), or NULL; *len receives its length. The format carries no
+   total length, so an ArrowSchema's metadata cannot be bounded; `end`, when
+   not NULL, bounds it (the tests pass one). A negative count or length, or
+   too many entries, is corrupt and reads as no metadata. */
+static const char *zu_metadata_get_in(const char *md, const char *end, const char *key, int32_t *len)
 {
     int32_t n, klen, vlen;
     size_t want = strlen(key);
-    if (md == NULL) return NULL;
+#define ZU_HAVE(k) (end == NULL || (size_t)(end - md) >= (size_t)(k))
+    if (md == NULL || !ZU_HAVE(4)) return NULL;
     memcpy(&n, md, 4);
     md += 4;
+    if (n < 0 || n > ZU_METADATA_MAX_ENTRIES) return NULL;
     for (int32_t i = 0; i < n; i++) {
+        if (!ZU_HAVE(4)) return NULL;
         memcpy(&klen, md, 4);
         md += 4;
+        if (klen < 0 || !ZU_HAVE(klen)) return NULL;
         const char *k = md;
         md += klen;
+        if (!ZU_HAVE(4)) return NULL;
         memcpy(&vlen, md, 4);
         md += 4;
+        if (vlen < 0 || !ZU_HAVE(vlen)) return NULL;
         if ((size_t)klen == want && memcmp(k, key, want) == 0) { *len = vlen; return md; }
         md += vlen;
     }
+#undef ZU_HAVE
     return NULL;
+}
+
+static const char *zu_metadata_get(const char *md, const char *key, int32_t *len)
+{
+    return zu_metadata_get_in(md, NULL, key, len);
+}
+
+/* For the tests: zu_metadata_get_in() on a raw vector, bounded by its
+   length. The value as a string, or NULL. */
+SEXP zu_metadata_get_c(SEXP raw, SEXP key)
+{
+    if (TYPEOF(raw) != RAWSXP || !Rf_isString(key)) Rf_error("zuint: expected a raw vector and a key");
+    int32_t len = 0;
+    const char *md = (const char *)RAW(raw);
+    const char *v = zu_metadata_get_in(md, md + XLENGTH(raw), CHAR(STRING_ELT(key, 0)), &len);
+    return v ? Rf_ScalarString(Rf_mkCharLenCE(v, len, CE_UTF8)) : R_NilValue;
 }
 
 /* The string value of "type_name" in the extension's JSON metadata. */
@@ -100,6 +130,9 @@ static int zu_schema_type(const struct ArrowSchema *s, const char **why)
     const char *f = s->format;
     *why = NULL;
     if (f == NULL) { *why = "the schema has no format"; return 0; }
+    /* a dictionary's format is its indices' type: never read indices as values */
+    if (s->dictionary != NULL) { *why = "the array is dictionary-encoded"; return 0; }
+    if (s->n_children != 0) { *why = "the array has children"; return 0; }
     if (strcmp(f, "l") == 0) return ZU_INT64;
     if (strcmp(f, "L") == 0) return ZU_UINT64;
     if (strncmp(f, "d:", 2) == 0) {
@@ -218,7 +251,9 @@ SEXP zu_sentinel_check_c(SEXP array, SEXP schema)
 
 /* ---- export ------------------------------------------------------------- */
 
-static long zu_arrow_releases = 0;   /* release callbacks run, for the tests */
+/* Release callbacks run, for the tests. Atomic: a consumer may call release
+   from any thread. */
+static atomic_long zu_arrow_releases = 0;
 
 typedef struct {
     const void *buffers[2];
@@ -235,7 +270,7 @@ static void zu_release_array(struct ArrowArray *a)
     }
     a->private_data = NULL;
     a->release = NULL;
-    zu_arrow_releases++;
+    atomic_fetch_add(&zu_arrow_releases, 1);
 }
 
 static void zu_release_schema(struct ArrowSchema *s)
@@ -372,7 +407,7 @@ SEXP zu_to_arrow_c(SEXP x, SEXP type_, SEXP decimal_)
     return res;
 }
 
-SEXP zu_arrow_releases_c(void) { return Rf_ScalarReal((double)zu_arrow_releases); }
+SEXP zu_arrow_releases_c(void) { return Rf_ScalarReal((double)atomic_load(&zu_arrow_releases)); }
 
 /* For the tests: has the ArrowArray behind an external pointer been
    released, and release it now (once; a second call does nothing). */
@@ -387,7 +422,7 @@ SEXP zu_arrow_released_c(SEXP xp)
 SEXP zu_arrow_release_c(SEXP xp)
 {
     struct ArrowArray *a = (struct ArrowArray *)R_ExternalPtrAddr(xp);
-    long before = zu_arrow_releases;
+    long before = atomic_load(&zu_arrow_releases);
     if (a && a->release) a->release(a);
-    return Rf_ScalarInteger((int)(zu_arrow_releases - before));
+    return Rf_ScalarInteger((int)(atomic_load(&zu_arrow_releases) - before));
 }

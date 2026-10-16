@@ -230,6 +230,11 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   them out, which sets `release` to NULL; `test-arrow.R` counts the calls.
 - **A decimal128 imports as its bits, with no 38-digit range check.**
   DuckDB's default export writes HUGEINT values beyond 38 digits that way.
+- **The Arrow import refuses what it cannot read as values.** A
+  dictionary-encoded array has its indices' format (`l` for int64 indices)
+  and a schema with children is nested; both are `zuint_arrow_error`. The
+  binary metadata has no total length, so its parser rejects negative counts
+  and lengths and caps the entries; `zu_metadata_get_c()` tests it bounded.
 - **arrow aborts R on the `arrow.opaque` type as an R object.**
   `arrow::as_arrow_array()`, `infer_type()` and `as_data_type()` crash on
   it in arrow 24.0.0 and 25.0.1, with or without zuint: an unchecked cast in
