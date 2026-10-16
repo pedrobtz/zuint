@@ -12,7 +12,10 @@ test_that("bit_and, bit_or, bit_xor and bit_not match a bit-string oracle", {
     ba <- oracle_bits(gmp::as.bigz(grid$a), type)
     bb <- oracle_bits(gmp::as.bigz(grid$b), type)
     for (name in names(ops)) {
-      expected <- oracle_chr(oracle_from_bits(oracle_bitop(ba, bb, ops[[name]][[2L]]), type))
+      expected <- oracle_chr(oracle_from_bits(
+        oracle_bitop(ba, bb, ops[[name]][[2L]]),
+        type
+      ))
       res <- withCallingHandlers(
         ops[[name]][[1L]](x, y),
         zuint_overflow_warning = function(w) invokeRestart("muffleWarning")
@@ -26,9 +29,15 @@ test_that("bit_and, bit_or, bit_xor and bit_not match a bit-string oracle", {
 })
 
 test_that("a result on the NA pattern is NA with an overflow warning", {
-  expect_warning(x <- bit_not(int64("9223372036854775807")), class = "zuint_overflow_warning")
+  expect_warning(
+    x <- bit_not(int64("9223372036854775807")),
+    class = "zuint_overflow_warning"
+  )
   expect_identical(x, NA_int64_)
-  expect_warning(x <- bit_or(uint64("0xffffffff00000000"), uint64("0xffffffff")), class = "zuint_overflow_warning")
+  expect_warning(
+    x <- bit_or(uint64("0xffffffff00000000"), uint64("0xffffffff")),
+    class = "zuint_overflow_warning"
+  )
   expect_identical(x, NA_uint64_)
   expect_warning(shift_left(int128(1), 127L), class = "zuint_overflow_warning")
 })
@@ -37,7 +46,11 @@ test_that("shifts match multiplication and floor division by powers of two", {
   for (type in zu_all_types) {
     w <- zu_width(type)
     v <- c(oracle_edges(type), oracle_random(type, 20, seed = 5))
-    grid <- expand.grid(a = v, n = c(0L, 1L, 7L, 31L, 63L, w - 1L), stringsAsFactors = FALSE)
+    grid <- expand.grid(
+      a = v,
+      n = c(0L, 1L, 7L, 31L, 63L, w - 1L),
+      stringsAsFactors = FALSE
+    )
     grid <- grid[grid$n < w, ]
     x <- zu_ctor(type)(grid$a)
     big <- gmp::as.bigz(grid$a)
@@ -45,9 +58,17 @@ test_that("shifts match multiplication and floor division by powers of two", {
     # left: the low `w` bits of a * 2^n, read in the type
     left <- oracle_wrap(big * p, type)
     res <- suppressWarnings(shift_left(x, grid$n))
-    expect_identical(as.character(res), oracle_chr(left), label = paste(type, "left"))
+    expect_identical(
+      as.character(res),
+      oracle_chr(left),
+      label = paste(type, "left")
+    )
     right <- big %/% p
-    expect_identical(as.character(shift_right(x, grid$n)), oracle_chr(right), label = paste(type, "right"))
+    expect_identical(
+      as.character(shift_right(x, grid$n)),
+      oracle_chr(right),
+      label = paste(type, "right")
+    )
   }
 })
 
@@ -84,7 +105,10 @@ test_that("bit operations mix types by the promotion order and reject doubles", 
   expect_s3_class(bit_and(int64(1), uint64(3)), "zu_int128")
   expect_identical(bit_or(uint64(4), 1L), uint64(5))
   expect_error(bit_and(int64(1), 1), class = "zuint_type_error")
-  expect_error(bit_and(int128(1), uint128(1)), class = "zuint_incompatible_error")
+  expect_error(
+    bit_and(int128(1), uint128(1)),
+    class = "zuint_incompatible_error"
+  )
   expect_error(popcount(1L), class = "zuint_type_error")
   expect_identical(names(bit_xor(uint64(c(a = 1, b = 2)), 1L)), c("a", "b"))
 })

@@ -137,7 +137,9 @@ oracle_chr <- function(v) {
   out
 }
 
-zu_width <- function(type) switch(type, int64 = , uint64 = 64L, int128 = , uint128 = 128L)
+zu_width <- function(type) {
+  switch(type, int64 = , uint64 = 64L, int128 = , uint128 = 128L)
+}
 
 # Text of a bigz in base 16 or 2, as format_hex() and format_bin() write it.
 oracle_base <- function(v, base) {
@@ -171,7 +173,11 @@ oracle_from_bits <- function(bits, type) {
 oracle_bitop <- function(a, b, f) {
   x <- strsplit(a, "")
   y <- strsplit(b, "")
-  vapply(seq_along(x), function(i) paste(f(x[[i]], y[[i]]), collapse = ""), character(1))
+  vapply(
+    seq_along(x),
+    function(i) paste(f(x[[i]], y[[i]]), collapse = ""),
+    character(1)
+  )
 }
 
 # Fixed-width keys whose string order is numeric order, for an exact
@@ -191,7 +197,9 @@ oracle_collisions <- function(type) {
   two64 <- gmp::as.bigz(2)^64
   lows <- gmp::as.bigz(c("1", "12345", "18446744073709551614"))
   highs <- gmp::as.bigz(c("0", "1", "7", "123456789"))
-  v <- as.character(c(outer(seq_along(highs), seq_along(lows), function(i, j) as.character(highs[i] * two64 + lows[j]))))
+  v <- as.character(c(outer(seq_along(highs), seq_along(lows), function(i, j) {
+    as.character(highs[i] * two64 + lows[j])
+  })))
   v <- v[oracle_fits(type, v)]
   c(v, rev(v), v[1:3])
 }
