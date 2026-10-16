@@ -258,6 +258,12 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 - **The vctrs equality and ordering proxy is exact 32-bit pieces, never the
   payload.** vctrs treats every NaN bit pattern as one value, and many int64
   values are NaN patterns as doubles (-1 and -2 among them).
+- **vctrs' proxy carries a flag next to the payload.** vctrs fills the slots
+  it creates (`vec_init()`, padding, unmatched joins, an NA index) with
+  `NA_real_` or `NA_complex_`, whose bits are a valid value here; the flag
+  column, never NA for a real row, is how `vec_restore()` knows to write the
+  type's NA instead. Every proxy must have the same columns, so vctrs
+  operations drop names, as for vctrs' own records.
 - **Hot paths pass classed objects straight to C.** `attributes(x) <- NULL`
   (`zu_bare()`) copies the vector; the C code ignores attributes. Strip only
   where an R-level `c()` would otherwise dispatch back to the method.
