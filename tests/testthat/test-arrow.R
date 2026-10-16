@@ -128,3 +128,35 @@ test_that("nanoarrow converts to and from every type", {
   # and from formats zuint does not import itself, through nanoarrow
   expect_identical(nanoarrow::convert_array(nanoarrow::as_nanoarrow_array(c(1L, NA)), int64()), int64(c(1, NA)))
 })
+
+test_that("dictionary-encoded and nested arrays are refused, not read as values", {
+  skip_if_not_installed("arrow")
+  skip_if_not_installed("nanoarrow")
+  d <- arrow::DictionaryArray$create(
+    arrow::Array$create(c(0, 1, 0, NA), type = arrow::int64()),
+    arrow::Array$create(c("alpha", "beta"))
+  )
+  na <- nanoarrow::as_nanoarrow_array(d)
+  expect_error(zu_from_arrow(na, nanoarrow::infer_nanoarrow_schema(na)), class = "zuint_arrow_error")
+  expect_error(zu_sentinel_check(na, nanoarrow::infer_nanoarrow_schema(na)), class = "zuint_arrow_error")
+  st <- nanoarrow::as_nanoarrow_array(data.frame(a = 1L))
+  expect_error(zu_from_arrow(st, nanoarrow::infer_nanoarrow_schema(st)), class = "zuint_arrow_error")
+})
+
+test_that("corrupt schema metadata reads as no metadata", {
+  i32 <- function(v) writeBin(as.integer(v), raw(), size = 4, endian = .Platform$endian)
+  entry <- function(k, v) c(i32(nchar(k)), charToRaw(k), i32(nchar(v)), charToRaw(v))
+  good <- c(i32(1), entry("ARROW:extension:name", "arrow.opaque"))
+  get <- function(md, key = "ARROW:extension:name") .Call(zu_metadata_get_c, md, key)
+  expect_identical(get(good), "arrow.opaque")
+  expect_null(get(good, "missing"))
+  # a negative count, a negative key length, a negative value length
+  expect_null(get(c(i32(-1), entry("ARROW:extension:name", "x"))))
+  expect_null(get(c(i32(1), i32(-5), charToRaw("ARROW:extension:name"), i32(1), charToRaw("x"))))
+  expect_null(get(c(i32(1), i32(20), charToRaw("ARROW:extension:name"), i32(-3), charToRaw("x"))))
+  # too many entries, and lengths that run past the end
+  expect_null(get(c(i32(1e6), entry("ARROW:extension:name", "x"))))
+  expect_null(get(c(i32(1), i32(400), charToRaw("ARROW"))))
+  expect_null(get(good[1:10]))
+  expect_null(get(raw(2)))
+})
