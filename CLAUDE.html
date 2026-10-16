@@ -162,7 +162,7 @@
 <li>
 <strong>Run the int64 tests with and without bit64 attached.</strong> Any difference means a method is missing on <code>zu_int64</code> (see Invariants). The bit64-attached run also covers mixed <code>zu_int64</code> ⊕ <code>integer64</code> dispatch.</li>
 <li>
-<strong>Helpers live in <code>tests/testthat/helper-*.R</code>.</strong> <code>helper-oracle.R</code> gives each type’s range, edge values, out-of-range values and random fills, computed with gmp (and skips without it). <code>helper-bit64.R</code> runs a string of R code in two fresh Rscript processes, one with bit64 attached and one where it never loaded, because S3 methods stay registered once a namespace has loaded; it skips on CRAN.</li>
+<strong>Helpers live in <code>tests/testthat/helper-*.R</code>.</strong> <code>helper-oracle.R</code> gives each type’s range, edge values, out-of-range values and random fills, computed with gmp (and skips without it). <code>helper-bit64.R</code> runs a string of R code in two fresh Rscript processes, one with bit64 attached and one where it never loaded, because S3 methods stay registered once a namespace has loaded; it skips on CRAN. The code it compares is the named list <code>bit64_parity_code</code>, evaluated once per run for every test.</li>
 <li>
 <strong>The round-trip matrix is <code>test-roundtrip.R</code></strong> (design §12): DuckDB, Arrow and Parquet paths for BIGINT, UBIGINT, HUGEINT and UHUGEINT, with the values of <code>matrix_values()</code> in <code>helper-arrow.R</code>. It skips without duckdb, DBI, arrow and nanoarrow; CI installs them.</li>
 <li>
