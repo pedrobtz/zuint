@@ -51,3 +51,12 @@
   `arrow::as_arrow_array()` and `arrow::infer_type()` work for `int64` and
   `uint64`.
 * `as_integer64()` returns a plain bit64 `integer64`.
+* `sort()`, and base `order()` and `rank()` through an exact `xtfrm()`,
+  with a stable radix sort; `unique()`, `duplicated()` and
+  `anyDuplicated()` with an exact hash; `match()`, `%in%` and `table()`
+  compare exact values, and `zu_match()` and `%zin%` do it faster.
+* `sum()` is type stable and exact, `NA` with a warning when the total does
+  not fit; `prod()`, `cumsum()`, `cumprod()`, `cummax()` and `cummin()`;
+  `min()`, `max()` and `range()` are exact; `mean()` and `median()` are
+  doubles from the exact values; `diff()` and `seq_zu()`.
+* `summary()` adds the median and the mean.

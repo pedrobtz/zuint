@@ -28,7 +28,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 3 | [Parsing, formatting and bit operations](#stage-3--parsing-formatting-and-bit-operations) | quick | [#5](https://github.com/pedrobtz/zuint/issues/5) | [#18](https://github.com/pedrobtz/zuint/pull/18) | 2026-10-16 |
 | 4 | [Arrow C Data Interface bridge](#stage-4--arrow-c-data-interface-bridge) | full — vendored header, external pointers and release callbacks | [#6](https://github.com/pedrobtz/zuint/issues/6) | [#19](https://github.com/pedrobtz/zuint/pull/19) | 2026-10-16 |
 | 5 | [Engine bridges and the round-trip matrix](#stage-5--engine-bridges-and-the-round-trip-matrix) | quick | [#7](https://github.com/pedrobtz/zuint/issues/7) | [#20](https://github.com/pedrobtz/zuint/pull/20) | 2026-10-16 |
-| 6 | [Sorting, hashing and reductions](#stage-6--sorting-hashing-and-reductions) | quick | [#8](https://github.com/pedrobtz/zuint/issues/8) | | |
+| 6 | [Sorting, hashing and reductions](#stage-6--sorting-hashing-and-reductions) | quick | [#8](https://github.com/pedrobtz/zuint/issues/8) | | 2026-10-16 |
 | 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | | |
 | 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | | |
 | 9 | [v0.1.0 readiness](#stage-9--v010-readiness) | full | [#11](https://github.com/pedrobtz/zuint/issues/11) | | |
@@ -398,6 +398,21 @@ summaries are exact and type-correct for every type.
 - `R CMD check` passes with 0 errors, 0 warnings, 0 notes.
 
 **Design.** §7, §10 of design.md.
+
+**Deviations (2026-10-16).**
+- Base `match()`, `%in%` and `table()` compare the exact decimal text
+  through an `mtfrm()` method: `match()` is not generic, and no other atomic
+  vector maps these values one to one. The hash serves `unique()`,
+  `duplicated()`, `anyDuplicated()`, and new exported `zu_match()` and
+  `%zin%`, which are the fast, exact equivalents of `match()` and `%in%`.
+- `prod()`, `any()` and `all()` come with the `Summary` group;
+  `summary()` reports the median and the mean as well as Stage 1's minimum
+  and maximum. Quartiles wait for `quantile()` (After 0.1.0).
+- `Imports: stats`, for the `median()` generic. stats is part of R, so
+  design §2.1's rule (nothing outside the zu-* family and R) still holds.
+- With bit64 attached, `rank()` on an int64 is bit64's function, which
+  keeps NA as NA; base R ranks it last. bit64 masks the function rather
+  than providing a method, so this is outside the parity rule.
 
 ## Stage 7 — vctrs, pillar and benchmarks
 
