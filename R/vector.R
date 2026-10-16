@@ -259,22 +259,35 @@ zu_as_data_frame <- function(
 }
 
 # Numbers are right-justified whatever `justify` says, as format() does for
-# doubles; format.data.frame() passes "left".
-zu_format <- function(x, ..., justify = "right") {
+# doubles; format.data.frame() passes "left". `big.mark` groups the digits in
+# threes; `width` is the minimum field width.
+zu_format <- function(x, ..., width = 0L, big.mark = "", justify = "right") {
   s <- zu_as_character(x)
-  s[is.na(s)] <- "NA"
-  out <- format(s, justify = "right", ...)
+  na <- is.na(s)
+  if (nzchar(big.mark)) {
+    s[!na] <- prettyNum(s[!na], big.mark = big.mark, preserve.width = "none")
+  }
+  s[na] <- "NA"
+  out <- formatC(s, width = max(width, nchar(s, "width"), 0L))
   names(out) <- names(x)
   out
 }
 
-zu_print <- function(x, ...) {
+# As print() does for a double vector: at most getOption("max.print")
+# values, then a note of how many were left out.
+zu_print <- function(x, ..., max = NULL) {
   type <- zu_type_name(x)
-  if (length(x) == 0L) {
+  n <- length(x)
+  if (n == 0L) {
     cat(type, "(0)\n", sep = "")
-  } else {
-    cat("<", type, "[", length(x), "]>\n", sep = "")
-    print(zu_format(x), quote = FALSE, ...)
+    return(invisible(x))
+  }
+  cat("<", type, "[", n, "]>\n", sep = "")
+  max <- if (is.null(max)) getOption("max.print", 99999L) else max
+  shown <- if (n > max) x[seq_len(max)] else x
+  print(zu_format(shown), quote = FALSE, ...)
+  if (n > max) {
+    cat(" [ reached 'max' / getOption(\"max.print\") -- omitted", n - max, "entries ]\n")
   }
   invisible(x)
 }
