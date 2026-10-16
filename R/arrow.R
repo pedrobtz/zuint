@@ -74,7 +74,7 @@ zu_to_arrow <- function(x, decimal = FALSE) {
   if (decimal && code != 3L) {
     zu_abort("`decimal = TRUE` is for int128 only.", "type", call = sys.call())
   }
-  out <- zu_arrow_try(.Call(zu_to_arrow_c, zu_bare(x), code, decimal), sys.call())
+  out <- zu_arrow_try(.Call(zu_to_arrow_c, x, code, decimal), sys.call())
   names(out) <- c("array", "schema")
   out
 }

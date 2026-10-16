@@ -51,7 +51,7 @@ zu_math <- function(x, ...) {
     cummax = ,
     cummin = {
       what <- match(.Generic, c("cumsum", "cumprod", "cummax", "cummin"))
-      res <- .Call(zu_cum_c, zu_bare(x), code, what)
+      res <- .Call(zu_cum_c, x, code, what)
       zu_report_overflow(res[[2L]], zu_policy_default, sys.call())
       out <- res[[1L]]
       names(out) <- names(x)
@@ -106,7 +106,15 @@ zu_double_problem <- function(type, call) {
 # when a double did not convert.
 zu_operand <- function(x, kind, code) {
   if (kind == zu_kind_int) {
-    return(list(value = if (is.null(x)) integer() else zu_bare(x), kind = 0L))
+    if (is.null(x)) {
+      x <- integer()
+    }
+    # into a signed type, or without negatives, an integer converts exactly
+    # and the C code takes its fast path
+    if ((code == 1L || code == 3L || !any(x < 0L, na.rm = TRUE)) && length(x) <= 1L) {
+      return(list(value = zu_convert(x, kind, code)[[1L]], kind = code))
+    }
+    return(list(value = x, kind = 0L))
   }
   r <- zu_convert(x, kind, code)
   if (r[[2L]] > 0) NULL else list(value = r[[1L]], kind = code)
@@ -116,7 +124,7 @@ zu_operand <- function(x, kind, code) {
 # that compute in double have said so.
 zu_dbl_quiet <- function(x) {
   code <- zu_code(x)
-  if (is.na(code)) as.double(x) else .Call(zu_to_double_c, zu_bare(x), code)[[1L]]
+  if (is.na(code)) as.double(x) else .Call(zu_to_double_c, x, code)[[1L]]
 }
 
 # Names as base arithmetic gives them: the first operand's when it is as
@@ -173,7 +181,7 @@ zu_arith <- function(op, x, y, policy, call) {
 zu_negate <- function(x, policy, call) {
   zu_check_operands(zu_kind(x), list(x), call)
   code <- zu_code(x)
-  res <- .Call(zu_neg_c, zu_bare(x), code, policy)
+  res <- .Call(zu_neg_c, x, code, policy)
   zu_report_overflow(res[[2L]], policy, call)
   out <- res[[1L]]
   names(out) <- names(x)
@@ -228,7 +236,7 @@ zu_compare <- function(op, x, y, call) {
   kinds <- c(zu_kind(x), zu_kind(y))
   zu_check_operands(kinds, list(x, y), call)
   zu_check_recycling(x, y)
-  out <- .Call(zu_compare_c, zu_compare_ops[[op]], zu_bare(x), kinds[[1L]], zu_bare(y), kinds[[2L]])
+  out <- .Call(zu_compare_c, zu_compare_ops[[op]], x, kinds[[1L]], y, kinds[[2L]])
   names(out) <- zu_result_names(x, y, length(out))
   out
 }

@@ -65,13 +65,13 @@ zu_bit_shift <- function(op, x, n, call) {
   if (!is.integer(n)) {
     n <- zu_as_integer(int64(n))
   }
-  res <- .Call(zu_bitop_c, op, zu_bare(x), zu_bare(n), code)
+  res <- .Call(zu_bitop_c, op, x, n, code)
   zu_bit_result(res, code, zu_result_names(x, n, length(res[[1L]])), call)
 }
 
 zu_bit_count <- function(what, x, call) {
   zu_check_operands(zu_kind(x), list(x), call)
-  out <- .Call(zu_bitcount_c, zu_bare(x), zu_code(x), what)
+  out <- .Call(zu_bitcount_c, x, zu_code(x), what)
   names(out) <- names(x)
   out
 }
@@ -94,7 +94,7 @@ bit_not <- function(x) {
   call <- sys.call()
   zu_check_operands(zu_kind(x), list(x), call)
   code <- zu_code(x)
-  zu_bit_result(.Call(zu_bitop_c, 4L, zu_bare(x), NULL, code), code, names(x), call)
+  zu_bit_result(.Call(zu_bitop_c, 4L, x, NULL, code), code, names(x), call)
 }
 
 #' @rdname zuint-bits

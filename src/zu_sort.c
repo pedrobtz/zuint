@@ -128,3 +128,52 @@ SEXP zu_rank_c(SEXP x, SEXP type_)
     UNPROTECT(1);
     return out;
 }
+
+/* The non-NA values sorted, as a payload; the NAs are left to the caller.
+   No positions are kept: the keys are the values. */
+SEXP zu_sort_values_c(SEXP x, SEXP type_, SEXP decreasing_)
+{
+    zu_type t = zu_type_arg(type_);
+    zu_check_payload(x, t);
+    bool decreasing = Rf_asLogical(decreasing_) == TRUE;
+    R_xlen_t n = XLENGTH(x), m = 0;
+    if (!zu_type_is_128(t)) {
+        const double *p = REAL(x);
+        const uint64_t na = zu_na64(t), flip = (t == ZU_INT64 ? ZU_SIGN64 : 0) ^ (decreasing ? ~UINT64_C(0) : 0);
+        uint64_t *a = (uint64_t *)R_alloc((size_t)(n ? n : 1), sizeof(uint64_t));
+        uint64_t *b = (uint64_t *)R_alloc((size_t)(n ? n : 1), sizeof(uint64_t));
+        /* four 16-bit digits, all histograms in one read pass */
+        R_xlen_t *count = (R_xlen_t *)R_alloc(4 * 65536, sizeof(R_xlen_t));
+        memset(count, 0, 4 * 65536 * sizeof(R_xlen_t));
+        for (R_xlen_t i = 0; i < n; i++) {
+            uint64_t v = zu_get64(p, i);
+            if (v == na) continue;
+            v ^= flip;
+            a[m++] = v;
+            count[v & 0xFFFF]++;
+            count[65536 + ((v >> 16) & 0xFFFF)]++;
+            count[2 * 65536 + ((v >> 32) & 0xFFFF)]++;
+            count[3 * 65536 + (v >> 48)]++;
+        }
+        for (unsigned d = 0; d < 4; d++) {
+            R_xlen_t *c = count + (size_t)d * 65536;
+            unsigned sh = 16 * d;
+            if (m == 0 || c[(a[0] >> sh) & 0xFFFF] == m) continue;   /* constant digit */
+            R_xlen_t pos = 0;
+            for (unsigned v = 0; v < 65536; v++) { R_xlen_t k = c[v]; c[v] = pos; pos += k; }
+            for (R_xlen_t i = 0; i < m; i++) b[c[(a[i] >> sh) & 0xFFFF]++] = a[i];
+            uint64_t *tmp = a; a = b; b = tmp;
+        }
+        SEXP out = PROTECT(zu_alloc(t, m));
+        double *po = REAL(out);
+        for (R_xlen_t i = 0; i < m; i++) zu_set64(po, i, a[i] ^ flip);
+        UNPROTECT(1);
+        return out;
+    }
+    R_xlen_t *sorted, *nas, n_na;
+    m = zu_sorted(x, t, decreasing, &sorted, &nas, &n_na);
+    SEXP out = PROTECT(zu_alloc(t, m));
+    for (R_xlen_t i = 0; i < m; i++) zu_set128(COMPLEX(out), i, zu_get128(COMPLEX(x), sorted[i]));
+    UNPROTECT(1);
+    return out;
+}

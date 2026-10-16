@@ -30,6 +30,9 @@ SEXP zu_order_c(SEXP x, SEXP type, SEXP decreasing, SEXP na_last);
 SEXP zu_rank_c(SEXP x, SEXP type);
 SEXP zu_duplicated_c(SEXP x, SEXP type, SEXP from_last);
 SEXP zu_match_c(SEXP x, SEXP table, SEXP type, SEXP nomatch);
+SEXP zu_pieces_c(SEXP x, SEXP type);
+SEXP zu_unique_c(SEXP x, SEXP type);
+SEXP zu_sort_values_c(SEXP x, SEXP type, SEXP decreasing);
 SEXP zu_sum_c(SEXP x, SEXP type, SEXP na_rm);
 SEXP zu_prod_c(SEXP x, SEXP type, SEXP na_rm);
 SEXP zu_cum_c(SEXP x, SEXP type, SEXP what);
@@ -63,6 +66,9 @@ static const R_CallMethodDef call_methods[] = {
   {"zu_rank_c", (DL_FUNC) &zu_rank_c, 2},
   {"zu_duplicated_c", (DL_FUNC) &zu_duplicated_c, 3},
   {"zu_match_c", (DL_FUNC) &zu_match_c, 4},
+  {"zu_pieces_c", (DL_FUNC) &zu_pieces_c, 2},
+  {"zu_unique_c", (DL_FUNC) &zu_unique_c, 2},
+  {"zu_sort_values_c", (DL_FUNC) &zu_sort_values_c, 3},
   {"zu_sum_c", (DL_FUNC) &zu_sum_c, 3},
   {"zu_prod_c", (DL_FUNC) &zu_prod_c, 3},
   {"zu_cum_c", (DL_FUNC) &zu_cum_c, 3},

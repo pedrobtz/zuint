@@ -115,6 +115,33 @@ SEXP zu_arith_c(SEXP op_, SEXP x, SEXP kx_, SEXP y, SEXP ky_, SEXP type_, SEXP p
     R_xlen_t nx = XLENGTH(x), ny = XLENGTH(y), n = zu_recycled_length(nx, ny), ovf = 0;
     SEXP out = PROTECT(zu_alloc(t, n));
 
+    /* The common case, two 64-bit payloads of one length or one of them a
+       scalar: a loop per operator, so the switch in zu_op64() folds away. */
+    if (!zu_type_is_128(t) && kx == (int)t && ky == (int)t && (nx == ny || nx == 1 || ny == 1)) {
+        const double *px = REAL(x), *py = REAL(y);
+        double *po = REAL(out);
+        const uint64_t na = zu_na64(t);
+        const R_xlen_t sx = nx == 1 ? 0 : 1, sy = ny == 1 ? 0 : 1;   /* strides */
+#define ZU_FAST64(OP)                                                         \
+        for (R_xlen_t i = 0; i < n; i++) {                                    \
+            uint64_t a = zu_get64(px, i * sx), b = zu_get64(py, i * sy), r = na; \
+            if (a == na || b == na) { zu_set64(po, i, na); continue; }        \
+            zu_status st = zu_op64(OP, t, a, b, &r);                          \
+            ovf += zu_store64(po, i, st, r, t, pol);                          \
+        }
+        switch (op) {
+        case ZU_OP_ADD: ZU_FAST64(ZU_OP_ADD) break;
+        case ZU_OP_SUB: ZU_FAST64(ZU_OP_SUB) break;
+        case ZU_OP_MUL: ZU_FAST64(ZU_OP_MUL) break;
+        case ZU_OP_IDIV: ZU_FAST64(ZU_OP_IDIV) break;
+        case ZU_OP_MOD: ZU_FAST64(ZU_OP_MOD) break;
+        }
+#undef ZU_FAST64
+        out = zu_pair_n(out, ovf);
+        UNPROTECT(1);
+        return out;
+    }
+
     for (R_xlen_t i = 0, ix = 0, iy = 0; i < n; i++) {
         zu_raw sa, sb;
         if (zu_type_is_128(t)) {
