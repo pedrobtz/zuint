@@ -30,7 +30,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 5 | [Engine bridges and the round-trip matrix](#stage-5--engine-bridges-and-the-round-trip-matrix) | quick | [#7](https://github.com/pedrobtz/zuint/issues/7) | [#20](https://github.com/pedrobtz/zuint/pull/20) | 2026-10-16 |
 | 6 | [Sorting, hashing and reductions](#stage-6--sorting-hashing-and-reductions) | quick | [#8](https://github.com/pedrobtz/zuint/issues/8) | [#21](https://github.com/pedrobtz/zuint/pull/21) | 2026-10-16 |
 | 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | [#22](https://github.com/pedrobtz/zuint/pull/22) | 2026-10-16 |
-| 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | | |
+| 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | | 2026-10-16 |
 | 9 | [v0.1.0 readiness](#stage-9--v010-readiness) | full | [#11](https://github.com/pedrobtz/zuint/issues/11) | | |
 
 ## Stage 0 — Package identity
@@ -489,6 +489,18 @@ default branch's code.
 - A full-profile run is green on the pull request and on its merge commit.
 
 **Design.** §12 of design.md.
+
+**Result (2026-10-16).** The full profile on the merge of Stage 7
+(`757cc52`) is green on every leg: the R CMD check runners and containers,
+`nosuggests`, `nold`, the `no-int128` build, UBSan and ASan, valgrind, LTO,
+rchk, the analyzer, rcnst, rlibro, vnu and gctorture at step 20. The
+`Full CI` issue had no failures recorded from Stages 2 to 7: the full-only
+failures that did appear (UBSan's shift, the argument-order bug, the
+release-count test, arrow's thread blocks under valgrind) were fixed in the
+stage that found them. This pull request carries only this note, so
+r-actions skips its jobs; the run on `757cc52` covers the same code.
+gctorture took 73 of its 120 minutes; if the suite grows, raise its `step`
+before its timeout, as zufast did.
 
 ## Stage 9 — v0.1.0 readiness
 
