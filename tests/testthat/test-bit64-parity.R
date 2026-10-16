@@ -94,3 +94,28 @@ test_that("zu_int64 and integer64 mix exactly and without warnings", {
   expect_no_warning(r <- big + int64(1))
   expect_identical(as.character(r), "9007199254740994")
 })
+
+test_that("int64 summaries and set operations behave the same with bit64 attached and absent", {
+  parity_code <- '
+x <- int64(c("9007199254740993", "-3", NA, "9007199254740992", "-3", "0"))
+list(
+  sum = zu_storage(sum(x, na.rm = TRUE)),
+  prod = zu_storage(prod(int64(c(2, -3)))),
+  minmax = lapply(list(min(x, na.rm = TRUE), max(x, na.rm = TRUE), range(x, na.rm = TRUE)), zu_storage),
+  mean = mean(x, na.rm = TRUE),
+  median = median(x, na.rm = TRUE),
+  sort = zu_storage(sort(x)),
+  sort_desc = zu_storage(sort(x, decreasing = TRUE, na.last = TRUE)),
+  xtfrm = xtfrm(x),
+  unique = zu_storage(unique(x)),
+  duplicated = duplicated(x),
+  any_dup = anyDuplicated(x),
+  cumsum = zu_storage(cumsum(int64(1:4))),
+  cummax = zu_storage(cummax(int64(c(3, 1, 5)))),
+  diff = zu_storage(diff(int64(c(1, 4, 9)))),
+  summary = summary(x)
+)
+'
+  res <- bit64_states(parity_code)
+  expect_identical(res$attached, res$absent)
+})
