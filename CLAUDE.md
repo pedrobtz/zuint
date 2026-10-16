@@ -136,6 +136,10 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   [`src/zu_reduce.c`](src/zu_reduce.c) the exact sums, products, cumulative
   functions and the mean. [`R/reduce.R`](R/reduce.R) holds their methods
   and `seq_zu()`.
+- [`R/vctrs.R`](R/vctrs.R) holds the vctrs and pillar methods, registered
+  lazily like the others, and `zu_ifelse()` / `zu_vapply()`.
+  [`inst/bench/bench.R`](inst/bench/bench.R) benchmarks int64 against bit64;
+  its results are in the README.
 - [`R/engines.R`](R/engines.R) is the engine glue: `as_integer64()`,
   `zu_duckdb_query()` and `zu_duckdb_register()`, `zu_arrow_table()` and
   `zu_from_arrow_table()`, and the arrow methods `R/zzz.R` registers when
@@ -247,6 +251,12 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   not methods. For int64 they agree with base R except `rank()`, which keeps
   NA as NA under bit64 and ranks it last under base R. The parity tests
   cover the generics; these are bit64's to define.
+- **The vctrs equality and ordering proxy is exact 32-bit pieces, never the
+  payload.** vctrs treats every NaN bit pattern as one value, and many int64
+  values are NaN patterns as doubles (-1 and -2 among them).
+- **Hot paths pass classed objects straight to C.** `attributes(x) <- NULL`
+  (`zu_bare()`) copies the vector; the C code ignores attributes. Strip only
+  where an R-level `c()` would otherwise dispatch back to the method.
 - **Native routines are called through their registered symbols.**
   `init.c` calls `R_forceSymbols()`, so `.Call("name", ...)` with a string
   fails; use the symbol `useDynLib(.registration = TRUE)` defines.

@@ -29,7 +29,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 4 | [Arrow C Data Interface bridge](#stage-4--arrow-c-data-interface-bridge) | full — vendored header, external pointers and release callbacks | [#6](https://github.com/pedrobtz/zuint/issues/6) | [#19](https://github.com/pedrobtz/zuint/pull/19) | 2026-10-16 |
 | 5 | [Engine bridges and the round-trip matrix](#stage-5--engine-bridges-and-the-round-trip-matrix) | quick | [#7](https://github.com/pedrobtz/zuint/issues/7) | [#20](https://github.com/pedrobtz/zuint/pull/20) | 2026-10-16 |
 | 6 | [Sorting, hashing and reductions](#stage-6--sorting-hashing-and-reductions) | quick | [#8](https://github.com/pedrobtz/zuint/issues/8) | [#21](https://github.com/pedrobtz/zuint/pull/21) | 2026-10-16 |
-| 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | | |
+| 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | [#22](https://github.com/pedrobtz/zuint/pull/22) | 2026-10-16 |
 | 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | | |
 | 9 | [v0.1.0 readiness](#stage-9--v010-readiness) | full | [#11](https://github.com/pedrobtz/zuint/issues/11) | | |
 
@@ -447,6 +447,25 @@ performance claim against bit64 has evidence.
 
 **Design.** §4.1 (helpers), §9.2 (vctrs, data.table), §12 (benchmarks) of
 design.md.
+
+**Deviations (2026-10-16).**
+- The benchmark criterion holds for `+`, `sum` and `sort` at every size
+  and for `match` and `unique` at 10⁷, but not everywhere: `match` is 1.13×
+  bit64's time at 10⁶, and `match` and `unique` are 1.9× and 2.7× at 10⁸,
+  where the hash table (2n slots of 12 bytes) outgrows the caches. Tried and
+  measured slower: packed key/position slots, a load factor of 0.8, a
+  non-power-of-two table, and hashing the smaller argument of `match`. The
+  README reports the numbers as they are; a partitioned or sort-based path
+  for very large inputs is left for after 0.1.0.
+- `match` in the benchmark is `zu_match()` (Stage 6): base `match()` is not
+  generic and goes through exact text.
+- vctrs' `vec_proxy()` is the payload, but its equality, comparison and
+  ordering proxies are a data frame of exact 32-bit pieces, because vctrs
+  treats all NaN bit patterns as equal.
+- The data.table tests use `merge()`: `dt[J(...)]` needs a data.table-aware
+  calling package.
+- dplyr, tibble, pillar, vctrs, data.table, knitr and rmarkdown join
+  `Suggests`, with `VignetteBuilder: knitr`.
 
 ## Stage 8 — Full CI
 

@@ -88,6 +88,52 @@ SEXP zu_sum_c(SEXP x, SEXP type_, SEXP na_rm_)
     R_xlen_t n = XLENGTH(x), ovf = 0;
     zu_wide_sum s = {zuf_u128_make(0, 0), 0};
     SEXP out = PROTECT(zu_alloc(t, 1));
+    if (!zu_type_is_128(t)) {
+        /* 64-bit values: a 64-bit partial sum, folded into the two-word
+           total only when the next value would overflow it. No wrap of the
+           total is possible. */
+        const double *p = REAL(x);
+        const uint64_t na = zu_na64(t);
+        const bool sgn = t == ZU_INT64;
+        R_xlen_t nas = 0;
+        /* Each value as 32-bit halves, summed in separate 64-bit lanes: no
+           carry chain, so the loop vectorises, and no lane can overflow
+           within 2^31 values. A signed value's high half is summed
+           unsigned and corrected by 2^32 for each negative value. Every
+           chunk folds into the 128-bit total exactly. */
+        zuf_u128 total = zuf_u128_make(0, 0);
+        const R_xlen_t chunk = (R_xlen_t)1 << 31;
+        for (R_xlen_t from = 0; from < n; from += chunk) {
+            R_xlen_t to = n - from < chunk ? n : from + chunk;
+            uint64_t lo_sum = 0, hi_sum = 0, negs = 0, k = 0;
+            for (R_xlen_t i = from; i < to; i++) {
+                uint64_t v = zu_get64(p, i), isna = v == na;
+                v = isna ? 0 : v;
+                k += isna;
+                lo_sum += v & 0xFFFFFFFFu;
+                hi_sum += v >> 32;
+                negs += v >> 63;
+            }
+            nas += (R_xlen_t)k;
+            /* chunk = hi_sum * 2^32 + lo_sum - (signed ? negs * 2^64 : 0) */
+            zuf_u128 c = zuf_u128_add_wrap(zuf_int_u128_shl(zuf_u128_from_u64(hi_sum), 32), zuf_u128_from_u64(lo_sum));
+            if (sgn) c = zuf_u128_sub_wrap(c, zuf_u128_make(negs, 0));
+            total = zuf_u128_add_wrap(total, c);
+        }
+        uint64_t lo = zuf_u128_low(total), hi = zuf_u128_high(total);
+        if (nas > 0 && !na_rm) {
+            zu_set_na(out, t, 0);
+            out = zu_pair_r(out, 0);
+            UNPROTECT(1);
+            return out;
+        }
+        s.acc = zuf_u128_make(hi, lo);
+        if (zu_sum_fits(s, t)) zu_put_bits(out, t, 0, s.acc);
+        else { zu_set_na(out, t, 0); ovf = 1; }
+        out = zu_pair_r(out, ovf);
+        UNPROTECT(1);
+        return out;
+    }
     for (R_xlen_t i = 0; i < n; i++) {
         if (zu_is_na(x, t, i)) {
             if (na_rm) continue;

@@ -26,12 +26,20 @@ LinkingTo:
 Suggests: 
     arrow,
     bit64,
+    data.table,
     DBI,
+    dplyr,
     duckdb,
     gmp,
+    knitr,
     nanoarrow,
+    pillar,
+    rmarkdown,
     testthat (>= 3.0.0),
+    tibble,
+    vctrs,
     withr
+VignetteBuilder: knitr
 Remotes: 
     pedrobtz/zufast
 Config/testthat/edition: 3

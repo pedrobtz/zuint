@@ -34,7 +34,7 @@ zu_format_base <- function(x, base, pad, call) {
   if (!isTRUE(pad) && !isFALSE(pad)) {
     zu_abort("`pad` must be TRUE or FALSE.", "type", call = call)
   }
-  out <- .Call(zu_format_base_c, zu_bare(x), code, base, pad)
+  out <- .Call(zu_format_base_c, x, code, base, pad)
   names(out) <- names(x)
   out
 }

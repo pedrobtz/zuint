@@ -70,21 +70,27 @@ zu_unclass <- function(x) {
 zu_type_name <- function(x) zu_types[[zu_code(x)]]
 
 # Positions of `x[i]` that fell outside x: base fills them with its own NA,
-# whose bits are a valid value here. Found by indexing a vector that has no
-# NA of its own the same way.
+# whose bits are a valid value here. For a numeric index they are the NA
+# and too-large entries (zeros drop out, negatives never pad); otherwise
+# index a vector with no NA of its own the same way.
 zu_out_of_range <- function(x, i) {
+  if (is.numeric(i) && !is.object(i)) {
+    if (any(i < 0, na.rm = TRUE)) {
+      return(NULL)   # negative indices never pad
+    }
+    i <- i[is.na(i) | i >= 1]
+    return(is.na(i) | i >= length(x) + 1)
+  }
   probe <- seq_along(x)
   names(probe) <- names(x)
   is.na(probe[i])
 }
 
 zu_fill_na <- function(payload, code, where) {
-  if (!any(where)) {
+  if (is.null(where) || !any(where)) {
     return(payload)
   }
-  out <- .Call(zu_fill_na_c, zu_bare(payload), code, where)
-  attributes(out) <- attributes(payload)
-  out
+  .Call(zu_fill_na_c, payload, code, where)
 }
 
 zu_subset <- function(x, i, ...) {
@@ -185,7 +191,8 @@ zu_c <- function(...) {
       return(unlist(lapply(args, zu_dbl_quiet)))
     }
     lost <- lost + r[[2L]]
-    parts[[i]] <- r[[1L]]
+    # bare, or c() below would dispatch back here
+    parts[[i]] <- zu_bare(r[[1L]])
     names(parts[[i]]) <- names(args[[i]])
   }
   zu_warn_lost(lost, zu_types[[code]], call = call)
@@ -202,7 +209,7 @@ zu_rev <- function(x) {
 }
 
 zu_is_na <- function(x) {
-  out <- .Call(zu_is_na_c, zu_bare(x), zu_code(x))
+  out <- .Call(zu_is_na_c, x, zu_code(x))
   names(out) <- names(x)
   out
 }
@@ -217,11 +224,11 @@ zu_any_na <- function(x, recursive = FALSE) {
 }
 
 zu_as_character <- function(x, ...) {
-  .Call(zu_to_character_c, zu_bare(x), zu_code(x))
+  .Call(zu_to_character_c, x, zu_code(x))
 }
 
 zu_as_double <- function(x, ...) {
-  res <- .Call(zu_to_double_c, zu_bare(x), zu_code(x))
+  res <- .Call(zu_to_double_c, x, zu_code(x))
   if (res[[2L]] > 0) {
     zu_warn(
       sprintf(
@@ -237,7 +244,7 @@ zu_as_double <- function(x, ...) {
 }
 
 zu_as_integer <- function(x, ...) {
-  res <- .Call(zu_to_integer_c, zu_bare(x), zu_code(x))
+  res <- .Call(zu_to_integer_c, x, zu_code(x))
   zu_warn_lost(res[[2L]], "integer", call = sys.call())
   res[[1L]]
 }
@@ -324,7 +331,7 @@ zu_str <- function(object, ..., vec.len = 4) {
 # quantile(), which comes after 0.1.0.
 zu_summary <- function(object, ...) {
   code <- zu_code(object)
-  r <- zu_as_character(zu_new(.Call(zu_range_c, zu_bare(object), code, TRUE), code))
+  r <- zu_as_character(zu_new(.Call(zu_range_c, object, code, TRUE), code))
   n_na <- sum(zu_is_na(object))
   out <- c(
     "Min." = r[[1L]],

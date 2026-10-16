@@ -141,8 +141,39 @@ The constructors are named after the types, and every conversion into a
 type, from a double, a string or another type, follows the same rule:
 exact, or `NA` with a warning.
 
+## Performance
+
+zuint’s `int64` against bit64’s `integer64` on random values across the
+whole range, in milliseconds (median of five runs; R 4.6.1, bit64 4.8.2,
+an Apple M-series laptop, 2026-10-16). `match` is `zu_match()`, the fast
+counterpart of base `match()`. The script is `inst/bench/bench.R`.
+
+| Elements       | Operation | zuint | bit64 | zuint / bit64 |
+|----------------|-----------|------:|------:|--------------:|
+| 10<sup>6</sup> | `+`       |   2.9 |  11.1 |          0.26 |
+|                | `sum`     |   0.5 |   0.6 |          0.83 |
+|                | `sort`    |  13.7 |  14.8 |          0.93 |
+|                | `match`   |  11.9 |  10.5 |          1.13 |
+|                | `unique`  |  10.8 |  10.5 |          1.03 |
+| 10<sup>7</sup> | `+`       |    27 |    78 |          0.35 |
+|                | `sum`     |     5 |     6 |          0.83 |
+|                | `sort`    |   141 |   158 |          0.89 |
+|                | `match`   |   148 |   295 |          0.50 |
+|                | `unique`  |   147 |   283 |          0.52 |
+| 10<sup>8</sup> | `+`       |   266 |   781 |          0.34 |
+|                | `sum`     |    51 |    58 |          0.88 |
+|                | `sort`    |  2364 |  2339 |          1.01 |
+|                | `match`   |  3056 |  1579 |          1.94 |
+|                | `unique`  |  4148 |  1556 |          2.67 |
+
+zuint is faster or level on most of them. It is slower for `match` and
+`unique` at 10<sup>8</sup> values, where its hash table outgrows memory
+caches, and slightly slower for `match` at 10<sup>6</sup>.
+
 ## Learn more
 
+- `vignette("zuint")` walks through the types, the promotion order, the
+  overflow policies and the engine round trip.
 - The [reference index](https://pedrobtz.github.io/zuint/reference/)
   lists every function, with the type ranges in `?int64`, the overflow
   policies in `?checked_add` and the Arrow bridge in `?zu_from_arrow`.

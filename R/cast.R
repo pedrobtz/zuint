@@ -31,14 +31,16 @@ zu_kind_label <- function(x) {
 
 # x, of kind `kind`, as a bare payload of type `code`, and how many values
 # were lost to NA.
+# For the same type x comes back as it is, attributes included: the C code
+# ignores them, and stripping them would copy the vector.
 zu_convert <- function(x, kind, code) {
   if (kind == code) {
-    return(list(zu_bare(x), 0))
+    return(list(x, 0))
   }
   if (is.null(x)) {
     x <- integer()
   }
-  .Call(zu_cast_c, zu_bare(x), kind, code)
+  .Call(zu_cast_c, x, kind, code)
 }
 
 # x as zuint type `code`, names kept. Lost values warn, reported against
@@ -53,7 +55,11 @@ zu_cast <- function(x, code, call = sys.call(-1L)) {
     )
   }
   if (kind == code) {
-    # the same type, or a bit64 integer64 for int64: only the class changes
+    # the same type as it is (setting the class again would copy), or a
+    # bit64 integer64 for int64, where only the class changes
+    if (identical(oldClass(x), zu_classes[[code]])) {
+      return(x)
+    }
     return(zu_new(x, code))
   }
   res <- zu_convert(x, kind, code)

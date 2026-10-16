@@ -9,7 +9,7 @@ zu_summary_group <- function(..., na.rm = FALSE) {
     x <- zu_cast(x, zu_common_code(vapply(args, zu_kind, integer(1)), call), call = call)
     code <- zu_code(x)
   }
-  p <- zu_bare(x)
+  p <- x
   switch(
     .Generic,
     sum = zu_reduce_result(.Call(zu_sum_c, p, code, na.rm), code, call),
@@ -40,12 +40,12 @@ zu_extreme <- function(x, code, na.rm, which, call) {
     )
     return(c(Inf, -Inf)[[which]])
   }
-  r <- .Call(zu_range_c, zu_bare(x), code, TRUE)
+  r <- .Call(zu_range_c, x, code, TRUE)
   zu_new(r[which], code)
 }
 
 zu_mean <- function(x, ..., na.rm = FALSE) {
-  .Call(zu_mean_c, zu_bare(x), zu_code(x), isTRUE(na.rm))
+  .Call(zu_mean_c, x, zu_code(x), isTRUE(na.rm))
 }
 
 zu_median <- function(x, na.rm = FALSE, ...) {
@@ -64,23 +64,37 @@ zu_median <- function(x, na.rm = FALSE, ...) {
   zu_mean(mid)
 }
 
+# Values sorted in C, with the NAs put back as na.last says. Names follow
+# their values, which needs the positions.
 zu_sort <- function(x, decreasing = FALSE, na.last = NA, ...) {
-  o <- .Call(zu_order_c, zu_bare(x), zu_code(x), isTRUE(decreasing), na.last)
-  x[o]
+  code <- zu_code(x)
+  if (!is.null(names(x))) {
+    return(x[.Call(zu_order_c, x, code, isTRUE(decreasing), na.last)])
+  }
+  s <- .Call(zu_sort_values_c, x, code, isTRUE(decreasing))
+  n_na <- length(x) - length(s)
+  if (n_na > 0L && !is.na(na.last)) {
+    nas <- zu_bare(zu_cast(rep(NA, n_na), code))
+    s <- if (isTRUE(na.last)) c(s, nas) else c(nas, s)
+  }
+  zu_new(s, code)
 }
 
 # Integer ranks, ties sharing the lowest, so base order() and rank() on any
 # number of keys stay exact (design 7). Doubles only past 2^31 - 1 values.
 zu_xtfrm <- function(x) {
-  .Call(zu_rank_c, zu_bare(x), zu_code(x))
+  .Call(zu_rank_c, x, zu_code(x))
 }
 
 zu_duplicated <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
-  .Call(zu_duplicated_c, zu_bare(x), zu_code(x), isTRUE(fromLast))
+  .Call(zu_duplicated_c, x, zu_code(x), isTRUE(fromLast))
 }
 
 zu_unique <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
-  x[!zu_duplicated(x, fromLast = fromLast)]
+  if (isTRUE(fromLast) || !is.null(names(x))) {
+    return(x[!zu_duplicated(x, fromLast = fromLast)])
+  }
+  zu_new(.Call(zu_unique_c, x, zu_code(x)), zu_code(x))
 }
 
 zu_any_duplicated <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
@@ -117,7 +131,7 @@ zu_match <- function(x, table, nomatch = NA_integer_) {
   kinds <- c(zu_kind(x), zu_kind(table))
   zu_check_operands(kinds, list(x, table), call)
   code <- zu_common_code(kinds, call)
-  .Call(zu_match_c, zu_bare(zu_cast(x, code, call = call)), zu_bare(zu_cast(table, code, call = call)), code, as.integer(nomatch))
+  .Call(zu_match_c, zu_cast(x, code, call = call), zu_cast(table, code, call = call), code, as.integer(nomatch))
 }
 
 #' @rdname zu_match

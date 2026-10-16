@@ -111,3 +111,24 @@ test_that("diff and seq_zu are exact", {
 test_that("summary reports the exact extremes", {
   expect_snapshot(summary(int64(c("-9223372036854775807", "0", "9223372036854775807", NA))))
 })
+
+test_that("the 64-bit sum is exact at the edges of the range", {
+  max64 <- "9223372036854775807"
+  expect_identical(sum(int64(c(max64, paste0("-", max64)))), int64(0))
+  expect_identical(sum(int64(c(max64, "-1", "1"))), int64(max64))
+  expect_warning(s <- sum(int64(c(max64, max64))), class = "zuint_overflow_warning")
+  expect_true(is.na(s))
+  expect_warning(sum(int64(c(paste0("-", max64), "-1"))), class = "zuint_overflow_warning")
+  expect_identical(sum(int64(rep("-4294967297", 3))), int64("-12884901891"))
+  umax <- "18446744073709551614"
+  expect_identical(sum(uint64(c(umax, "0"))), uint64(umax))
+  expect_warning(sum(uint64(c(umax, "1"))), class = "zuint_overflow_warning")
+  expect_identical(sum(uint64(rep("4294967295", 4))), uint64("17179869180"))
+  for (type in c("int64", "uint64")) {
+    v <- oracle_random(type, 2000, seed = 33)
+    exact <- sum(gmp::as.bigz(v))
+    fits <- oracle_fits(type, as.character(exact))
+    r <- suppressWarnings(sum(zu_ctor(type)(v)))
+    expect_identical(as.character(r), if (fits) as.character(exact) else NA_character_)
+  }
+})
