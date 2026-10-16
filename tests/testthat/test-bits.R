@@ -27,9 +27,9 @@ test_that("bit_and, bit_or, bit_xor and bit_not match a bit-string oracle", {
 
 test_that("a result on the NA pattern is NA with an overflow warning", {
   expect_warning(x <- bit_not(int64("9223372036854775807")), class = "zuint_overflow_warning")
-  expect_true(is.na(x))
+  expect_identical(x, NA_int64_)
   expect_warning(x <- bit_or(uint64("0xffffffff00000000"), uint64("0xffffffff")), class = "zuint_overflow_warning")
-  expect_true(is.na(x))
+  expect_identical(x, NA_uint64_)
   expect_warning(shift_left(int128(1), 127L), class = "zuint_overflow_warning")
 })
 
@@ -56,8 +56,8 @@ test_that("shifts by a negative amount or by the width are NA", {
     x <- zu_ctor(type)(1)
     w <- zu_width(type)
     expect_no_warning(r <- shift_left(x, c(-1L, w, w + 1L, NA)))
-    expect_true(all(is.na(r)))
-    expect_true(all(is.na(shift_right(x, c(-1L, w)))))
+    expect_identical(r, zu_na(type, 4), label = type)
+    expect_identical(shift_right(x, c(-1L, w)), zu_na(type, 2), label = type)
   }
   expect_identical(shift_left(uint64(1), 3), uint64(8))
   expect_identical(shift_left(uint64(c(1, 2)), int64(1)), uint64(c(2, 4)))
@@ -76,7 +76,7 @@ test_that("popcount, clz and ctz count over the full width", {
     expect_identical(popcount(x), as.integer(ones), label = type)
     expect_identical(clz(x), as.integer(lead), label = type)
     expect_identical(ctz(x), as.integer(trail), label = type)
-    expect_identical(popcount(zu_ctor(type)(NA)), NA_integer_)
+    expect_identical(popcount(zu_ctor(type)(NA)), NA_integer_, label = type)
   }
 })
 

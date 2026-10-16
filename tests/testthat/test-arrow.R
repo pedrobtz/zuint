@@ -4,12 +4,12 @@ test_that("every type round-trips through the C Data Interface, nulls included",
     x <- zu_ctor(type)(vals)
     a <- zu_to_arrow(x)
     expect_identical(zu_from_arrow(a$array, a$schema), x, label = type)
-    expect_identical(zu_from_arrow(a$array, a$schema), x)
+    expect_identical(zu_from_arrow(a$array, a$schema), x, label = type)
   }
   for (type in zu_all_types) {
     x <- zu_ctor(type)()
     a <- zu_to_arrow(x)
-    expect_identical(zu_from_arrow(a$array, a$schema), x)
+    expect_identical(zu_from_arrow(a$array, a$schema), x, label = type)
   }
 })
 

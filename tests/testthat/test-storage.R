@@ -48,8 +48,8 @@ test_that("zu_storage and zu_from_storage are inverses and keep names", {
     x <- zu_ctor(type)(c(a = 0, b = 1, c = NA))
     p <- zu_storage(x)
     expect_null(oldClass(p))
-    expect_identical(names(p), c("a", "b", "c"))
-    expect_identical(zu_from_storage(p, type), x)
+    expect_identical(names(p), c("a", "b", "c"), label = type)
+    expect_identical(zu_from_storage(p, type), x, label = type)
   }
 })
 

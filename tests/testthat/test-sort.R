@@ -7,7 +7,7 @@ test_that("sort and order match an exact reference, stably, with every na.last",
       for (decreasing in c(FALSE, TRUE)) {
         ref <- order(keys, na.last = na_last, decreasing = decreasing, method = "radix")
         expect_identical(order(x, na.last = na_last, decreasing = decreasing), ref, label = paste(type, na_last, decreasing))
-        expect_identical(sort(x, decreasing = decreasing, na.last = na_last), x[ref])
+        expect_identical(sort(x, decreasing = decreasing, na.last = na_last), x[ref], label = type)
       }
     }
   }
@@ -18,7 +18,7 @@ test_that("order() on a data frame with a wide key and a second key is exact bey
     k <- zu_ctor(type)(c("9007199254740993", "9007199254740992", "9007199254740993", "9007199254740994"))
     df <- data.frame(k = k, j = c(2, 1, 1, 0))
     expect_identical(order(df$k, df$j), c(2L, 3L, 1L, 4L), label = type)
-    expect_identical(rownames(df[order(df$k, -df$j), ]), c("2", "1", "3", "4"))
+    expect_identical(rownames(df[order(df$k, -df$j), ]), c("2", "1", "3", "4"), label = type)
   }
 })
 
@@ -33,8 +33,8 @@ test_that("sorting agrees with base R on values below 2^53", {
   v <- c(round(runif(300, -2^52, 2^52)), NA, 0, 0)
   for (type in c("int64", "int128")) {
     x <- zu_ctor(type)(v)
-    expect_identical(as.double(sort(x)), sort(v))
-    expect_identical(order(x, decreasing = TRUE), order(v, decreasing = TRUE, method = "radix"))
+    expect_identical(as.double(sort(x)), sort(v), label = type)
+    expect_identical(order(x, decreasing = TRUE), order(v, decreasing = TRUE, method = "radix"), label = type)
   }
 })
 
@@ -44,14 +44,14 @@ test_that("unique, duplicated and match agree with exact references, with word c
     v <- c(v, sample(v, 20, replace = TRUE))
     x <- zu_ctor(type)(v)
     expect_identical(duplicated(x), duplicated(v), label = type)
-    expect_identical(duplicated(x, fromLast = TRUE), duplicated(v, fromLast = TRUE))
-    expect_identical(as.character(unique(x)), unique(v))
-    expect_identical(anyDuplicated(x), anyDuplicated(v))
+    expect_identical(duplicated(x, fromLast = TRUE), duplicated(v, fromLast = TRUE), label = type)
+    expect_identical(as.character(unique(x)), unique(v), label = type)
+    expect_identical(anyDuplicated(x), anyDuplicated(v), label = type)
     tab <- rev(unique(v))
-    expect_identical(match(x, zu_ctor(type)(tab)), match(v, tab))
-    expect_identical(x %in% zu_ctor(type)(tab[1:5]), v %in% tab[1:5])
-    expect_identical(zu_match(x, zu_ctor(type)(tab)), match(v, tab))
-    expect_identical(x %zin% zu_ctor(type)(tab[1:5]), v %in% tab[1:5])
+    expect_identical(match(x, zu_ctor(type)(tab)), match(v, tab), label = type)
+    expect_identical(x %in% zu_ctor(type)(tab[1:5]), v %in% tab[1:5], label = type)
+    expect_identical(zu_match(x, zu_ctor(type)(tab)), match(v, tab), label = type)
+    expect_identical(x %zin% zu_ctor(type)(tab[1:5]), v %in% tab[1:5], label = type)
   }
   expect_identical(anyDuplicated(int64(1:3)), 0L)
   expect_identical(zu_match(int64(3), uint64(c(1, 3))), 2L)

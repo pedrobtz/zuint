@@ -1,25 +1,25 @@
 test_that("[ keeps the class and pads out-of-range positions with the type's NA", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(a = 1, b = 2, c = 3))
-    expect_identical(x[2:3], zu_ctor(type)(c(b = 2, c = 3)))
-    expect_identical(x[-1], x[2:3])
-    expect_identical(x[c(TRUE, FALSE, TRUE)], x[c(1, 3)])
-    expect_identical(x["b"], x[2])
-    expect_identical(x[], x)
+    expect_identical(x[2:3], zu_ctor(type)(c(b = 2, c = 3)), label = type)
+    expect_identical(x[-1], x[2:3], label = type)
+    expect_identical(x[c(TRUE, FALSE, TRUE)], x[c(1, 3)], label = type)
+    expect_identical(x["b"], x[2], label = type)
+    expect_identical(x[], x, label = type)
     y <- x[c(1, 5, NA)]
     expect_identical(
       is.na(y),
-      structure(c(FALSE, TRUE, TRUE), names = c("a", NA, NA))
+      structure(c(FALSE, TRUE, TRUE), names = c("a", NA, NA)), label = type
     )
-    expect_identical(as.character(y), c("1", NA, NA))
+    expect_identical(as.character(y), c("1", NA, NA), label = type)
   }
 })
 
 test_that("[[ extracts one element without its name", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(a = 1, b = 2))
-    expect_identical(x[[2]], zu_ctor(type)(2))
-    expect_identical(x[["a"]], zu_ctor(type)(1))
+    expect_identical(x[[2]], zu_ctor(type)(2), label = type)
+    expect_identical(x[["a"]], zu_ctor(type)(1), label = type)
     expect_error(x[[3]], class = "subscriptOutOfBoundsError")
   }
 })
@@ -29,9 +29,9 @@ test_that("[<- casts the value to the vector's type", {
     x <- zu_ctor(type)(1:4)
     x[2] <- 20L
     x[3:4] <- c("30", "40")
-    expect_identical(as.character(x), c("1", "20", "30", "40"))
+    expect_identical(as.character(x), c("1", "20", "30", "40"), label = type)
     x[] <- 0
-    expect_identical(as.character(x), rep("0", 4))
+    expect_identical(as.character(x), rep("0", 4), label = type)
   }
   x <- int64(1:2)
   expect_warning(x[1] <- 1.5, class = "zuint_cast_warning")
@@ -49,14 +49,14 @@ test_that("[<- beyond the end pads with the type's NA", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(1)
     x[4] <- 4
-    expect_identical(as.character(x), c("1", NA, NA, "4"))
+    expect_identical(as.character(x), c("1", NA, NA, "4"), label = type)
     y <- zu_ctor(type)(c(a = 1))
     y["c"] <- 3
-    expect_identical(names(y), c("a", "c"))
-    expect_identical(as.character(y), c("1", "3"))
+    expect_identical(names(y), c("a", "c"), label = type)
+    expect_identical(as.character(y), c("1", "3"), label = type)
     z <- zu_ctor(type)(1)
     z[[3]] <- 3
-    expect_identical(as.character(z), c("1", NA, "3"))
+    expect_identical(as.character(z), c("1", NA, "3"), label = type)
   }
 })
 
@@ -68,16 +68,16 @@ test_that("[[<- casts the value", {
     "340282366920938463463374607431768211454"
   )
   expect_warning(x[[1]] <- -1L, class = "zuint_cast_warning")
-  expect_true(is.na(x[[1]]))
+  expect_identical(x[[1]], NA_uint128_)
 })
 
 test_that("length<- truncates or pads with NA", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(1:3)
     length(x) <- 5
-    expect_identical(as.character(x), c("1", "2", "3", NA, NA))
+    expect_identical(as.character(x), c("1", "2", "3", NA, NA), label = type)
     length(x) <- 2
-    expect_identical(x, zu_ctor(type)(1:2))
+    expect_identical(x, zu_ctor(type)(1:2), label = type)
   }
 })
 
@@ -95,22 +95,22 @@ test_that("c() converts every argument to the common type", {
 test_that("rep and rev keep the type and names", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(a = 1, b = NA))
-    expect_identical(rep(x, 2), zu_ctor(type)(c(a = 1, b = NA, a = 1, b = NA)))
-    expect_identical(rep(x, each = 2), x[c(1, 1, 2, 2)])
-    expect_identical(rep(x, length.out = 3), x[c(1, 2, 1)])
-    expect_identical(rev(x), x[2:1])
-    expect_identical(rev(zu_ctor(type)()), zu_ctor(type)())
+    expect_identical(rep(x, 2), zu_ctor(type)(c(a = 1, b = NA, a = 1, b = NA)), label = type)
+    expect_identical(rep(x, each = 2), x[c(1, 1, 2, 2)], label = type)
+    expect_identical(rep(x, length.out = 3), x[c(1, 2, 1)], label = type)
+    expect_identical(rev(x), x[2:1], label = type)
+    expect_identical(rev(zu_ctor(type)()), zu_ctor(type)(), label = type)
   }
 })
 
 test_that("is.na, is.na<- and anyNA see only the type's NA", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(a = 0, b = NA, c = 1))
-    expect_identical(is.na(x), c(a = FALSE, b = TRUE, c = FALSE))
-    expect_true(anyNA(x))
-    expect_false(anyNA(x[-2]))
+    expect_identical(is.na(x), c(a = FALSE, b = TRUE, c = FALSE), label = type)
+    expect_true(anyNA(x), label = type)
+    expect_false(anyNA(x[-2]), label = type)
     is.na(x) <- 3
-    expect_identical(is.na(x), c(a = FALSE, b = TRUE, c = TRUE))
+    expect_identical(is.na(x), c(a = FALSE, b = TRUE, c = TRUE), label = type)
   }
   # bits that base R reads as NaN or NA are ordinary values here
   x <- int64(c("-1", "-9223372036854775807"))
@@ -122,8 +122,8 @@ test_that("as.double is exact up to 2^53 and warns when it rounds", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(0, 1, 2^53, NA))
     expect_no_warning(d <- as.double(x))
-    expect_identical(d, c(0, 1, 2^53, NA))
-    expect_identical(as.numeric(x), as.double(x))
+    expect_identical(d, c(0, 1, 2^53, NA), label = type)
+    expect_identical(as.numeric(x), as.double(x), label = type)
   }
   expect_identical(as.double(int64(-2^53)), -2^53)
   expect_warning(
@@ -156,7 +156,7 @@ test_that("as.integer is exact within the integer range, NA with a warning outsi
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(0, 2147483647, NA))
     expect_no_warning(i <- as.integer(x))
-    expect_identical(i, c(0L, 2147483647L, NA))
+    expect_identical(i, c(0L, 2147483647L, NA), label = type)
   }
   expect_identical(as.integer(int64(-2147483647)), -2147483647L)
   expect_warning(
@@ -183,9 +183,9 @@ test_that("zuint vectors work as data frame columns", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(1, NA, 3))
     df <- data.frame(id = 1:3, v = x)
-    expect_identical(df$v, x)
-    expect_identical(df[2:3, "v"], x[2:3])
-    expect_identical(as.vector(format(df)$v), c(" 1", "NA", " 3"))
+    expect_identical(df$v, x, label = type)
+    expect_identical(df[2:3, "v"], x[2:3], label = type)
+    expect_identical(as.vector(format(df)$v), c(" 1", "NA", " 3"), label = type)
   }
 })
 
@@ -219,17 +219,17 @@ test_that("multi-dimensional indexing is a type error", {
 test_that("each class claims mixed Ops calls", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(1)
-    expect_true(chooseOpsMethod(x, 1, NULL, NULL, NULL, FALSE))
+    expect_true(chooseOpsMethod(x, 1, NULL, NULL, NULL, FALSE), label = type)
   }
 })
 
 test_that("is.nan, is.finite and is.infinite read values, not raw bits", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(a = "1", b = NA, c = "0"))
-    expect_identical(is.nan(x), c(a = FALSE, b = FALSE, c = FALSE))
-    expect_identical(is.finite(x), c(a = TRUE, b = FALSE, c = TRUE))
-    expect_identical(is.infinite(x), c(a = FALSE, b = FALSE, c = FALSE))
-    expect_true(is.numeric(x))
+    expect_identical(is.nan(x), c(a = FALSE, b = FALSE, c = FALSE), label = type)
+    expect_identical(is.finite(x), c(a = TRUE, b = FALSE, c = TRUE), label = type)
+    expect_identical(is.infinite(x), c(a = FALSE, b = FALSE, c = FALSE), label = type)
+    expect_true(is.numeric(x), label = type)
   }
   # -1 is a NaN bit pattern as a double
   expect_false(is.nan(int64(-1)))
@@ -277,5 +277,5 @@ test_that("a zuint vector used as an index is read as a number", {
   x[[int64(1)]] <- 9L
   expect_identical(x, int64(c(9, 5, 30)))
   expect_warning(r <- x[int64("9007199254740993")], class = "zuint_cast_warning")
-  expect_true(is.na(r))
+  expect_identical(r, NA_int64_)
 })
