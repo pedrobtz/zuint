@@ -24,6 +24,9 @@ jobs:
       # 80-bit intermediates.
       nosuggests: true
       nold: true
+      # No container in the quick profile: the containers are R-devel, which
+      # builds arrow and duckdb from source. The full profile runs all three.
+      quick-containers: '[]'
       # Every leg is 64-bit gcc or clang, so every leg must build on
       # __int128; test-storage.R checks.
       env: |
