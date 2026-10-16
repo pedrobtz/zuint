@@ -77,8 +77,9 @@ anything arrow writes and reads, such as Parquet files.</p>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>They go through nanoarrow rather than arrow's own conversion. arrow
-24.0.0 aborts R when it makes an R object for the <code>arrow.opaque</code>
-extension type that <code>int128</code> and <code>uint128</code> use, so
+(24.0.0 and 25.0.1) aborts R when it makes an R object for the
+<code>arrow.opaque</code> extension type that <code>int128</code> and <code>uint128</code> use
+(<a href="https://github.com/apache/arrow/issues/53951" class="external-link">https://github.com/apache/arrow/issues/53951</a>), so
 <code><a href="https://arrow.apache.org/docs/r/reference/as_arrow_array.html" class="external-link">arrow::as_arrow_array()</a></code> and <code><a href="https://arrow.apache.org/docs/r/reference/infer_type.html" class="external-link">arrow::infer_type()</a></code> work for <code>int64</code> and
 <code>uint64</code> only, and give an error for the 128-bit types.</p>
 <p>Both need the arrow and nanoarrow packages.</p>

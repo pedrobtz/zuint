@@ -33,8 +33,9 @@ data frame.
 ## Details
 
 They go through nanoarrow rather than arrow's own conversion. arrow
-24.0.0 aborts R when it makes an R object for the `arrow.opaque`
-extension type that `int128` and `uint128` use, so
+(24.0.0 and 25.0.1) aborts R when it makes an R object for the
+`arrow.opaque` extension type that `int128` and `uint128` use
+(<https://github.com/apache/arrow/issues/53951>), so
 [`arrow::as_arrow_array()`](https://arrow.apache.org/docs/r/reference/as_arrow_array.html)
 and
 [`arrow::infer_type()`](https://arrow.apache.org/docs/r/reference/infer_type.html)
