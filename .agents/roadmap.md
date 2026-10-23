@@ -6,6 +6,16 @@ Tracking: [v0.1.0 (#1)](https://github.com/pedrobtz/zuint/issues/1), with one
 sub-issue per stage;
 [CRAN-submission (#12)](https://github.com/pedrobtz/zuint/issues/12).
 
+Re-planned 2026-10-23 after the joint design review of `zubin`, `zuint` and
+`zuarrow` (`zubin-zuint-zuarrow-2026-10-22.md` in `pedrobtz/packages`,
+decisions X1 to X8). Stages 0 to 8 were done by then. The Arrow bridge
+Stages 4 and 5 built is handed to `zuarrow` in a new Stage 9: the R
+surface and the engine helpers leave, the C conversion stays as
+`zuarrow` registrations, and `zuint` becomes types and arithmetic.
+Readiness is renumbered to Stage 10 and a Review stage is appended. The
+first release still does not link to `zubin`; that edge arrives with the
+zero-copy work under [After 0.1.0](#after-010).
+
 The design numbers its milestones v0.1 (core semantics), v0.2 (interop) and
 v0.3 (vector toolkit, first CRAN release). This roadmap takes all three to
 0.1.0: Stages 1 to 3 are the design's v0.1, Stages 4 and 5 its v0.2, and
@@ -31,7 +41,9 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 6 | [Sorting, hashing and reductions](#stage-6--sorting-hashing-and-reductions) | quick | [#8](https://github.com/pedrobtz/zuint/issues/8) | [#21](https://github.com/pedrobtz/zuint/pull/21) | 2026-10-16 |
 | 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | [#22](https://github.com/pedrobtz/zuint/pull/22) | 2026-10-16 |
 | 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | [#23](https://github.com/pedrobtz/zuint/pull/23) | 2026-10-16 |
-| 9 | [v0.1.0 readiness](#stage-9--v010-readiness) | full | [#11](https://github.com/pedrobtz/zuint/issues/11) | | |
+| 9 | [Arrow bridge handover](#stage-9--arrow-bridge-handover) | full — compiled code removed and a new Suggests guard | [#52](https://github.com/pedrobtz/zuint/issues/52) | | |
+| 10 | [v0.1.0 readiness](#stage-10--v010-readiness) | full | [#11](https://github.com/pedrobtz/zuint/issues/11) | | |
+| 11 | [Review](#stage-11--review) | full | [#53](https://github.com/pedrobtz/zuint/issues/53) | | |
 
 ## Stage 0 — Package identity
 
@@ -503,35 +515,140 @@ r-actions skips its jobs; the run on `757cc52` covers the same code.
 gctorture took 73 of its 120 minutes; if the suite grows, raise its `step`
 before its timeout, as zufast did.
 
-## Stage 9 — v0.1.0 readiness
+## Stage 9 — Arrow bridge handover
+
+**Issue.** [#52](https://github.com/pedrobtz/zuint/issues/52), sub-issue of
+[v0.1.0](https://github.com/pedrobtz/zuint/issues/1). Blocked by
+[zuarrow#28](https://github.com/pedrobtz/zuarrow/issues/28), which ships
+`arrow_duckdb()` and the handler contract this stage registers against.
+
+**CI.** `full — compiled code is removed and a Suggests guard (zuarrow) is
+added: the symbol audit, the nosuggests leg, and valgrind on the handlers
+that still own release callbacks`.
+
+**Goal.** zuint is types and arithmetic. The R-level Arrow surface and the
+engine helpers live in `zuarrow`; what stays here is the C conversion,
+reached only as `zuarrow` registrations, and the storage API as the public
+representation contract.
+
+**Work.**
+- Remove from the R surface, each with its `zuarrow` replacement named in
+  `NEWS.md`: `zu_from_arrow()`, `zu_to_arrow()`, `zu_arrow_table()`,
+  `zu_from_arrow_table()`, `zu_sentinel_check()`, `zu_duckdb_query()`,
+  `zu_duckdb_register()`, the nanoarrow `convert_array()`,
+  `as_nanoarrow_array()` and `infer_nanoarrow_schema()` methods and the
+  arrow `as_arrow_array()` and `infer_type()` methods (`R/arrow.R`,
+  `R/nanoarrow.R`, `R/engines.R`).
+- Keep `src/vendor/arrow/abi.h` (struct definitions only; review X1 under
+  X2(b)) and the import and export kernels of `src/zu_arrow.c`, reduced to
+  what the handlers need.
+- Register with `zuarrow` lazily on `packageEvent("zuarrow", "onLoad")`,
+  the pattern `R/zzz.R` already uses: `to` handlers for `l` (int64), `L`
+  (uint64) and the `arrow.opaque` hugeint and uhugeint extension (int128,
+  uint128), each taking `zuarrow`'s `lossy` policy and applying review X4
+  to the sentinel edge; `from` handlers by class exporting `l`, `L` and the
+  extension. No registration for `d:38,0` (review X5): `to =
+  zuint::int128()` is the opt-in, and whether the `decimal = TRUE` export
+  form survives as an option is decided here.
+- `zu_storage()` and `zu_from_storage()` documented as the public
+  representation contract (review X3): the payload shapes (REALSXP for the
+  64-bit types, CPLXSXP for the 128-bit ones), the sentinel bit patterns,
+  and stability under the same rule as the R API; design §4.3 rewritten.
+- design.md records the handover with the date: §0 (success criterion 2
+  becomes "`zuarrow::arrow_duckdb()` and `arrow_to_r()` return zuint
+  columns once zuint is loaded"; the nanoarrow half of §9.3 goes, the
+  duckdb half survives through the storage API), §2.1 (the bridge is
+  `zuarrow`'s; zuint registers), §9 (the registration contract), §13 (the
+  v0.2 milestone recorded as superseded), §15 (name check resolved on
+  2026-10-23; schema-fidelity classes resolved as `zuarrow`'s, review X7).
+- `DESCRIPTION`: Title and Description without 'Arrow' and 'DuckDB';
+  `Suggests` loses `arrow`, `DBI`, `duckdb` and `nanoarrow` unless a test
+  still needs one. The README's before-and-after table and worked round
+  trip are rewritten over `zuarrow::arrow_duckdb()` (`pkg-readme`).
+- The round-trip matrix of Stage 5 runs through `zuarrow` instead,
+  skipped when it is absent; CI installs it from GitHub until it is on
+  CRAN.
+
+**Exit criteria.**
+- `NAMESPACE` exports none of the removed functions, and `test-symbols.R`
+  passes with the reduced `zu_arrow.o`.
+- With `zuarrow` installed, `arrow_registry()` lists zuint's entries, and
+  the round-trip matrix passes through `arrow_duckdb()`, `arrow_to_r()` and
+  `arrow_array()` for every row of design §0's table that 0.1.0 covers.
+- Without `zuarrow` the package loads, every test that needs it skips, and
+  the nosuggests leg is green.
+- A `UBIGINT` value of 2⁶⁴ − 1 raises `zuarrow_lossy_error` under the
+  default policy and reads as `NA` with a warning under `lossy = "warn"`.
+- `?zu_storage` states the contract above.
+- `R CMD check` passes on the full profile with 0 errors, 0 warnings,
+  0 notes.
+
+**Design.** §0, §2.1, §4.3, §9, §13, §15 of design.md; review decisions X1
+to X5.
+
+## Stage 10 — v0.1.0 readiness
 
 **Issue.** [#11](https://github.com/pedrobtz/zuint/issues/11), sub-issue of
-[v0.1.0](https://github.com/pedrobtz/zuint/issues/1).
+[v0.1.0](https://github.com/pedrobtz/zuint/issues/1). Renumbered from Stage 9 on
+2026-10-23.
 
 **CI.** `full`.
 
-**Goal.** Only the submission itself is left.
+**Goal.** Only the review and the submission are left.
 
 **Work.**
 - zufast 0.1.1 on CRAN: raise `LinkingTo` to `zufast (>= 0.1.1)` and delete
-  `Remotes:` in the same commit (design §2.1).
+  `Remotes:` in the same commit (design §2.1). zufast 0.1.0 reached CRAN
+  on 2026-10-21, so under the six-week cadence 0.1.1 cannot be submitted
+  before 2026-12-02; this stage cannot close before that.
+- `zuarrow` on CRAN: add `Suggests: zuarrow` so the registration tests run
+  on CRAN. If it is not, the tests stay skip-only and `Suggests` omits it,
+  since a CRAN package cannot suggest one that is not there.
 - `Version: 0.1.0` and the matching `NEWS.md` heading.
 - `cran-comments.md` listing the r-actions CI legs as test environments.
-- The `pkg-cran-review` skill run, every finding resolved;
-  `urlchecker::url_check()` and `spelling::spell_check_package()` clean.
+- `urlchecker::url_check()` and `spelling::spell_check_package()` clean.
 - `CLAUDE.md` Architecture and Invariants sections brought up to date with
   what the stages established.
 
 **Exit criteria.**
-- A full-profile r-actions run is green on the release commit.
+- A full-profile r-actions run is green on the merge commit.
 - `R CMD check --as-cran` shows only the "New submission" note.
 - `DESCRIPTION` has no `Remotes:` field and depends on a released zufast.
 
 **Design.** §2.1, §13 of design.md; `CLAUDE.md`, Releasing to CRAN.
 
+## Stage 11 — Review
+
+**Issue.** [#53](https://github.com/pedrobtz/zuint/issues/53), sub-issue of
+[v0.1.0](https://github.com/pedrobtz/zuint/issues/1).
+
+**CI.** `full`.
+
+**Goal.** The release candidate is reviewed twice and only the submission
+itself is left.
+
+**Work.**
+- Critical review: the `pkg-critical-review` skill over code, tests and
+  style. Its blocking and required findings become sub-issues of `v0.1.0`,
+  each fixed in a pull request that closes it.
+- CRAN review: the `pkg-cran-review` skill, run after those fixes so it
+  sees the code that is submitted, every FAIL and WARN resolved.
+- `NEWS.md` reflects any user-visible fix.
+
+**Exit criteria.**
+- Every blocking and required review issue is closed.
+- The `pkg-cran-review` table is clean.
+- A full-profile r-actions run is green on the merge commit, which becomes
+  the release commit.
+
+**Design.** §13 of design.md; `CLAUDE.md`, Releasing to CRAN.
+
 ## After 0.1.0
 
-- **ALTREP views** for uint64, int128 and uint128 (design §4.2, §13 v0.4):
+- **ALTREP views** for uint64, int128 and uint128 (design §4.2, §13 v0.4),
+  and with them `LinkingTo: zubin`, so that `zu_from_storage()` accepts a
+  `zubin` foreign buffer as its payload (review X3): null-free arrays only,
+  int64 last because it needs the bits-view wrapper. Then the rest:
   graceful degradation of class-stripped values, zero-copy wrapping of
   null-free Arrow buffers including the int64 bits-view wrapper, exact
   `Extract_subset`, `Is_sorted` and `No_NA` flags, and the
@@ -540,8 +657,9 @@ before its timeout, as zufast did.
 - **Upstream adoption** (design §9.3): approach the duckdb and
   nanoarrow/arrow maintainers once the round-trip matrix and benchmarks are
   public.
-- **Schema-fidelity classes** for uint32 and the small integer types (design
-  §0, §3), pending the open question on where they live.
+- **Schema fidelity** for uint32 and the small integer types is `zuarrow`'s,
+  carried by the schema handle at export (review X7, 2026-10-23); no class
+  here.
 - **The `decimal` bridge** for scale > 0 decimals, implemented in `decimal`.
 - **`saturating_*` operations, `mean_exact()` and `quantile()`** (design §6,
   §7, §13): cheap, but not needed for the engine round trip.
@@ -549,8 +667,20 @@ before its timeout, as zufast did.
 
 ## Open questions
 
-- **zufast 0.1.1 on CRAN**: required before Stage 9 can close.
+- **zufast 0.1.1 on CRAN**: required before Stage 10 can close; not before
+  2026-12-02 under the six-week cadence.
+- **zuarrow's Stage 9** ([zuarrow#28](https://github.com/pedrobtz/zuarrow/issues/28)):
+  required before Stage 9 can start.
 
 Resolved 2026-10-15, recorded in design §15: the `integer ⊕ unsigned`
 promotion rule and the wrapping NA rule (Stage 2), and the type-stable
 `sum()` (Stage 6).
+
+Resolved 2026-10-23 by the joint design review (decisions X1 to X5, X7
+and X8 of `zubin-zuint-zuarrow-2026-10-22.md` in `pedrobtz/packages`),
+recorded in design.md by Stage 9: the Arrow bridge is `zuarrow`'s and
+zuint registers (X1, X2), vectors are built through `zu_from_storage()`
+(X3), the sentinel edge follows `zuarrow`'s policy (X4), `d:38,0` is not
+registered (X5), schema fidelity is `zuarrow`'s (X7), and the first
+release does not link to `zubin` (X8). The name check is done: no `zuint`
+on CRAN, r-universe or PyPI.
