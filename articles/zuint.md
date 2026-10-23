@@ -119,7 +119,7 @@ hands a data frame back to DuckDB with their types:
 
 con <- DBI::dbConnect(duckdb::duckdb())
 #> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/Rtmpve8N1d/duckdb
+#> ℹ /tmp/RtmpXGSfvx/duckdb
 #> This is removed when the R session ends.
 #> • Extensions are re-downloaded each session.
 #> • Secrets are lost.
