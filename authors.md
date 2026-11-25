@@ -12,12 +12,12 @@
 Source:
 [`DESCRIPTION`](https://github.com/pedrobtz/zuint/blob/main/DESCRIPTION)
 
-Baltazar P (2026). *zuint: Lossless 64- And 128-Bit Integers for 'Arrow'
-and 'DuckDB'*. R package version 0.0.0.9000,
+Baltazar P (2026). *zuint: Lossless Signed and Unsigned 64- And 128-Bit
+Integers*. R package version 0.0.0.9000,
 <https://pedrobtz.github.io/zuint/>.
 
     @Manual{,
-      title = {zuint: Lossless 64- And 128-Bit Integers for 'Arrow' and 'DuckDB'},
+      title = {zuint: Lossless Signed and Unsigned 64- And 128-Bit Integers},
       author = {Pedro Baltazar},
       year = {2026},
       note = {R package version 0.0.0.9000},

@@ -110,54 +110,45 @@ mean(int64(1:2))
 
 ## Through engines and back
 
-[`zu_duckdb_query()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
-reads a query’s wide integer columns exactly, and
-[`zu_duckdb_register()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
-hands a data frame back to DuckDB with their types:
+zuint has no Arrow functions of its own. It registers its types with
+[zuarrow](https://github.com/pedrobtz/zuarrow), so once zuarrow is
+loaded its readers and writers handle zuint columns exactly
+(`?zuint-arrow`).
+
+From DuckDB, turn on `arrow_lossless_conversion`, so that `HUGEINT` and
+`UHUGEINT` arrive as themselves rather than as decimals, and read the
+result through zuarrow:
 
 ``` r
 
-con <- DBI::dbConnect(duckdb::duckdb())
-#> duckdb keeps downloaded extensions and secrets in a temporary directory:
-#> ℹ /tmp/Rtmpyj07Tx/duckdb
-#> This is removed when the R session ends.
-#> • Extensions are re-downloaded each session.
-#> • Secrets are lost.
-#> ℹ Run duckdb(shared_home = TRUE) (or create ~/.duckdb) to keep them (suitable for most users).
-#> ℹ Run duckdb(shared_home = FALSE) to accept the temporary directory (and silence this message).
-#> ℹ See ?duckdb_storage for details and alternatives.
-df <- zu_duckdb_query(con, "
+library(zuarrow)
+con <- DBI::dbConnect(duckdb::duckdb(shared_home = FALSE))
+DBI::dbExecute(con, "SET arrow_lossless_conversion = true")
+#> [1] 0
+df <- arrow_to_r(DBI::dbGetQueryArrow(con, "
   SELECT 18446744073709551614::UBIGINT AS id,
          -170141183460469231731687303715884105727::HUGEINT AS total
-")
+"))
 df
 #>                     id                                    total
 #> 1 18446744073709551614 -170141183460469231731687303715884105727
-zu_duckdb_register(con, "back", df)
-DBI::dbGetQuery(con, "SELECT typeof(id) AS id, typeof(total) AS total FROM back")
-#>        id   total
-#> 1 UBIGINT HUGEINT
-DBI::dbDisconnect(con)
+DBI::dbDisconnect(con, shutdown = TRUE)
 ```
 
-The same columns go through Arrow tables, and so through Parquet files:
+The same columns are written with their types, so an Arrow IPC file, and
+anything that reads one, gets them back exactly:
 
 ``` r
 
-f <- tempfile(fileext = ".parquet")
-arrow::write_parquet(zu_arrow_table(df), f)
-zu_from_arrow_table(arrow::read_parquet(f, as_data_frame = FALSE))
-#>                     id                                    total
-#> 1 18446744073709551614 -170141183460469231731687303715884105727
+f <- tempfile(fileext = ".arrow")
+arrow_write(df, f)
+identical(arrow_read(f), df)
+#> [1] TRUE
 ```
 
-Underneath,
-[`zu_to_arrow()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
-and
-[`zu_from_arrow()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
-speak the Arrow C Data Interface directly, and
-`nanoarrow::convert_array(array, int64())` uses them when nanoarrow is
-installed.
+A value equal to a type’s `NA` bit pattern, such as `UINT64_MAX` in a
+`UBIGINT` column, has no zuint form. zuarrow’s `lossy` argument decides:
+an error by default, `NA` with a warning under `lossy = "warn"`.
 
 ## Where the class gets lost
 

@@ -31,10 +31,6 @@
   [`print()`](https://rdrr.io/r/base/print.html),
   [`str()`](https://rdrr.io/r/utils/str.html) and
   [`summary()`](https://rdrr.io/r/base/summary.html).
-- [`zu_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
-  and
-  [`zu_from_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
-  expose the raw payload.
 - Exact arithmetic: `+`, `-`, `*`, `%/%` (floor), `%%` (sign of the
   divisor), `^` with a non-negative integer exponent, unary minus,
   [`abs()`](https://rdrr.io/r/base/MathFun.html) and
@@ -87,32 +83,45 @@
   [`clz()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
   and
   [`ctz()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md).
-- [`zu_from_arrow()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
+- With zuarrow installed, zuint registers its four types with zuarrow’s
+  registry, so
+  [`zuarrow::arrow_to_r()`](https://pedrobtz.github.io/zuarrow/reference/arrow_to_r.html),
+  [`zuarrow::arrow_read()`](https://pedrobtz.github.io/zuarrow/reference/arrow_read.html)
   and
-  [`zu_to_arrow()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
-  convert through the Arrow C Data Interface with no R package in
-  between: `int64`, `uint64`, DuckDB’s `arrow.opaque`
-  `hugeint`/`uhugeint`, and `decimal128(p, 0)`.
-  [`zu_sentinel_check()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
-  counts engine values that would import as `NA`.
-- With nanoarrow installed, `nanoarrow::convert_array(array, int64())`
-  and the other prototypes import through the bridge, and
-  [`nanoarrow::as_nanoarrow_array()`](https://arrow.apache.org/nanoarrow/latest/r/reference/as_nanoarrow_array.html)
-  exports zuint vectors.
-- [`zu_duckdb_query()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
-  reads DuckDB results with `BIGINT`, `UBIGINT`, `HUGEINT` and
-  `UHUGEINT` columns as zuint vectors, exactly, and
-  [`zu_duckdb_register()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
-  writes them back with their types.
-- [`zu_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)
+  [`zuarrow::arrow_array()`](https://pedrobtz.github.io/zuarrow/reference/arrow_array.html)
+  read and write `int64`, `uint64` and DuckDB’s `arrow.opaque`
+  `hugeint`/`uhugeint` exactly (`?zuint-arrow`). A value equal to a
+  type’s `NA` bit pattern follows zuarrow’s `lossy` policy: an error by
+  default, `NA` with a warning under `lossy = "warn"`.
+- The Arrow and DuckDB functions of the development versions are gone,
+  each replaced by zuarrow:
+  - `zu_from_arrow()` and `zu_to_arrow()`:
+    [`zuarrow::arrow_to_r()`](https://pedrobtz.github.io/zuarrow/reference/arrow_to_r.html)
+    and
+    [`zuarrow::arrow_array()`](https://pedrobtz.github.io/zuarrow/reference/arrow_array.html).
+    `decimal128(p, 0)` reads as `int128` with `to = int128()`; the
+    `decimal = TRUE` export has no replacement.
+  - `zu_sentinel_check()`: the `zuarrow_lossy_error` that
+    [`zuarrow::arrow_to_r()`](https://pedrobtz.github.io/zuarrow/reference/arrow_to_r.html)
+    raises.
+  - `zu_duckdb_query()`:
+    `zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))` after
+    `SET arrow_lossless_conversion = true`.
+  - `zu_duckdb_register()`, `zu_arrow_table()` and
+    `zu_from_arrow_table()`:
+    [`zuarrow::arrow_stream()`](https://pedrobtz.github.io/zuarrow/reference/arrow_array.html),
+    [`zuarrow::arrow_write()`](https://pedrobtz.github.io/zuarrow/reference/arrow_write.html)
+    and
+    [`zuarrow::arrow_read()`](https://pedrobtz.github.io/zuarrow/reference/arrow_read.html).
+  - The nanoarrow methods (`convert_array()`, `as_nanoarrow_array()`,
+    `infer_nanoarrow_schema()`) and the arrow methods
+    (`as_arrow_array()`, `infer_type()`): zuarrow, which reads and
+    writes nanoarrow handles.
+- [`zu_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
   and
-  [`zu_from_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)
-  carry zuint columns through Arrow Tables, and so through Parquet
-  files. With arrow loaded,
-  [`arrow::as_arrow_array()`](https://arrow.apache.org/docs/r/reference/as_arrow_array.html)
-  and
-  [`arrow::infer_type()`](https://arrow.apache.org/docs/r/reference/infer_type.html)
-  work for `int64` and `uint64`.
+  [`zu_from_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
+  document the payload shapes and `NA` bit patterns as the public
+  representation contract.
 - [`as_integer64()`](https://pedrobtz.github.io/zuint/reference/as_integer64.md)
   returns a plain bit64 `integer64`.
 - [`sort()`](https://rdrr.io/r/base/sort.html), and base

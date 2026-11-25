@@ -1,86 +1,59 @@
-# Arrow C Data Interface
+# zuint columns from Arrow, through zuarrow
 
-Convert between zuint vectors and Arrow arrays through the Arrow C Data
-Interface, with no R package in between. The arrays and schemas are
-external pointers to `ArrowArray` and `ArrowSchema` structs, the form
-nanoarrow's `nanoarrow_array` and `nanoarrow_schema` objects take.
-
-## Usage
-
-``` r
-zu_from_arrow(array, schema)
-
-zu_to_arrow(x, decimal = FALSE)
-
-zu_sentinel_check(array, schema)
-```
-
-## Arguments
-
-- array:
-
-  An external pointer to an `ArrowArray`, such as a `nanoarrow_array`.
-
-- schema:
-
-  An external pointer to the array's `ArrowSchema`.
-
-- x:
-
-  A zuint vector.
-
-- decimal:
-
-  Export `int128` as `decimal128(38, 0)`.
-
-## Value
-
-`zu_from_arrow()` returns a zuint vector; `zu_to_arrow()` a list of
-external pointers named `array` and `schema`, which release their
-structs when garbage collected unless a consumer moved them out;
-`zu_sentinel_check()` the number of values that would import as `NA`
-though they are not null.
+zuint has no Arrow functions of its own. When the
+[zuarrow](https://github.com/pedrobtz/zuarrow) package is installed,
+zuint registers its four types with zuarrow's registry as soon as both
+are loaded, and from then on
+[`zuarrow::arrow_to_r()`](https://pedrobtz.github.io/zuarrow/reference/arrow_to_r.html),
+[`zuarrow::arrow_read()`](https://pedrobtz.github.io/zuarrow/reference/arrow_read.html)
+and
+[`zuarrow::arrow_array()`](https://pedrobtz.github.io/zuarrow/reference/arrow_array.html)
+read and write zuint columns exactly.
+[`zuarrow::arrow_registry()`](https://pedrobtz.github.io/zuarrow/reference/arrow_register.html)
+lists the entries:
 
 ## Details
 
-|  |  |
-|----|----|
-| zuint | Arrow format |
-| `int64` | `int64` (`l`) |
-| `uint64` | `uint64` (`L`) |
-| `int128` | DuckDB's `arrow.opaque` `hugeint` extension (`w:16`); with `decimal = TRUE`, `decimal128(38, 0)` |
-| `uint128` | DuckDB's `arrow.opaque` `uhugeint` extension (`w:16`) |
+|                |                                        |            |
+|----------------|----------------------------------------|------------|
+| Key            | Arrow type                             | zuint type |
+| `l`            | `int64`                                | `int64`    |
+| `L`            | `uint64`                               | `uint64`   |
+| `arrow.opaque` | DuckDB's `hugeint` extension (`w:16`)  | `int128`   |
+| `arrow.opaque` | DuckDB's `uhugeint` extension (`w:16`) | `uint128`  |
 
-`zu_from_arrow()` also reads any `decimal128(p, 0)` with `p` up to 38 as
-`int128`, taking the 128 bits as they are, which is how DuckDB exports
-`HUGEINT` by default. It copies the data and leaves the structs to their
-owner. A null becomes `NA` and an `NA` becomes a null. A valid value
-that happens to equal a type's `NA` bit pattern (for example
-`UINT64_MAX`) cannot be told from `NA`: it imports as `NA` with a
-warning of class `zuint_cast_warning`. `zu_sentinel_check()` counts
-those values without importing.
+Other `arrow.opaque` types, which DuckDB uses for types Arrow has no
+form for, keep zuarrow's own conversion.
 
-`zu_to_arrow()` exports `int128` as the extension by default because
-DuckDB reads `decimal128(38, 0)` back as `DECIMAL(38,0)`, not `HUGEINT`.
-`decimal = TRUE` is for consumers without extension support; a value
-with more than 38 digits is then an error.
+A `decimal128(p, 0)` column is a decimal, not an integer, so zuint does
+not register for it. Asking for `int128` with `to = int128()` in
+[`zuarrow::arrow_to_r()`](https://pedrobtz.github.io/zuarrow/reference/arrow_to_r.html)
+reads one with `p` up to 38 as the 128 bits it holds. DuckDB writes
+`HUGEINT` that way unless its `arrow_lossless_conversion` setting is on,
+so turn the setting on, and `HUGEINT` and `UHUGEINT` arrive as the
+extension:
 
-When nanoarrow is installed, `nanoarrow::convert_array(array, int64())`
-and the other constructors' prototypes import through this bridge, and
-[`nanoarrow::as_nanoarrow_array()`](https://arrow.apache.org/nanoarrow/latest/r/reference/as_nanoarrow_array.html)
-exports zuint vectors.
+    DBI::dbExecute(con, "SET arrow_lossless_conversion = true")
+    zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))
 
-## Examples
+A null reads as `NA` and an `NA` writes as a null. A valid value equal
+to a type's `NA` bit pattern, such as `UINT64_MAX` in a `UBIGINT`
+column, cannot be held. zuarrow's `lossy` policy decides what happens to
+it:
 
-``` r
-x <- uint64(c("18446744073709551614", NA, "1"))
-a <- zu_to_arrow(x)
-zu_from_arrow(a$array, a$schema)
-#> <uint64[3]>
-#> [1] 18446744073709551614                   NA                    1
+- `"error"` and `"character"` raise `zuarrow_lossy_error`, naming the
+  value. `"character"` would give the column as text only when every
+  batch held such a value, so it fails like `"error"` instead.
 
-b <- zu_to_arrow(int128(-1), decimal = TRUE)
-zu_from_arrow(b$array, b$schema)
-#> <int128[1]>
-#> [1] -1
-```
+- `"warn"` reads it as `NA` with one `zuarrow_lossy_warning` per batch.
+
+- `"allow"` reads it as `NA` silently.
+
+Writing never loses a value: `int128` and `uint128` are written as the
+DuckDB extension, which DuckDB reads back as `HUGEINT` and `UHUGEINT`.
+
+## See also
+
+[`zu_storage()`](https://pedrobtz.github.io/zuint/reference/zu_storage.md)
+for the representation, the contract a package that builds zuint vectors
+in C relies on.

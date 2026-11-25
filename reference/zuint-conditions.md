@@ -28,8 +28,8 @@ Errors:
   [`checked_mod()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md).
 
 - `zuint_arrow_error`: an Arrow array zuint cannot read, or a released
-  struct (see
-  [`zu_from_arrow()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)).
+  struct, met through zuarrow (see
+  [zuint-arrow](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)).
 
 - `zuint_unsupported_error`: an operation zuint does not do, such as
   [`quantile()`](https://rdrr.io/r/stats/quantile.html) or a matrix.

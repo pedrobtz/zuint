@@ -9,14 +9,8 @@
   : Hexadecimal and binary text
 - [`seq_zu()`](https://pedrobtz.github.io/zuint/reference/seq_zu.md) :
   Exact sequences
-- [`zu_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)
-  [`zu_from_arrow_table()`](https://pedrobtz.github.io/zuint/reference/zu_arrow_table.md)
-  : Arrow tables with zuint columns
 - [`zu_common_type()`](https://pedrobtz.github.io/zuint/reference/zu_common_type.md)
   : The common type of zuint vectors
-- [`zu_duckdb_query()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
-  [`zu_duckdb_register()`](https://pedrobtz.github.io/zuint/reference/zu_duckdb_query.md)
-  : Query DuckDB into zuint columns
 - [`zu_ifelse()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
   [`zu_vapply()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
   : Helpers for code that drops the class
@@ -39,10 +33,8 @@
   [`wrapping_pow()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   [`wrapping_neg()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
   : Arithmetic with an explicit overflow policy
-- [`zu_from_arrow()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
-  [`zu_to_arrow()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
-  [`zu_sentinel_check()`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
-  : Arrow C Data Interface
+- [`zuint-arrow`](https://pedrobtz.github.io/zuint/reference/zuint-arrow.md)
+  : zuint columns from Arrow, through zuarrow
 - [`bit_and()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
   [`bit_or()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
   [`bit_xor()`](https://pedrobtz.github.io/zuint/reference/zuint-bits.md)
