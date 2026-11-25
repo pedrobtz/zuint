@@ -55,6 +55,11 @@ One row per boundary the package crosses. An oracle knows the answer:
 | Arrow schema metadata, decoding | test vectors: hand-built metadata bytes, valid and corrupt, read as the key or as no metadata; and a reference reader written from the Arrow spec, under the fuzzer | tests/testthat/test-arrow.R, tools/fuzz/harness.c |
 | Arrow schema metadata, encoding | the bytes the other side received: DuckDB reads the exported extension as HUGEINT and UHUGEINT | tests/testthat/test-arrow.R |
 | Parquet through arrow | round trip: Parquet to R to Parquet keeps the schema and every value | tests/testthat/test-roundtrip.R |
+| DECIMAL text, decoding | reference implementations: DuckDB 2.0.0's casts on structured and mutated texts, gmp's exact value of each structured text, and Python's `decimal` on 300,000 more; every difference from DuckDB is one of design 2.2's two deviations; a reference grammar and exact value under the fuzzer | tests/testthat/test-fixed.R, tools/fixed/diff.py, tools/fuzz/harness.c |
+| DECIMAL text, encoding | reference implementations: DuckDB writes the same text and reads it back to the same value; DuckDB's formatter written again in R and in Python | tests/testthat/test-fixed.R, tools/fixed/diff.py |
+| DECIMAL rescale, add, subtract, multiply and compare | conformance suite: the General Decimal Arithmetic cases that apply to fixed point (2,033); gmp and Python's `decimal`; DuckDB's casts for rescaling | tools/fixed/fixed.c, tests/testthat/test-fixed.R |
+| DECIMAL to and from double | reference implementation: DuckDB's casts, bit for bit; Python's correctly rounded division, and zufast's correctly rounded parser under the fuzzer | tests/testthat/test-fixed.R, tools/fixed/diff.py, tools/fuzz/harness.c |
+| `zuint_api_v1`, the C table | the other side: `zuint.h` compiles alone with no R headers; a translation unit resolves the table through `zuint-r.h`; the C binary calls it with no R in the process, from 8 threads at once against one | tests/testthat/test-fixed.R, tools/fixed/fixed.c |
 <!-- markdownlint-enable MD013 -->
 
 ## Objects
@@ -82,4 +87,6 @@ One row per limit the package enforces. "Straddled by" is the test of
 | 128 bits of text | digits | tests/testthat/test-text.R: 33 hex digits and 60 decimal digits are NA with a warning; the gmp edges are the largest that fit |
 | `ZU_METADATA_MAX_ENTRIES` (4096) | metadata entries | tests/testthat/test-arrow.R (4095, 4096 and 4097 entries, the key last), and the fuzz corpus's three seeds at the same counts |
 | `decimal128` precision 38 | decimal digits | tests/testthat/test-arrow.R (`d:37,0`, `d:38,0` and `d:39,0`, with and without `,128`; values read at 37 and 38) |
+| DECIMAL precision 1 to 38, scale 0 to p | decimal digits | tests/testthat/test-fixed.R (precision 0, 1, 37, 38, 39; scale -1, p - 1, p, p + 1; 10^38 - 1 and 10^38 at scale 0, and their halfway point) |
+| a DECIMAL(p, s) value | decimal digits | tests/testthat/test-fixed.R (10^p - 1 against 10^p for every width class, parsed, formatted and rescaled; rescaling at 128 bits), tools/fixed/diff.py (the same edges, weighted) |
 <!-- markdownlint-enable MD013 -->

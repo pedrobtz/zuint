@@ -95,7 +95,22 @@ Vendored native code); run it after touching `src/vendor/`.
 `make -C tools/fuzz driver && tools/fuzz/driver tools/fuzz/corpus/*` runs
 the fuzz harness locally without libFuzzer, under ASan and UBSan: the
 corpus, then 200,000 generated inputs (`ZU_FUZZ_RUNS` changes the count).
-Run it after touching `src/zu_parse.c` or `src/zu_metadata.c`.
+Run it after touching `src/zu_parse.c`, `src/zu_metadata.c` or
+`src/zu_fixed.c`.
+
+The fixed-point core's C tests run without R (`fixed.yaml` in CI):
+
+```sh
+make -C tools/fixed
+tools/fixed/fetch-dectest /tmp/dectest
+tools/fixed/fixed dectest /tmp/dectest/*.decTest
+python3 tools/fixed/diff.py 200000 1 | tools/fixed/fixed diff
+tools/fixed/fixed threads 8
+make -C tools/fixed clean
+```
+
+`make -C tools/fixed SAN=thread` builds it under ThreadSanitizer, and
+`CPPFLAGS=-DZUF_NO_INT128` with zufast's fallback.
 
 ## Architecture
 
@@ -130,6 +145,14 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   lazily like the others, and `zu_ifelse()` / `zu_vapply()`.
   [`inst/bench/bench.R`](inst/bench/bench.R) benchmarks int64 against bit64;
   its results are in the README.
+- [`src/zu_fixed.c`](src/zu_fixed.c) is the fixed-point `DECIMAL(p, s)`
+  core (design §2.2), R-free; [`src/zu_api.c`](src/zu_api.c) builds
+  `zuint_api_v1`, the C table of
+  [`inst/include/zuint.h`](inst/include/zuint.h), which `init.c`
+  registers as the callable `zuint_get_api` and
+  [`inst/include/zuint-r.h`](inst/include/zuint-r.h) resolves.
+  [`src/zu_fixed_r.c`](src/zu_fixed_r.c) holds its R entry points, and
+  [`tools/fixed/`](tools/fixed) its C tests.
 - [`R/bit64.R`](R/bit64.R) holds the bit64 methods and `as_integer64()`.
 - [`R/types.R`](R/types.R) has the constructors, the `NA_*_` constants and
   `zu_storage()`; [`R/cast.R`](R/cast.R) is the one conversion path every
@@ -277,6 +300,19 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 - **`src/zu_parse.c` and `src/zu_metadata.c` never call R.** The fuzz
   target and the mutation driver (`tools/fuzz/`) build them with R's
   headers but without libR; an `Rf_*` call there breaks both builds.
+- **`src/zu_fixed.c` and `src/zu_api.c` never include R or call it.**
+  Another package calls them through `zuint_api_v1` on any thread, and
+  `tools/fixed/` builds them with no R headers at all; `zuint.h` includes
+  only `<stddef.h>` and `<stdint.h>`.
+- **`zuint_api_v1` only grows.** Members are appended, never reordered or
+  removed; an append grows `struct_size` and keeps `ZUINT_ABI_VERSION`,
+  any other change bumps it. `zu_api_c()` and `test-fixed.R` list every
+  member, so a new one must be added there too.
+- **The DECIMAL parser follows DuckDB 2.0.0's acceptance, not its
+  values.** Which texts are read comes from the port of DuckDB's state
+  machine (`dk_*`, credited in `inst/COPYRIGHTS`); the value comes from
+  the digits, exactly. Its two deviations from DuckDB are in design §2.2,
+  and `test-fixed.R` allows no other difference.
 - **Native routines are called through their registered symbols.**
   `init.c` calls `R_forceSymbols()`, so `.Call("name", ...)` with a string
   fails; use the symbol `useDynLib(.registration = TRUE)` defines.
@@ -328,6 +364,10 @@ The shared workflows this package calls:
 - `fuzz.yaml`: `fuzz.yml` over `tools/fuzz/harness.c`, which compares the
   text parser and the metadata reader with references written from their
   specs. 120 seconds on a pull request, half an hour on a dispatch.
+- `fixed.yaml`, the package's own: `tools/fixed/fixed` (Commands) under
+  ASan and UBSan, with zufast's fallback, and under ThreadSanitizer,
+  gated by `changes.yml`; 200,000 differential cases on the quick
+  profile, 5,000,000 on the full.
 - `mutation.yaml` and `alloc-failure.yaml`, on dispatch only:
   `mutation.yml` runs `tools/fuzz/driver` against each mutant of the two
   readers, and `alloc-failure.yml` fails each allocation of
