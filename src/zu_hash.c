@@ -164,6 +164,8 @@ SEXP zu_match_c(SEXP x, SEXP table, SEXP type_, SEXP nomatch_)
     zu_check_payload(table, t);
     int nomatch = Rf_asInteger(nomatch_);
     R_xlen_t n = XLENGTH(x), m = XLENGTH(table);
+    /* match() returns int positions. Unreachable in tests: it needs a table
+       of 2^31 values, 16 GiB for a 64-bit type (#65). */
     if (m > INT_MAX) Rf_error("zuint: the table is too long to match against");
     if (!zu_type_is_128(t)) {
         /* 64-bit: the keys inline, positions beside them */

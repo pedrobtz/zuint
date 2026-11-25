@@ -219,8 +219,21 @@ static zu_type zu_import_type(SEXP schema)
     return (zu_type)t;
 }
 
+/* The C Data Interface carries no buffer sizes, so the import reads as many
+   bytes as the schema's format says a value takes. A schema that is not the
+   array's own would make it read past the data buffer (#61). zuarrow passes
+   the column's own pair, though not always the struct the array's handle
+   holds: an array handle in nanoarrow's r.h layout carries its own schema in
+   its tag, and when it does, its format must be this schema's. */
 SEXP zu_from_arrow_c(SEXP array, SEXP schema)
 {
+    SEXP own = TYPEOF(array) == EXTPTRSXP ? R_ExternalPtrTag(array) : R_NilValue;
+    if (TYPEOF(own) == EXTPTRSXP && R_ExternalPtrAddr(own) != NULL) {
+        const struct ArrowSchema *o = (const struct ArrowSchema *)R_ExternalPtrAddr(own);
+        const struct ArrowSchema *s = zu_schema_arg(schema);
+        if (o->release != NULL && (o->format == NULL || s->format == NULL || strcmp(o->format, s->format) != 0))
+            Rf_error("zuint: the schema is not the array's own");
+    }
     zu_type t = zu_import_type(schema);
     return zu_import(zu_array_arg(array), t);
 }
@@ -284,6 +297,8 @@ static SEXP zu_owned_xptr(size_t size, R_CFinalizer_t fin, SEXP tag)
     SEXP xp = PROTECT(R_MakeExternalPtr(NULL, t, R_NilValue));
     R_RegisterCFinalizerEx(xp, fin, TRUE);
     void *p = calloc(1, size);
+    /* Unreachable in the R suite, which has no allocation hook: the
+       alloc-failure workflow (tools/alloc-exercise.R) reaches it (#65). */
     if (p == NULL) Rf_error("zuint: out of memory");
     R_SetExternalPtrAddr(xp, p);
     UNPROTECT(2);
@@ -327,6 +342,7 @@ SEXP zu_to_arrow_c(SEXP x, SEXP type_)
     char *md = NULL;
     if (zu_type_is_128(t)) {
         md = zu_opaque_metadata(t == ZU_INT128 ? "hugeint" : "uhugeint");
+        /* out of memory: reached by the alloc-failure sweep only (#65) */
         if (md == NULL) Rf_error("zuint: out of memory");
     }
     s->format = t == ZU_INT64 ? "l" : t == ZU_UINT64 ? "L" : "w:16";
@@ -340,6 +356,7 @@ SEXP zu_to_arrow_c(SEXP x, SEXP type_)
     zu_array_private *p = calloc(1, sizeof *p);
     unsigned char *data = malloc(n > 0 ? (size_t)n * width : 1);
     unsigned char *validity = nulls > 0 ? calloc(((size_t)n + 7) / 8, 1) : NULL;
+    /* out of memory: reached by the alloc-failure sweep only (#65) */
     if (p == NULL || data == NULL || (nulls > 0 && validity == NULL)) {
         free(p); free(data); free(validity);
         Rf_error("zuint: out of memory");
@@ -374,6 +391,27 @@ SEXP zu_arrow_schema_c(SEXP array)
 {
     if (TYPEOF(array) != EXTPTRSXP) Rf_error("zuint: `array` must be an external pointer");
     return R_ExternalPtrTag(array);
+}
+
+/* For the tests: make an exported array malformed, one field at a time,
+   so the import's guards can be reached; nanoarrow refuses to build such
+   arrays. 1: negative length; 2: negative offset; 3: three buffers; 4: no
+   data buffer. The buffers the array owns are left where the release
+   callback frees them: case 4 points `buffers` at a static pair instead. */
+static const void *zu_no_buffers[2] = {NULL, NULL};
+
+SEXP zu_arrow_corrupt_c(SEXP xp, SEXP what)
+{
+    struct ArrowArray *a = (struct ArrowArray *)R_ExternalPtrAddr(xp);
+    if (a == NULL || a->release != zu_release_array) Rf_error("zuint: not an array zuint exported");
+    switch (Rf_asInteger(what)) {
+    case 1: a->length = -1; break;
+    case 2: a->offset = -1; break;
+    case 3: a->n_buffers = 3; break;
+    case 4: a->buffers = zu_no_buffers; break;
+    default: Rf_error("zuint: unknown corruption");
+    }
+    return R_NilValue;
 }
 
 SEXP zu_arrow_releases_c(void) { return Rf_ScalarReal((double)atomic_load(&zu_arrow_releases)); }

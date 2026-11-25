@@ -3,8 +3,24 @@
 zu_summary_group <- function(..., na.rm = FALSE) {
   call <- sys.call()
   args <- list(...)
+  # range()'s `finite` is an argument, not data (#56); for integers it
+  # drops NA, as base R does
+  finite <- FALSE
+  if (.Generic == "range" && "finite" %in% names(args)) {
+    finite <- isTRUE(args[["finite"]])
+    args[names(args) == "finite"] <- NULL
+    na.rm <- na.rm || finite
+  }
   x <- if (length(args) == 1L) args[[1L]] else do.call(zu_c, args)
   code <- zu_code(x)
+  if (is.na(code) && is.double(x) && !is.object(x)) {
+    # zu_c() fell back to double under options(zuint.double = "allow")
+    # (#60): the answer is base R's on those doubles
+    if (.Generic == "range") {
+      return(range(x, na.rm = na.rm, finite = finite))
+    }
+    return(get(.Generic, baseenv())(x, na.rm = na.rm))
+  }
   if (is.na(code)) {
     x <- zu_cast(x, zu_common_code(vapply(args, zu_kind, integer(1)), call), call = call)
     code <- zu_code(x)
@@ -134,7 +150,27 @@ zu_match <- function(x, table, nomatch = NA_integer_) {
   kinds <- c(zu_kind(x), zu_kind(table))
   zu_check_operands(kinds, list(x, table), call)
   code <- zu_common_code(kinds, call)
-  .Call(zu_match_c, zu_cast(x, code, call = call), zu_cast(table, code, call = call), code, as.integer(nomatch))
+  nomatch <- as.integer(nomatch)
+  # A value the common type can't hold matches nothing, quietly: a lookup
+  # that finds nothing loses nothing (#58). Cast to NA, it must not match
+  # the table's NA, nor may an NA match a table value lost the same way.
+  quiet <- function(v) {
+    withCallingHandlers(
+      zu_cast(v, code, call = call),
+      zuint_cast_warning = function(w) invokeRestart("muffleWarning")
+    )
+  }
+  cx <- quiet(x)
+  ct <- quiet(table)
+  res <- .Call(zu_match_c, cx, ct, code, nomatch)
+  na_x <- is.na(cx)
+  lost_x <- na_x & !is.na(x)
+  res[lost_x] <- nomatch
+  if (any(is.na(ct) & !is.na(table)) && any(na_x & !lost_x)) {
+    first <- match(TRUE, is.na(table))
+    res[na_x & !lost_x] <- if (is.na(first)) nomatch else first
+  }
+  res
 }
 
 #' @rdname zu_match
@@ -230,12 +266,13 @@ seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
 zu_seq_count <- function(from, to, step, down, call) {
   hi <- if (down) from else to
   lo <- if (down) to else from
+  # in the elements' own type: q_hi >= q_lo, so an unsigned difference
+  # cannot wrap, and a signed one that overflows is too long anyway (#59)
   dq <- withCallingHandlers(
-    zu_cast(hi %/% step, 3L) - zu_cast(lo %/% step, 3L),
-    zuint_overflow_warning = function(w) invokeRestart("muffleWarning"),
-    zuint_cast_warning = function(w) invokeRestart("muffleWarning")
+    (hi %/% step) - (lo %/% step),
+    zuint_overflow_warning = function(w) invokeRestart("muffleWarning")
   )
-  if (is.na(dq)) {
+  if (is.na(dq) || dq > .Machine$integer.max) {
     return(Inf)
   }
   zu_dbl_quiet(dq) - as.double(hi %% step < lo %% step) + 1

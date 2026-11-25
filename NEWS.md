@@ -70,6 +70,15 @@
   `min()`, `max()` and `range()` are exact; `mean()` and `median()` are
   doubles from the exact values; `diff()` and `seq_zu()`.
 * `summary()` adds the median and the mean.
+* `rep()` of an empty vector pads with the type's `NA` (#55); `range()`
+  takes `finite`, which drops `NA` (#56); under
+  `options(zuint.double = "allow")`, `sum()`, `prod()`, `min()`, `max()`
+  and `range()` give base R's double answer (#60); `zu_match()` and
+  `%zin%` treat a value the common type cannot hold as no match, as
+  `match()` does (#58); `seq_zu()` counts in the elements' own type, so it
+  reaches the top of the unsigned ranges (#59).
+* The Arrow import refuses a schema whose format is not the array's own
+  (`zuint_arrow_error`), which would have read past the data (#61).
 * With vctrs, dplyr and tibble: zuint columns combine by the promotion order,
   cast exactly, arrange, group, summarise, bind and print. data.table keys
   on `int64` natively.

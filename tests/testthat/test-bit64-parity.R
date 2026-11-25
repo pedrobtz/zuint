@@ -1,8 +1,7 @@
 # Every int64 behaviour of this stage, run with bit64 attached and with bit64
 # never loaded. A difference means bit64 has a method zuint lacks.
 test_that("int64 behaves the same with bit64 attached and absent", {
-  res <- bit64_parity("vector")
-  expect_identical(res$attached, res$absent)
+  res <- expect_bit64_parity("vector")
   # and the attached run is not vacuous
   expect_true(length(res$attached$value) > 10)
   expect_true("zuint_cast_warning" %in% res$attached$warnings)
@@ -18,8 +17,7 @@ test_that("int64 and bit64 integer64 mix in c() and [<-", {
 })
 
 test_that("int64 arithmetic behaves the same with bit64 attached and absent", {
-  res <- bit64_parity("arithmetic")
-  expect_identical(res$attached, res$absent)
+  res <- expect_bit64_parity("arithmetic")
   expect_identical(
     res$attached$value$checked,
     c("zuint_overflow_error", "zuint_error", "error", "condition")
@@ -42,8 +40,7 @@ test_that("zu_int64 and integer64 mix exactly and without warnings", {
 })
 
 test_that("int64 summaries and set operations behave the same with bit64 attached and absent", {
-  res <- bit64_parity("summaries")
-  expect_identical(res$attached, res$absent)
+  expect_bit64_parity("summaries")
 })
 
 test_that("every base generic bit64 has an integer64 method for has a zu_int64 method", {
@@ -150,8 +147,7 @@ test_that("every base generic bit64 has an integer64 method for has a zu_int64 m
 })
 
 test_that("the bit64-shadowed predicates and conversions agree with bit64 absent", {
-  res <- bit64_parity("predicates")
-  expect_identical(res$attached, res$absent)
+  expect_bit64_parity("predicates")
 })
 
 test_that("a plain integer64 on the left of a wider type is exact or NA, never truncated", {

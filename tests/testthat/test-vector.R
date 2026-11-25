@@ -312,3 +312,24 @@ test_that("a zuint vector used as an index is read as a number", {
   )
   expect_identical(r, NA_int64_)
 })
+
+test_that("rep() of an empty vector pads with the type's NA (#55)", {
+  for (type in zu_all_types) {
+    e <- zu_ctor(type)()
+    expect_identical(rep(e, length.out = 3), zu_na(type, 3), label = type)
+    expect_identical(rep(e, times = 0), e, label = type)
+    expect_identical(rep(e, length.out = 0), e, label = type)
+    # a non-empty vector repeats its own values, NA included
+    x <- zu_ctor(type)(c(1, NA))
+    expect_identical(rep(x, length.out = 3), zu_ctor(type)(c(1, NA, 1)))
+  }
+  skip_if_not_installed("vctrs")
+  expect_identical(
+    zu_ifelse(c(TRUE, FALSE), int64(), int64(1)),
+    int64(c(NA, 1))
+  )
+  expect_identical(
+    zu_ifelse(c(FALSE, TRUE), uint128(2), uint128()),
+    uint128(c(NA, 2))
+  )
+})

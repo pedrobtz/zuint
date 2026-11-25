@@ -644,6 +644,11 @@ to X5.
 itself is left.
 
 **Work.**
+- **Deviation, 2026-11-25:** the critical review of 13dfd72 had already
+  filed its findings (#55 to #66) under `v0.1.0`, and Stage 10 cannot
+  close before zufast 0.1.1 is on CRAN (#86). So the findings are fixed
+  ahead of Stage 10, in one pull request that closes them. This stage
+  still runs both reviews on the release candidate once Stage 10 is done.
 - Critical review: the `pkg-critical-review` skill over code, tests and
   style. Its blocking and required findings become sub-issues of `v0.1.0`,
   each fixed in a pull request that closes it.

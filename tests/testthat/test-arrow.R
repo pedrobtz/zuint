@@ -270,7 +270,7 @@ test_that("decimal128 imports up to precision 38, straddled", {
     expect_identical(type_of(f), 3L, label = f)
   }
   # nanoarrow refuses to build precision 39, so the format is edited
-  for (f in c("d:39,0", "d:39,0,128", "d:0,0")) {
+  for (f in c("d:39,0", "d:39,0,128", "d:0,0", "d:38,0,256")) {
     expect_identical(type_of(f), NA_integer_, label = f)
   }
   # the values at both precisions zuint reads
@@ -286,4 +286,20 @@ test_that("decimal128 imports up to precision 38, straddled", {
       label = p
     )
   }
+})
+
+test_that("the import refuses a schema that is not the array's own (#61)", {
+  to <- zu_arrow_to(NA_integer_)
+  a <- zu_arrow_from(uint64(c(1, 2)))
+  wide <- zu_arrow_from(int128(1))
+  # reading 16-byte values from an 8-byte buffer would over-read it
+  expect_error(to(a, zu_arrow_tag(wide), "error"), class = "zuint_arrow_error")
+  expect_error(to(wide, zu_arrow_tag(a), "error"), class = "zuint_arrow_error")
+  # the array's own schema, and a copy with the same format, read
+  expect_identical(to(a, zu_arrow_tag(a), "error"), uint64(c(1, 2)))
+  skip_without_zuarrow()
+  expect_identical(
+    zuarrow::arrow_to_r(zuarrow::arrow_array(int128(c(1, NA)))),
+    int128(c(1, NA))
+  )
 })

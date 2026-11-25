@@ -74,6 +74,7 @@ test_that("sorting agrees with base R on values below 2^53", {
 })
 
 test_that("unique, duplicated and match agree with exact references, with word collisions", {
+  withr::local_seed(20261125) # sample() below (#62)
   for (type in zu_all_types) {
     v <- c(oracle_collisions(type), oracle_random(type, 30, seed = 2), NA, NA)
     v <- c(v, sample(v, 20, replace = TRUE))
@@ -132,4 +133,25 @@ test_that("table counts exact values", {
     c("18446744073709551613", "18446744073709551614")
   )
   expect_identical(as.vector(tab), c(1L, 2L))
+})
+
+test_that("sort() keeps names under every na.last, and unique() its options (#64)", {
+  v <- c(b = 2, a = 1, c = NA, d = 2)
+  for (type in zu_all_types) {
+    x <- zu_ctor(type)(v)
+    for (nl in list(NA, TRUE, FALSE)) {
+      want <- sort(v, na.last = nl)
+      got <- sort(x, na.last = nl)
+      expect_identical(names(got), names(want), label = paste(type, nl))
+      expect_identical(as.double(got), unname(want), label = paste(type, nl))
+    }
+    w <- c(1, 2, 1, 3, NA, 2)
+    y <- zu_ctor(type)(w)
+    expect_identical(
+      as.double(unique(y, fromLast = TRUE)),
+      unique(w, fromLast = TRUE),
+      label = type
+    )
+    expect_identical(as.double(unique(x)), unique(unname(v)), label = type)
+  }
 })
