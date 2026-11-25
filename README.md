@@ -21,8 +21,10 @@ loses its low digits, and writing it back loses the column’s type as
 well.
 
 zuint gives R the four integer types those engines use, `int64`,
-`uint64`, `int128` and `uint128`, and moves them in and out of Arrow,
-Parquet and DuckDB with every value and every column type intact.
+`uint64`, `int128` and `uint128`. With
+[zuarrow](https://github.com/pedrobtz/zuarrow) installed, they move in
+and out of Arrow, Parquet and DuckDB with every value and every column
+type intact.
 
 - **Exact or explicit.** A result is exact, or it is `NA` with a
   warning, or an error. Nothing is rounded, truncated or clamped without
@@ -36,12 +38,12 @@ Parquet and DuckDB with every value and every column type intact.
 - **Compatible with bit64.** `int64` is a bit64 `integer64` underneath,
   so data.table, arrow, duckdb and the database drivers read it as they
   read `integer64`.
-- **One bridge to the engines.** Data moves through the [Arrow C Data
-  Interface](https://arrow.apache.org/docs/format/CDataInterface.html),
-  in C, with no R package in between; nanoarrow, arrow and duckdb are
-  only needed for their own conveniences.
+- **One bridge to the engines.** zuint registers its types with zuarrow,
+  which reads and writes Arrow data through the [Arrow C Data
+  Interface](https://arrow.apache.org/docs/format/CDataInterface.html).
+  zuint itself needs no other package.
 
-| Engine type | R today | zuint |
+| Engine type | R today | with zuint and zuarrow |
 |----|----|----|
 | Arrow `int64`, DuckDB `BIGINT` | a double by default, or bit64 `integer64` | `int64` |
 | Arrow `uint64`, DuckDB `UBIGINT` | a double, rounded beyond 2<sup>53</sup> | `uint64` |
@@ -106,25 +108,29 @@ int128(big) * 4L
 #> [1] 36893488147419103228
 ```
 
-Values come out of DuckDB as they are stored, and go back with their
-types. Here a `UHUGEINT` near the top of its range makes the round trip:
+With zuarrow loaded, values come out of DuckDB as they are stored.
+DuckDB’s `arrow_lossless_conversion` setting makes it send `HUGEINT` and
+`UHUGEINT` as themselves rather than as decimals. Here a `UHUGEINT` near
+the top of its range arrives exactly:
 
 ``` r
-con <- DBI::dbConnect(duckdb::duckdb())
-ids <- zu_duckdb_query(
+library(zuarrow)
+con <- DBI::dbConnect(duckdb::duckdb(shared_home = FALSE))
+DBI::dbExecute(con, "SET arrow_lossless_conversion = true")
+#> [1] 0
+ids <- arrow_to_r(DBI::dbGetQueryArrow(
   con,
   "SELECT 340282366920938463463374607431768211454::UHUGEINT AS id"
-)
+))
 ids$id
 #> <uint128[1]>
 #> [1] 340282366920938463463374607431768211454
-
-zu_duckdb_register(con, "ids_back", ids)
-DBI::dbGetQuery(con, "SELECT typeof(id) AS type, id::VARCHAR AS id FROM ids_back")
-#>       type                                      id
-#> 1 UHUGEINT 340282366920938463463374607431768211454
-DBI::dbDisconnect(con)
+DBI::dbDisconnect(con, shutdown = TRUE)
 ```
+
+They go back with their types too: `arrow_array(ids)` and
+`arrow_write()` write the column as DuckDB’s `UHUGEINT`, and Arrow’s
+other readers keep the type.
 
 Text goes both ways in decimal, hexadecimal and binary:
 
@@ -176,14 +182,15 @@ caches, and slightly slower for `match` at 10<sup>6</sup>.
   overflow policies and the engine round trip.
 - The [reference index](https://pedrobtz.github.io/zuint/reference/)
   lists every function, with the type ranges in `?int64`, the overflow
-  policies in `?checked_add` and the Arrow bridge in `?zu_from_arrow`.
+  policies in `?checked_add`, the Arrow types in `?zuint-arrow` and the
+  representation in `?zu_storage`.
 
 ## Related work
 
 [bit64](https://CRAN.R-project.org/package=bit64) gave R its 64-bit
 integers and the `integer64` layout that zuint’s `int64` keeps. The
 128-bit arithmetic, parsing and formatting come from
-[zufast](https://github.com/pedrobtz/zufast). Arrow arrays move through
-the Arrow C Data Interface, and the 128-bit types through DuckDB’s
-`arrow.opaque` extension types. The tests check values against
-[gmp](https://CRAN.R-project.org/package=gmp).
+[zufast](https://github.com/pedrobtz/zufast). Arrow data moves through
+[zuarrow](https://github.com/pedrobtz/zuarrow), and the 128-bit types
+through DuckDB’s `arrow.opaque` extension types. The tests check values
+against [gmp](https://CRAN.R-project.org/package=gmp).

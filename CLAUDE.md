@@ -14,10 +14,10 @@ a stricter second implementation: exact or explicit, overflow as a policy,
 summaries in the right type (design §0.1). Dependencies outside the zu-*
 family are allowed only in `Suggests` (design §2.1): zufast (>= 0.1.1) is
 `LinkingTo` only, R (>= 4.3.0) is required for `chooseOpsMethod()`, stats
-(part of R) is imported for the `median()` generic, and
-bit64, nanoarrow, arrow, duckdb, vctrs, pillar and gmp are Suggests used in
-tests and lazily registered methods. It does not fork bit64, do arithmetic
-on small integer types, offer arbitrary precision, handle decimals (the
+(part of R) is imported for the `median()` generic, and bit64, zuarrow,
+vctrs, pillar and gmp are Suggests used in tests and lazily registered
+methods; arrow, duckdb, DBI and nanoarrow are test oracles only. It does not
+fork bit64, do arithmetic on small integer types, offer arbitrary precision, handle decimals (the
 companion `decimal` package does, and depends on zuint, never the reverse),
 or do matrix algebra.
 
@@ -125,10 +125,11 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   [`src/zu_format.c`](src/zu_format.c).
 - [`src/zu_bits.c`](src/zu_bits.c) and [`R/bits.R`](R/bits.R) are the bit
   operations; [`R/text.R`](R/text.R) is `format_hex()` and `format_bin()`.
-- [`src/zu_arrow.c`](src/zu_arrow.c) is the Arrow C Data Interface bridge,
-  and [`R/arrow.R`](R/arrow.R) its R surface. [`R/nanoarrow.R`](R/nanoarrow.R)
-  holds the nanoarrow methods, which [`R/zzz.R`](R/zzz.R) registers when
-  nanoarrow loads; nothing else touches a Suggests package.
+- [`src/zu_arrow.c`](src/zu_arrow.c) holds the Arrow C Data Interface
+  kernels, and [`R/arrow.R`](R/arrow.R) the `to` and `from` handlers that
+  [`R/zzz.R`](R/zzz.R) registers with zuarrow when zuarrow loads (design
+  §9.4). zuint has no Arrow functions of its own since Stage 9; the R
+  surface is zuarrow's.
 - [`src/zu_sort.c`](src/zu_sort.c) is a stable LSD radix sort on unsigned
   keys (sign bit flipped for the signed types), behind `sort()` and
   `xtfrm()`; [`src/zu_hash.c`](src/zu_hash.c) an open-addressing hash on the
@@ -140,10 +141,7 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   lazily like the others, and `zu_ifelse()` / `zu_vapply()`.
   [`inst/bench/bench.R`](inst/bench/bench.R) benchmarks int64 against bit64;
   its results are in the README.
-- [`R/engines.R`](R/engines.R) is the engine glue: `as_integer64()`,
-  `zu_duckdb_query()` and `zu_duckdb_register()`, `zu_arrow_table()` and
-  `zu_from_arrow_table()`, and the arrow methods `R/zzz.R` registers when
-  arrow loads. Each function checks for the Suggests packages it needs.
+- [`R/bit64.R`](R/bit64.R) holds the bit64 methods and `as_integer64()`.
 - [`R/types.R`](R/types.R) has the constructors, the `NA_*_` constants and
   `zu_storage()`; [`R/cast.R`](R/cast.R) is the one conversion path every
   method uses; [`R/conditions.R`](R/conditions.R) lists the condition
@@ -230,13 +228,22 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   zufast's `zuf_int_u128_shr()`/`shl()`, which take 0..127.
 - **An exported Arrow struct must never call into R.** A consumer may call
   `release` from any thread, so `zu_to_arrow_c()` allocates the structs and
-  buffers with `malloc`, and the release callbacks only `free`.
+  buffers with `malloc`, and the release callbacks only `free`. It returns
+  an array handle in nanoarrow's `r.h` layout (class `nanoarrow_array`, the
+  schema's external pointer in its tag), which is what zuarrow requires of
+  a `from` handler.
+- **A sentinel value is zuarrow's policy, in zuarrow's classes.** The `to`
+  handler raises `zuarrow_lossy_error` under `"error"` and `"character"`
+  and `zuarrow_lossy_warning` under `"warn"` (design §9.1, review X4), never
+  a zuint class, so a caller handles it with zuarrow's other conditions.
 - **Import borrows; it never releases the caller's structs.** The struct
   owner (nanoarrow, an engine) releases them. Our own exported structs are
   released by their external pointer's finalizer unless a consumer moved
   them out, which sets `release` to NULL; `test-arrow.R` counts the calls.
-- **A decimal128 imports as its bits, with no 38-digit range check.**
-  DuckDB's default export writes HUGEINT values beyond 38 digits that way.
+- **A decimal128 imports as its bits, with no 38-digit range check,** and
+  only when the caller asks with `to = int128()`: zuint registers no `d:*`
+  key (review X5). DuckDB's default export writes HUGEINT values beyond 38
+  digits that way.
 - **The Arrow import refuses what it cannot read as values.** A
   dictionary-encoded array has its indices' format (`l` for int64 indices)
   and a schema with children is nested; both are `zuint_arrow_error`. The
@@ -247,12 +254,12 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   it in arrow 24.0.0 and 25.0.1, with or without zuint: an unchecked cast in
   `ExtensionType__r6_class()`, reported as
   [apache/arrow#53951](https://github.com/apache/arrow/issues/53951). So the
-  arrow methods exist for int64 and uint64 only (the 128-bit ones raise
-  `zuint_unsupported_error`), and tables go through nanoarrow
-  (`zu_arrow_table()`), which never makes that R object. When a fixed arrow
-  is released, register the 128-bit methods for it.
+  tests move tables between zuarrow and arrow as IPC streams
+  (`helper-arrow.R`), which never make that R object.
 - **Register an Arrow Table with DuckDB, not a record batch reader.** A
   registered reader is consumed by the first query and is empty after.
+- **Open DuckDB with `shared_home = FALSE` in tests** (#74), or it writes
+  under `~/.duckdb`.
 - **`xtfrm()` must return exact integer ranks.** Base `order()`, `rank()`
   and `sort()` on several keys go through it; a double proxy would tie
   values beyond 2^53. `match()`, `%in%` and `table()` go through `mtfrm()`,
@@ -312,9 +319,10 @@ Add each new one when a stage establishes it.
   namespace has loaded; it skips on CRAN. The code it compares is the named
   list `bit64_parity_code`, evaluated once per run for every test.
 - **The round-trip matrix is `test-roundtrip.R`** (design §12): DuckDB,
-  Arrow and Parquet paths for BIGINT, UBIGINT, HUGEINT and UHUGEINT, with
-  the values of `matrix_values()` in `helper-arrow.R`. It skips without
-  duckdb, DBI, arrow and nanoarrow; CI installs them.
+  Arrow and Parquet paths for BIGINT, UBIGINT, HUGEINT and UHUGEINT, through
+  zuarrow, with the values of `matrix_values()` in `helper-arrow.R`. It
+  skips without zuarrow, duckdb, DBI, arrow and nanoarrow; CI installs them,
+  zuarrow from GitHub until it is on CRAN.
 - **Keep the suite inside the CRAN time budget.** About 10 seconds locally
   (2026-10-16), most of it the bit64 processes and DuckDB.
 
