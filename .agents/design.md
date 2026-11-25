@@ -5,8 +5,9 @@ on 2026-10-15. From here on this file is authoritative; the RFC is history.
 
 Wide integer vectors for R (`int64`, `uint64`, `int128`, `uint128`) matching the
 integer types of Arrow and DuckDB. They share one C core and one promotion
-lattice, and convert exactly to and from `integer64`, Arrow, DuckDB and
-`decimal`.
+lattice, and convert exactly to and from `integer64`, Arrow and DuckDB.
+After the first release, fixed-point `DECIMAL(p, s)` values on the same
+128-bit core (§2.2).
 
 - **Status:** Adopted 2026-10-15. Revised on 2026-10-14 alongside RFC 0035
   (`zutempo`): the 128-bit type, its checked and wrapping arithmetic, floor
@@ -17,9 +18,14 @@ lattice, and convert exactly to and from `integer64`, Arrow, DuckDB and
   table and the ALTREP slot layout corrected, and every engine behaviour
   previously marked *(verify)* checked against duckdb 1.5.4.1, arrow 24.0.0,
   nanoarrow 0.9.0 and bit64 4.8.2 on R 4.6.1 (§9, §15).
-- **Date:** 2026-10-09; revised 2026-10-14; reviewed 2026-10-15.
+- **Scope change, 2026-11-20** ([#88](https://github.com/pedrobtz/zuint/issues/88)):
+  zuint takes on fixed-point decimals and an R-free C table, after its
+  first release (§2.2). Until then decimals were a non-goal and the
+  `decimal` package was to depend on zuint; both are reversed.
+- **Date:** 2026-10-09; revised 2026-10-14; reviewed 2026-10-15; scope
+  changed 2026-11-20.
 - **Packages:** `zuint` (not yet created; name availability unchecked);
-  `LinkingTo: zufast (>= 0.1.1)`, build time only; companion to `decimal`;
+  `LinkingTo: zufast (>= 0.1.1)`, build time only;
   optional bridges to `bit64`, `nanoarrow`, `arrow`, `duckdb` and `vctrs`
   through Suggests.
 - **Source:** design discussion of 2026-10-09; the duckdb R reference
@@ -42,10 +48,12 @@ systems, not from a wish list:
 | unsigned 128 | — (as above; the `decimal128` export reads values ≥ 2¹²⁷ as negative) | `UHUGEINT` | double | `uint128` |
 | unsigned 32 | `uint32` | `UINTEGER` | double (exact, but the type is lost on write-back) | later: schema-fidelity class |
 | small ints | `int8/16`, `uint8/16` | `TINYINT`… | integer (type lost on write-back) | later: schema-fidelity classes |
-| decimals | `decimal32/64/128/256` | `DECIMAL(p, s)` | double | **`decimal`** (companion package) |
+| decimals | `decimal32/64/128/256` | `DECIMAL(p, s)` | double | after 0.1.0: fixed-point decimal on `int128`, p ≤ 38 (§2.2); `decimal256` stays out |
 
-The pitch: **zuint + decimal cover every numeric Arrow/DuckDB type R can't
-represent.**
+The pitch: **zuint covers every integer Arrow/DuckDB type R can't
+represent, and after 0.1.0 DuckDB's fixed-point `DECIMAL` too.** Changed
+2026-11-20 (#88): the pitch was "zuint + decimal", with the decimals in
+the companion package.
 
 Success criteria:
 
@@ -146,11 +154,13 @@ scarce, and the linear coercion hierarchy doesn't accommodate int64
 4. Explicit overflow policy: R-like default plus `checked_*` and `wrapping_*`
    variants.
 5. Zero-copy interop with `integer64` (bit64 layout), and exact bridges to
-   DuckDB, Arrow and `decimal`.
+   DuckDB and Arrow.
 6. Graceful degradation: misused uint64/int128 values look like approximate
    numbers, never garbage.
 7. No dependencies outside the zu-* family (§2.1). vctrs/pillar integration
    is registered lazily.
+8. After 0.1.0: fixed-point decimals on `int128` and an R-free C table
+   (§2.2).
 
 ### 2.1 Dependency policy
 
@@ -178,8 +188,57 @@ load or use zuint.
   kernels over the vendored `abi.h` structs (§9.1); every R-level Arrow and
   engine function is zuarrow's. nanoarrow, arrow and duckdb remain test
   oracles only.
-- **`decimal` depends on zuint, never the reverse.** Both bridge functions in
-  §9.2 live in `decimal`.
+- **The family no longer relies on `decimal`** (2026-11-20, #88). It was
+  to depend on zuint and hold the decimal bridge. `decimal` imports
+  rlang, vctrs and withr and has no R-free C table, so zuint takes the
+  fixed-point decimals itself (§2.2). `decimal` stays as it is for its own
+  users; neither package depends on the other.
+
+### 2.2 Fixed-point decimals and the C table (after 0.1.0)
+
+Decided 2026-11-20 by the maintainer
+([#88](https://github.com/pedrobtz/zuint/issues/88)). zugodb's engine
+(libzugodb) refuses `DECIMAL(p, s)` (libzugodb#26), its largest block of
+refused cases in DuckDB's tests: 2,183 cases in `test/sql/types/decimal`,
+181 passing. No family package fits. `decimal` has no R-free C table, and
+the small C decimal libraries (mpdecimal, decNumber, Intel BID) are decimal
+*floating* point. DuckDB's `DECIMAL` is fixed-point: an integer of at most
+128 bits scaled by 10^s, with p ≤ 38. zuint already has that integer, its
+checked arithmetic (`zufast/wide.h`), parsing and formatting, so
+fixed-point is a small layer on top.
+
+- **The core, in C, R-free.** A value is an `int128` coefficient with a
+  precision p (1 to 38) and a scale s (0 to p), as DuckDB stores it:
+  - rescale up by 10^k with an overflow check, and down by 10^k rounding
+    half away from zero (DuckDB's rule for casts, `ROUND` and narrowing);
+  - a check that a coefficient fits p digits;
+  - strict parsing and formatting with a decimal point: what DuckDB v2.0.0
+    refuses is a status, never a guess;
+  - conversion to and from double with DuckDB's rounding;
+  - checked add, subtract, multiply and compare, exact before any rescale.
+
+  Overflow, invalid input and a result that does not fit are each a
+  status. No function calls R.
+- **An R-free C table, `zuint_api_v1`,** in a header that includes no R
+  header, with the operations above and the integer ones the engine may
+  use. The `R_GetCCallable` resolver lives in a second header, as
+  zukomp#132 settled. The header states the thread contract (no R API; a
+  status, never an unwind; distinct states on distinct threads) and the
+  append rule (the struct size grows, the version does not).
+- **An R vector class** on the same core, so zugodb returns and writes a
+  `DECIMAL(p, s)` column without losing a digit. Its shape, printing and
+  arithmetic in R are open (§15).
+- **Tests:** the General Decimal Arithmetic suite (Cowlishaw's `.decTest`
+  files from CPython's `Lib/test/decimaltestdata/`, at a pinned tag) for
+  the fixed-point cases, run by a C test binary with no R; random
+  differential tests against Python's `decimal` at 100 digits, weighted to
+  `10^p - 1`, `10^p`, `±(2^127 - 1)` and every halfway point; precision 37,
+  38 and 39 and scale p - 1, p and p + 1; several threads through the table
+  against a single-threaded run; and the `ZUF_NO_INT128` build.
+- **Order:** after zuint's first CRAN release. zugodb 0.1.0 does not need
+  it; the engine keeps refusing `DECIMAL` until then. Its consumers are
+  libzugodb#55 (the engine) and zugodb#72 (the R mapping).
+- Arbitrary precision stays a non-goal (§3).
 
 ## 3. Non-goals
 
@@ -189,7 +248,9 @@ load or use zuint.
 - Arithmetic on small types (`int8`/`int16`/`uint8`/`uint16`/`uint32`). Values
   fit in R integers or doubles exactly. Thin "schema-fidelity" classes that only
   remember the engine type for write-back are a later, optional milestone.
-- Arbitrary precision (`gmp`, `Rmpfr`) and decimals (`decimal`).
+- Arbitrary precision (`gmp`, `Rmpfr`), and decimals beyond 38 digits
+  (`decimal256`). Fixed-point decimals up to 38 digits were a non-goal
+  until 2026-11-20 and are now planned after 0.1.0 (§2.2, #88).
 - Matrix algebra on wide integers.
 
 ## 4. Types and representation
@@ -455,10 +516,9 @@ two classes, so it casts nothing.
 | Partner | Mapping |
 | --- | --- |
 | bit64 `integer64` | zero-copy both ways (`as_integer64()`, and `int64()` on an integer64 only swaps the class) |
-| Arrow | through zuarrow (§9.4): `int64` ↔ int64, `uint64` ↔ uint64, `arrow.opaque` hugeint/uhugeint ↔ int128/uint128; `decimal128(p, 0)` → int128 only with `to = int128()`. `decimal128(p, s>0)` goes to the `decimal` package. arrow R today converts uint64, uint32 and decimal128 to double. Since Stage 9 zuint registers no methods on arrow's generics |
+| Arrow | through zuarrow (§9.4): `int64` ↔ int64, `uint64` ↔ uint64, `arrow.opaque` hugeint/uhugeint ↔ int128/uint128; `decimal128(p, 0)` → int128 only with `to = int128()`. `decimal128(p, s>0)` has no reader until the fixed-point class (§2.2). arrow R today converts uint64, uint32 and decimal128 to double. Since Stage 9 zuint registers no methods on arrow's generics |
 | DuckDB | BIGINT ↔ int64, UBIGINT ↔ uint64, HUGEINT ↔ int128, UHUGEINT ↔ uint128, via DuckDB's Arrow export and zuarrow: `SET arrow_lossless_conversion = true`, since the default export loses UHUGEINT values ≥ 2¹²⁷ (§9.1), then `zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))`. The former `zu_duckdb_query()` and `zu_duckdb_register()` are gone (Stage 9). Today the R client's `bigint` option accepts only `"numeric"` and `"integer64"`; HUGEINT and UHUGEINT always arrive as doubles |
 | nanoarrow | zuarrow reads and writes nanoarrow handles; zuint registers no nanoarrow methods since Stage 9. Today `convert_array(uint64_array, bit64::integer64())` clamps 2⁶³ and above to 2⁶³ − 1 |
-| decimal | `as_decimal(int128, scale)` and `as_int128(decimal)` (exact or error), both implemented in `decimal`, which depends on zuint (§2.1) |
 | data.table | int64 works natively. Other types: `as.character()` or `as_integer64()` before keyed joins; documented |
 | vctrs / dplyr / tibble | `vec_ptype2`/`vec_cast`/`vec_proxy` registered lazily; `vec_proxy` returns the payload for exact equality and ordering |
 
@@ -488,6 +548,11 @@ src/
   zu_reduce.c      # sum (int128 accumulator), min/max, cumulative ops
   zu_arrow.c       # Arrow C Data Interface (vendored abi.h)
   init.c           # registration, ALTREP class init
+  # after 0.1.0 (§2.2):
+  zu_fixed.c       # fixed-point DECIMAL(p, s) core, R-free
+inst/include/
+  zuint_api.h      # zuint_api_v1, the R-free C table; no R header
+  zuint_api_r.h    # its R_GetCCallable resolver
 ```
 
 - Generic code uses macros or `_Generic` over the four types; no C++.
@@ -564,8 +629,9 @@ zu_storage(int128(1))        # raw CPLXSXP payload
    whose `Dataptr` exposes the bits, §9.1), exact `Extract_subset`,
    serialization modes. Then approach duckdb and nanoarrow/arrow maintainers
    (§9.3).
-5. **Later.** Schema-fidelity classes for small/uint32 types, the `decimal`
-   bridge for scale > 0 decimals, saturating ops, `mean_exact`, quantiles, an
+5. **Later.** Schema-fidelity classes for small/uint32 types, fixed-point
+   decimals and the C table (§2.2, #88), saturating ops, `mean_exact`,
+   quantiles, an
    optional ALTREP view for int64.
 
 ## 14. Risks
@@ -590,6 +656,11 @@ zu_storage(int128(1))        # raw CPLXSXP payload
 
 Open:
 
+- **The fixed-point R class** (§2.2, #88): its storage (an `int128`
+  payload with p and s as attributes is the obvious start), printing,
+  the promotion of two decimals of different scales and of a decimal with
+  the integer types, and its `decimal128(p, s)` Arrow mapping. To settle
+  before that work starts, after 0.1.0.
 - Should the DuckDB bridge use DuckDB's C API directly (no R duckdb dependency)
   or go through duckdb's Arrow export? Arrow export is the plan (§9.1); the C
   API would add a non-zu runtime dependency (§2.1).
