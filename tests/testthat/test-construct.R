@@ -167,3 +167,40 @@ test_that("the NA constants are NA of their type", {
     )
   }
 })
+
+test_that("as.double() rounds to nearest, ties to even, against gmp", {
+  # gmp's as.double() truncates, so the oracle checks the result exactly:
+  # within half an ulp of the value, and on a tie the even neighbour.
+  nearest <- function(v, d) {
+    v <- gmp::as.bigz(v)
+    dz <- gmp::as.bigz(d)
+    e <- nchar(as.character(abs(v), b = 2)) - 1
+    ulp <- gmp::as.bigz(2)^pmax(e - 52, 0)
+    err2 <- abs(dz - v) * 2
+    err2 < ulp | (err2 == ulp & (dz %/% ulp) %% 2 == 0)
+  }
+  # At each 2^k: half an ulp above it (a tie, to even: down), three halves
+  # (a tie, up), half plus one (just past a tie: up, which needs every low
+  # bit), and 2^k - 1, which rounds up into the next binade.
+  ties <- function(type) {
+    w <- if (grepl("128", type)) 128 else 64
+    b <- gmp::as.bigz(2)^(53:(w - 2))
+    h <- b %/% gmp::as.bigz(2)^53
+    v <- c(b + h, b + 3 * h, b + h + 1, b - 1, gmp::as.bigz(2)^(w - 1) - 1)
+    vals <- as.character(c(v, -v))
+    vals[oracle_fits(type, vals)]
+  }
+  for (type in zu_all_types) {
+    vals <- c(
+      oracle_edges(type),
+      oracle_random(type, 500, seed = 20261125),
+      ties(type)
+    )
+    x <- zu_ctor(type)(vals)
+    d <- withCallingHandlers(
+      as.double(x),
+      zuint_precision_warning = function(w) invokeRestart("muffleWarning")
+    )
+    expect_true(all(nearest(vals, d)), label = type)
+  }
+})

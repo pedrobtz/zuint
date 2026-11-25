@@ -1,0 +1,50 @@
+# The text parser (src/zu_parse.c) and the Arrow metadata reader
+# (src/zu_metadata.c), each against a reference written from its spec in
+# tools/fuzz/harness.c (#93). R's headers only: embed-r is there for
+# `R CMD config --cppflags`, since zu_wide.h includes R.h; nothing calls R.
+# zufast's headers come through github-packages until it is on CRAN.
+#
+# Seeds and dictionary: tools/fuzz/corpus and tools/fuzz/zuint.dict. The
+# corpus holds metadata at 4095, 4096 and 4097 entries, at least 32 KB, so
+# -max_len lets libFuzzer keep inputs that long. -timeout makes an input
+# over 10 s a finding.
+#
+# Quick on pull requests (120 s); half an hour on a manual dispatch.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+
+name: fuzz
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    uses: pedrobtz/r-actions/.github/workflows/fuzz.yml@v1
+    with:
+      harness: tools/fuzz/harness.c
+      sources: |
+        src/zu_parse.c
+        src/zu_metadata.c
+      cflags: >-
+        -g -O1 -fno-omit-frame-pointer -Isrc
+        -I.github-packages/zufast/inst/include
+      embed-r: true
+      github-packages: pedrobtz/zufast
+      seed-corpus: tools/fuzz/corpus
+      dictionary: tools/fuzz/zuint.dict
+      libfuzzer-args: -max_len=65536 -timeout=10
+      # The share of the lines in `sources` the corpus reaches (#94). The
+      # first run, on 2026-11-25 (PR #99), reached 100% of 70 lines and
+      # 98.2% of 110 branches. A few points under, so a harness or corpus
+      # change that stops reaching code goes red.
+      reach-floor: 95
+      profile: auto
+      quick-max-total-time: 120
+      max-total-time: 1800

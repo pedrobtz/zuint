@@ -88,6 +88,11 @@ request. It is occasional locally; the default loop is the shared
 `tools/verify-vendor` checks the vendored Arrow header against upstream (see
 Vendored native code); run it after touching `src/vendor/`.
 
+`make -C tools/fuzz driver && tools/fuzz/driver tools/fuzz/corpus/*` runs
+the fuzz harness locally without libFuzzer, under ASan and UBSan: the
+corpus, then 200,000 generated inputs (`ZU_FUZZ_RUNS` changes the count).
+Run it after touching `src/zu_parse.c` or `src/zu_metadata.c`.
+
 ## Architecture
 
 Grows with the stages; `.agents/design.md` §10 has the planned C layout.
@@ -104,8 +109,10 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 - [`src/zu_bits.c`](src/zu_bits.c) and [`R/bits.R`](R/bits.R) are the bit
   operations; [`R/text.R`](R/text.R) is `format_hex()` and `format_bin()`.
 - [`src/zu_arrow.c`](src/zu_arrow.c) holds the Arrow C Data Interface
-  kernels, and [`R/arrow.R`](R/arrow.R) the `to` and `from` handlers that
-  [`R/zzz.R`](R/zzz.R) registers with zuarrow when zuarrow loads (design
+  kernels, [`src/zu_metadata.c`](src/zu_metadata.c) the reader of Arrow's
+  binary schema metadata, and [`R/arrow.R`](R/arrow.R) the `to` and `from`
+  handlers that [`R/zzz.R`](R/zzz.R) registers with zuarrow when zuarrow
+  loads (design
   §9.4). zuint has no Arrow functions of its own since Stage 9; the R
   surface is zuarrow's.
 - [`src/zu_sort.c`](src/zu_sort.c) is a stable LSD radix sort on unsigned
@@ -263,6 +270,9 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 - **Hot paths pass classed objects straight to C.** `attributes(x) <- NULL`
   (`zu_bare()`) copies the vector; the C code ignores attributes. Strip only
   where an R-level `c()` would otherwise dispatch back to the method.
+- **`src/zu_parse.c` and `src/zu_metadata.c` never call R.** The fuzz
+  target and the mutation driver (`tools/fuzz/`) build them with R's
+  headers but without libR; an `Rf_*` call there breaks both builds.
 - **Native routines are called through their registered symbols.**
   `init.c` calls `R_forceSymbols()`, so `.Call("name", ...)` with a string
   fails; use the symbol `useDynLib(.registration = TRUE)` defines.
@@ -311,6 +321,13 @@ The shared workflows this package calls:
 - `cran-release.yaml`: `cran-release.yml`, pinned to a commit.
 - `assurance.yaml`: `assurance.yml`, which checks
   [`.agents/assurance.md`](.agents/assurance.md).
+- `fuzz.yaml`: `fuzz.yml` over `tools/fuzz/harness.c`, which compares the
+  text parser and the metadata reader with references written from their
+  specs. 120 seconds on a pull request, half an hour on a dispatch.
+- `mutation.yaml` and `alloc-failure.yaml`, on dispatch only:
+  `mutation.yml` runs `tools/fuzz/driver` against each mutant of the two
+  readers, and `alloc-failure.yml` fails each allocation of
+  `tools/alloc-exercise.R` in turn.
 
 Two deliberate deviations from the shared CI rules:
 
