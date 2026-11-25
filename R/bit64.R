@@ -100,3 +100,27 @@ zu_register_bit64 <- function(...) {
 }
 
 zu_as_integer64_method <- function(x, ...) as_integer64(x)
+
+#' Convert to bit64's integer64
+#'
+#' `as_integer64()` returns the values as a plain bit64 `integer64`, for
+#' code that checks the class exactly. `int64` already has bit64's storage,
+#' so for it only the class changes; the other types convert first, exactly
+#' or to `NA` with a warning of class `zuint_cast_warning`. bit64 itself is
+#' not needed.
+#'
+#' The other direction is [int64()], which on an `integer64` likewise only
+#' swaps the class.
+#'
+#' @param x A zuint vector or a bit64 `integer64`.
+#' @return An `integer64` vector the length of `x`, with its names.
+#' @examples
+#' y <- as_integer64(int64("9007199254740993"))
+#' class(y)
+#' int64(y)
+#' @export
+as_integer64 <- function(x) {
+  x <- zu_cast(x, 1L, call = sys.call())
+  oldClass(x) <- "integer64"
+  x
+}

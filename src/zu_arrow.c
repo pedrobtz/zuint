@@ -1,11 +1,15 @@
 /*
  * zu_arrow.c -- the Arrow C Data Interface bridge (design 9.1).
  *
+ * The kernels behind zuint's zuarrow registrations (design 9): zuarrow
+ * calls them through the `to` and `from` handlers in R/arrow.R.
+ *
  * Formats:
  *   int64    "l"
  *   uint64   "L"
  *   int128   "w:16" + arrow.opaque {"type_name":"hugeint"}  (DuckDB's lossless
- *            export), or "d:P,0" with P <= 38 on import / "d:38,0" on request
+ *            export); on import also "d:P,0" with P <= 38, when the caller
+ *            asks for int128
  *   uint128  "w:16" + arrow.opaque {"type_name":"uhugeint"}
  *
  * A 128-bit value is 16 bytes of native-endian two's complement, low word
@@ -21,8 +25,14 @@
  * consumer that moves a struct out (setting its release to NULL) takes that
  * job over.
  *
+ * Export returns an array handle in nanoarrow's r.h layout, the form zuarrow
+ * takes from a `from` handler: an external pointer to the ArrowArray, classed
+ * "nanoarrow_array", whose tag is the schema's external pointer, classed
+ * "nanoarrow_schema".
+ *
  * NA and null map to each other both ways. A valid engine value that equals
- * a type's NA bit pattern imports as NA and is counted as lost.
+ * a type's NA bit pattern imports as NA and is counted as lost; the R handler
+ * applies zuarrow's `lossy` policy to the count.
  */
 #include "zu_wide.h"
 #include "vendor/arrow/abi.h"
@@ -191,6 +201,13 @@ SEXP zu_arrow_type_c(SEXP schema)
     return t ? Rf_ScalarInteger(t) : Rf_ScalarString(Rf_mkChar(why));
 }
 
+/* The schema's format string, for messages. */
+SEXP zu_arrow_format_c(SEXP schema)
+{
+    const struct ArrowSchema *s = zu_schema_arg(schema);
+    return s->format ? Rf_mkString(s->format) : R_NilValue;
+}
+
 /* ---- import ------------------------------------------------------------- */
 
 static bool zu_valid(const struct ArrowArray *a, int64_t j)
@@ -199,12 +216,11 @@ static bool zu_valid(const struct ArrowArray *a, int64_t j)
     return a->null_count == 0 || v == NULL || (v[j >> 3] >> (j & 7)) & 1;
 }
 
-/* list(payload, n_lost) for an array whose schema maps to `type`; with
-   count_only, the payload is NULL and nothing is allocated. */
-static SEXP zu_import(const struct ArrowArray *a, zu_type t, bool count_only)
+/* list(payload, n_lost, type) for an array whose schema maps to `type`. */
+static SEXP zu_import(const struct ArrowArray *a, zu_type t)
 {
     R_xlen_t n = (R_xlen_t)a->length, lost = 0;
-    SEXP out = PROTECT(count_only ? R_NilValue : zu_alloc(t, n));
+    SEXP out = PROTECT(zu_alloc(t, n));
     const unsigned char *data = (const unsigned char *)a->buffers[1];
     for (R_xlen_t i = 0; i < n; i++) {
         int64_t j = a->offset + (int64_t)i;
@@ -212,12 +228,12 @@ static SEXP zu_import(const struct ArrowArray *a, zu_type t, bool count_only)
         if (zu_type_is_128(t)) {
             zuf_u128 v = valid ? zu_read16(data + 16 * j) : zu_na128(t);
             sentinel = valid && zuf_u128_cmp(v, zu_na128(t)) == 0;
-            if (!count_only) zu_set128(COMPLEX(out), i, valid ? v : zu_na128(t));
+            zu_set128(COMPLEX(out), i, valid ? v : zu_na128(t));
         } else {
             uint64_t v = 0;
             if (valid) memcpy(&v, data + 8 * j, 8);
             sentinel = valid && v == zu_na64(t);
-            if (!count_only) zu_set64(REAL(out), i, valid ? v : zu_na64(t));
+            zu_set64(REAL(out), i, valid ? v : zu_na64(t));
         }
         lost += sentinel;
     }
@@ -240,14 +256,9 @@ static zu_type zu_import_type(SEXP schema)
 SEXP zu_from_arrow_c(SEXP array, SEXP schema)
 {
     zu_type t = zu_import_type(schema);
-    return zu_import(zu_array_arg(array), t, false);
+    return zu_import(zu_array_arg(array), t);
 }
 
-SEXP zu_sentinel_check_c(SEXP array, SEXP schema)
-{
-    zu_type t = zu_import_type(schema);
-    return zu_import(zu_array_arg(array), t, true);
-}
 
 /* ---- export ------------------------------------------------------------- */
 
@@ -300,10 +311,10 @@ static void zu_finalize_schema(SEXP xp)
     R_ClearExternalPtr(xp);
 }
 
-/* An external pointer owning a zeroed struct of `size` bytes. */
-static SEXP zu_owned_xptr(size_t size, R_CFinalizer_t fin, const char *tag)
+/* An external pointer owning a zeroed struct of `size` bytes, with `tag`. */
+static SEXP zu_owned_xptr(size_t size, R_CFinalizer_t fin, SEXP tag)
 {
-    SEXP t = PROTECT(Rf_mkString(tag));
+    SEXP t = PROTECT(tag);
     SEXP xp = PROTECT(R_MakeExternalPtr(NULL, t, R_NilValue));
     R_RegisterCFinalizerEx(xp, fin, TRUE);
     void *p = calloc(1, size);
@@ -331,43 +342,28 @@ static char *zu_opaque_metadata(const char *type_name)
     return md;
 }
 
-/* Does |v| have at most 38 decimal digits? */
-static bool zu_fits_decimal38(zu_val v)
-{
-    zuf_u128 limit = zuf_u128_from_u64(1), ten = zuf_u128_from_u64(10);
-    for (int k = 0; k < 38; k++) zuf_u128_mul(limit, ten, &limit);
-    return zuf_u128_cmp(v.mag, limit) < 0;
-}
-
-/* list(array, schema) external pointers holding x exported. */
-SEXP zu_to_arrow_c(SEXP x, SEXP type_, SEXP decimal_)
+/* An array handle holding x exported, its schema in the tag. */
+SEXP zu_to_arrow_c(SEXP x, SEXP type_)
 {
     zu_type t = zu_type_arg(type_);
-    bool decimal = Rf_asLogical(decimal_) == TRUE;
     zu_check_payload(x, t);
     R_xlen_t n = XLENGTH(x), nulls = 0;
     size_t width = zu_type_is_128(t) ? 16 : 8;
 
-    for (R_xlen_t i = 0; i < n; i++) {
-        if (zu_is_na(x, t, i)) { nulls++; continue; }
-        if (decimal && t == ZU_INT128 && !zu_fits_decimal38(zu_val_get(x, t, i)))
-            Rf_error("zuint: a value has more than 38 digits and does not fit decimal128(38, 0)");
-    }
-    if (decimal && t != ZU_INT128) Rf_error("zuint: `decimal = TRUE` is for int128 only");
+    for (R_xlen_t i = 0; i < n; i++) nulls += zu_is_na(x, t, i);
 
-    SEXP res = PROTECT(Rf_allocVector(VECSXP, 2));
-    SEXP sxp = zu_owned_xptr(sizeof(struct ArrowSchema), zu_finalize_schema, "zuint_arrow_schema");
-    SET_VECTOR_ELT(res, 1, sxp);
-    SEXP axp = zu_owned_xptr(sizeof(struct ArrowArray), zu_finalize_array, "zuint_arrow_array");
-    SET_VECTOR_ELT(res, 0, axp);
+    SEXP sxp = PROTECT(zu_owned_xptr(sizeof(struct ArrowSchema), zu_finalize_schema, R_NilValue));
+    Rf_setAttrib(sxp, R_ClassSymbol, Rf_mkString("nanoarrow_schema"));
+    SEXP axp = PROTECT(zu_owned_xptr(sizeof(struct ArrowArray), zu_finalize_array, sxp));
+    Rf_setAttrib(axp, R_ClassSymbol, Rf_mkString("nanoarrow_array"));
 
     struct ArrowSchema *s = (struct ArrowSchema *)R_ExternalPtrAddr(sxp);
     char *md = NULL;
-    if (zu_type_is_128(t) && !decimal) {
+    if (zu_type_is_128(t)) {
         md = zu_opaque_metadata(t == ZU_INT128 ? "hugeint" : "uhugeint");
         if (md == NULL) Rf_error("zuint: out of memory");
     }
-    s->format = t == ZU_INT64 ? "l" : t == ZU_UINT64 ? "L" : decimal ? "d:38,0" : "w:16";
+    s->format = t == ZU_INT64 ? "l" : t == ZU_UINT64 ? "L" : "w:16";
     s->name = "";
     s->metadata = md;
     s->flags = ZU_ARROW_FLAG_NULLABLE;
@@ -403,8 +399,15 @@ SEXP zu_to_arrow_c(SEXP x, SEXP type_, SEXP decimal_)
     a->private_data = p;
     a->release = zu_release_array;
 
-    UNPROTECT(1);
-    return res;
+    UNPROTECT(2);
+    return axp;
+}
+
+/* The schema an exported array handle carries in its tag. */
+SEXP zu_arrow_schema_c(SEXP array)
+{
+    if (TYPEOF(array) != EXTPTRSXP) Rf_error("zuint: `array` must be an external pointer");
+    return R_ExternalPtrTag(array);
 }
 
 SEXP zu_arrow_releases_c(void) { return Rf_ScalarReal((double)atomic_load(&zu_arrow_releases)); }

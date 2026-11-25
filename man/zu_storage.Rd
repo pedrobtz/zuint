@@ -21,16 +21,42 @@ zu_from_storage(payload, type)
 \code{zu_from_storage()} a zuint vector of \code{type}.
 }
 \description{
-\code{zu_storage()} returns the payload a zuint vector is stored in, for code
-that reads the bits directly: a double vector whose bits are 64-bit
-integers for \code{int64} and \code{uint64}, and a complex vector whose real and
-imaginary parts hold the low and high 64-bit words for \code{int128} and
-\code{uint128}. \code{zu_from_storage()} reverses it. Names are kept both ways.
+\code{zu_storage()} returns the payload a zuint vector is stored in, and
+\code{zu_from_storage()} makes a zuint vector of a payload. Names are kept both
+ways, and no other attribute is. They are the public representation
+contract: a package that reads or builds zuint vectors in C, such as an
+Arrow or database reader, relies on these shapes and nothing else.
 }
 \details{
-The payload is not a number: printing it or computing with it is
-meaningless. Keeping the representation behind these two functions is
-what lets it change without breaking callers.
+\tabular{lll}{
+   Type \tab Payload \tab One value \cr
+   \code{int64} \tab double \tab the bits of an \code{int64_t}, as bit64's \code{integer64} \cr
+   \code{uint64} \tab double \tab the bits of a \code{uint64_t} \cr
+   \code{int128} \tab complex \tab real part the low 64 bits, imaginary part the high 64 bits, two's complement \cr
+   \code{uint128} \tab complex \tab real part the low 64 bits, imaginary part the high 64 bits \cr
+}
+
+
+The bits are in the machine's byte order, and are moved in and out of the
+doubles with \code{memcpy()}, never through a conversion to \code{double}, which
+would change NaN payloads.
+
+Each type's \code{NA} is one bit pattern, which no value of the type has:\tabular{lll}{
+   Type \tab \code{NA} bit pattern \tab As the integer \cr
+   \code{int64} \tab \code{0x8000000000000000} \tab \code{INT64_MIN}, bit64's \code{NA} \cr
+   \code{uint64} \tab \code{0xFFFFFFFFFFFFFFFF} \tab \code{UINT64_MAX} \cr
+   \code{int128} \tab high word \code{0x8000000000000000}, low word 0 \tab \code{INT128_MIN} \cr
+   \code{uint128} \tab both words \code{0xFFFFFFFFFFFFFFFF} \tab \code{UINT128_MAX} \cr
+}
+
+
+So the value an engine can hold at that pattern, such as \code{UINT64_MAX} in
+a \code{UBIGINT} column, has no zuint form, and a reader decides what to do
+with it (zuarrow's \code{lossy} policy, see \link{zuint-arrow}).
+
+These shapes and patterns change only under the rule the R API follows:
+with a deprecation, in a release whose \code{NEWS.md} says so. The payload is
+not a number: printing it or computing with it is meaningless.
 }
 \examples{
 p <- zu_storage(int128(-1))

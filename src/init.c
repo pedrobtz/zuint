@@ -20,9 +20,10 @@ SEXP zu_format_base_c(SEXP x, SEXP type, SEXP base, SEXP pad);
 SEXP zu_bitop_c(SEXP op, SEXP x, SEXP y, SEXP type);
 SEXP zu_bitcount_c(SEXP x, SEXP type, SEXP what);
 SEXP zu_arrow_type_c(SEXP schema);
+SEXP zu_arrow_format_c(SEXP schema);
 SEXP zu_from_arrow_c(SEXP array, SEXP schema);
-SEXP zu_sentinel_check_c(SEXP array, SEXP schema);
-SEXP zu_to_arrow_c(SEXP x, SEXP type, SEXP decimal);
+SEXP zu_to_arrow_c(SEXP x, SEXP type);
+SEXP zu_arrow_schema_c(SEXP array);
 SEXP zu_arrow_releases_c(void);
 SEXP zu_arrow_released_c(SEXP xp);
 SEXP zu_arrow_release_c(SEXP xp);
@@ -57,9 +58,10 @@ static const R_CallMethodDef call_methods[] = {
   {"zu_bitop_c", (DL_FUNC) &zu_bitop_c, 4},
   {"zu_bitcount_c", (DL_FUNC) &zu_bitcount_c, 3},
   {"zu_arrow_type_c", (DL_FUNC) &zu_arrow_type_c, 1},
+  {"zu_arrow_format_c", (DL_FUNC) &zu_arrow_format_c, 1},
   {"zu_from_arrow_c", (DL_FUNC) &zu_from_arrow_c, 2},
-  {"zu_sentinel_check_c", (DL_FUNC) &zu_sentinel_check_c, 2},
-  {"zu_to_arrow_c", (DL_FUNC) &zu_to_arrow_c, 3},
+  {"zu_to_arrow_c", (DL_FUNC) &zu_to_arrow_c, 2},
+  {"zu_arrow_schema_c", (DL_FUNC) &zu_arrow_schema_c, 1},
   {"zu_arrow_releases_c", (DL_FUNC) &zu_arrow_releases_c, 0},
   {"zu_arrow_released_c", (DL_FUNC) &zu_arrow_released_c, 1},
   {"zu_arrow_release_c", (DL_FUNC) &zu_arrow_release_c, 1},

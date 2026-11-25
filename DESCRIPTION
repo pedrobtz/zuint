@@ -1,5 +1,5 @@
 Package: zuint
-Title: Lossless 64- And 128-Bit Integers for 'Arrow' and 'DuckDB'
+Title: Lossless Signed and Unsigned 64- And 128-Bit Integers
 Version: 0.0.0.9000
 Authors@R: c(
     person("Pedro", "Baltazar", , "pedrobtz@gmail.com", role = c("aut", "cre", "cph")),
@@ -7,12 +7,12 @@ Authors@R: c(
            comment = "Arrow C Data Interface header in src/vendor/arrow/abi.h")
   )
 Description: Wide integer vectors, signed and unsigned 64-bit and 128-bit,
-    matching the integer types of 'Apache Arrow' and 'DuckDB'. The four types
-    share one 'C' core and one lossless promotion order, with exact
+    matching the integer types of databases and columnar formats. The four
+    types share one 'C' core and one lossless promotion order, with exact
     arithmetic, comparison, parsing and formatting, and explicit overflow
     policies. The signed 64-bit type keeps the 'bit64' 'integer64' storage
-    layout, and every type converts exactly to and from the 'Arrow' 'C' Data
-    Interface.
+    layout. With 'zuarrow' installed, the types read and write Arrow columns
+    exactly.
 License: MIT + file LICENSE
 Copyright: See inst/COPYRIGHTS.
 URL: https://pedrobtz.github.io/zuint/, https://github.com/pedrobtz/zuint
@@ -38,11 +38,13 @@ Suggests:
     testthat (>= 3.0.0),
     tibble,
     vctrs,
-    withr
+    withr,
+    zuarrow
 VignetteBuilder: knitr
 Remotes: 
-    pedrobtz/zufast
+    pedrobtz/zufast,
+    pedrobtz/zuarrow
 Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-Config/roxygen2/version: 8.1.0
+Config/roxygen2/version: 8.1.1

@@ -21,7 +21,7 @@ function (see \code{\link[=checked_add]{checked_add()}}).
 \item \code{zuint_division_error}: a zero divisor in \code{\link[=checked_idiv]{checked_idiv()}} or
 \code{\link[=checked_mod]{checked_mod()}}.
 \item \code{zuint_arrow_error}: an Arrow array zuint cannot read, or a released
-struct (see \code{\link[=zu_from_arrow]{zu_from_arrow()}}).
+struct, met through zuarrow (see \link{zuint-arrow}).
 \item \code{zuint_unsupported_error}: an operation zuint does not do, such as
 \code{quantile()} or a matrix.
 }

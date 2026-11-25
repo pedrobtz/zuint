@@ -2,73 +2,54 @@
 % Please edit documentation in R/arrow.R
 \name{zuint-arrow}
 \alias{zuint-arrow}
-\alias{zu_from_arrow}
-\alias{zu_to_arrow}
-\alias{zu_sentinel_check}
-\title{Arrow C Data Interface}
-\usage{
-zu_from_arrow(array, schema)
-
-zu_to_arrow(x, decimal = FALSE)
-
-zu_sentinel_check(array, schema)
-}
-\arguments{
-\item{array}{An external pointer to an \code{ArrowArray}, such as a
-\code{nanoarrow_array}.}
-
-\item{schema}{An external pointer to the array's \code{ArrowSchema}.}
-
-\item{x}{A zuint vector.}
-
-\item{decimal}{Export \code{int128} as \code{decimal128(38, 0)}.}
-}
-\value{
-\code{zu_from_arrow()} returns a zuint vector; \code{zu_to_arrow()} a list
-of external pointers named \code{array} and \code{schema}, which release their
-structs when garbage collected unless a consumer moved them out;
-\code{zu_sentinel_check()} the number of values that would import as \code{NA}
-though they are not null.
-}
+\title{zuint columns from Arrow, through zuarrow}
 \description{
-Convert between zuint vectors and Arrow arrays through the Arrow C Data
-Interface, with no R package in between. The arrays and schemas are
-external pointers to \code{ArrowArray} and \code{ArrowSchema} structs, the form
-nanoarrow's \code{nanoarrow_array} and \code{nanoarrow_schema} objects take.
+zuint has no Arrow functions of its own. When the
+\href{https://github.com/pedrobtz/zuarrow}{zuarrow} package is installed, zuint
+registers its four types with zuarrow's registry as soon as both are
+loaded, and from then on \code{zuarrow::arrow_to_r()}, \code{zuarrow::arrow_read()}
+and \code{zuarrow::arrow_array()} read and write zuint columns exactly.
+\code{zuarrow::arrow_registry()} lists the entries:
 }
 \details{
-\tabular{ll}{
-   zuint \tab Arrow format \cr
-   \code{int64} \tab \code{int64} (\code{l}) \cr
-   \code{uint64} \tab \code{uint64} (\code{L}) \cr
-   \code{int128} \tab DuckDB's \code{arrow.opaque} \code{hugeint} extension (\code{w:16}); with \code{decimal = TRUE}, \code{decimal128(38, 0)} \cr
-   \code{uint128} \tab DuckDB's \code{arrow.opaque} \code{uhugeint} extension (\code{w:16}) \cr
+\tabular{lll}{
+   Key \tab Arrow type \tab zuint type \cr
+   \code{l} \tab \code{int64} \tab \code{int64} \cr
+   \code{L} \tab \code{uint64} \tab \code{uint64} \cr
+   \code{arrow.opaque} \tab DuckDB's \code{hugeint} extension (\code{w:16}) \tab \code{int128} \cr
+   \code{arrow.opaque} \tab DuckDB's \code{uhugeint} extension (\code{w:16}) \tab \code{uint128} \cr
 }
 
 
-\code{zu_from_arrow()} also reads any \code{decimal128(p, 0)} with \code{p} up to 38 as
-\code{int128}, taking the 128 bits as they are, which is how DuckDB exports
-\code{HUGEINT} by default. It copies the data and leaves the structs to their
-owner. A null becomes \code{NA} and an \code{NA} becomes a null. A valid value that
-happens to equal a type's \code{NA} bit pattern (for example \code{UINT64_MAX})
-cannot be told from \code{NA}: it imports as \code{NA} with a warning of class
-\code{zuint_cast_warning}. \code{zu_sentinel_check()} counts those values without
-importing.
+Other \code{arrow.opaque} types, which DuckDB uses for types Arrow has no
+form for, keep zuarrow's own conversion.
 
-\code{zu_to_arrow()} exports \code{int128} as the extension by default because
-DuckDB reads \code{decimal128(38, 0)} back as \code{DECIMAL(38,0)}, not \code{HUGEINT}.
-\code{decimal = TRUE} is for consumers without extension support; a value with
-more than 38 digits is then an error.
+A \code{decimal128(p, 0)} column is a decimal, not an integer, so zuint does
+not register for it. Asking for \code{int128} with \code{to = int128()} in
+\code{zuarrow::arrow_to_r()} reads one with \code{p} up to 38 as the 128 bits it
+holds. DuckDB writes \code{HUGEINT} that way unless its
+\code{arrow_lossless_conversion} setting is on, so turn the setting on, and
+\code{HUGEINT} and \code{UHUGEINT} arrive as the extension:
 
-When nanoarrow is installed, \code{nanoarrow::convert_array(array, int64())}
-and the other constructors' prototypes import through this bridge, and
-\code{nanoarrow::as_nanoarrow_array()} exports zuint vectors.
+\if{html}{\out{<div class="sourceCode r">}}\preformatted{DBI::dbExecute(con, "SET arrow_lossless_conversion = true")
+zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))
+}\if{html}{\out{</div>}}
+
+A null reads as \code{NA} and an \code{NA} writes as a null. A valid value equal to
+a type's \code{NA} bit pattern, such as \code{UINT64_MAX} in a \code{UBIGINT} column,
+cannot be held. zuarrow's \code{lossy} policy decides what happens to it:
+\itemize{
+\item \code{"error"} and \code{"character"} raise \code{zuarrow_lossy_error}, naming the
+value. \code{"character"} would give the column as text only when every
+batch held such a value, so it fails like \code{"error"} instead.
+\item \code{"warn"} reads it as \code{NA} with one \code{zuarrow_lossy_warning} per batch.
+\item \code{"allow"} reads it as \code{NA} silently.
 }
-\examples{
-x <- uint64(c("18446744073709551614", NA, "1"))
-a <- zu_to_arrow(x)
-zu_from_arrow(a$array, a$schema)
 
-b <- zu_to_arrow(int128(-1), decimal = TRUE)
-zu_from_arrow(b$array, b$schema)
+Writing never loses a value: \code{int128} and \code{uint128} are written as the
+DuckDB extension, which DuckDB reads back as \code{HUGEINT} and \code{UHUGEINT}.
+}
+\seealso{
+\code{\link[=zu_storage]{zu_storage()}} for the representation, the contract a package
+that builds zuint vectors in C relies on.
 }

@@ -16,7 +16,7 @@
 #' * `zuint_division_error`: a zero divisor in [checked_idiv()] or
 #'   [checked_mod()].
 #' * `zuint_arrow_error`: an Arrow array zuint cannot read, or a released
-#'   struct (see [zu_from_arrow()]).
+#'   struct, met through zuarrow (see [zuint-arrow]).
 #' * `zuint_unsupported_error`: an operation zuint does not do, such as
 #'   `quantile()` or a matrix.
 #'
