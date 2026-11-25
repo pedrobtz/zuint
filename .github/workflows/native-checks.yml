@@ -28,6 +28,11 @@ jobs:
       # building them from source takes half an hour; pull requests use
       # R-release, the full profile CRAN's R-devel.
       r-version: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'release' || 'devel' }}
+      # On R-devel: duckdb from r-universe when it has a binary, and 90
+      # minutes, not 60, for a cold cache that builds it under the
+      # sanitizer (PR #89's first full run timed out).
+      pre-install: Rscript tools/ci-binaries.R
+      timeout-minutes: 90
       profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
 
   valgrind:
