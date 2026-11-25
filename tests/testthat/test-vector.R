@@ -254,7 +254,7 @@ test_that("is.nan, is.finite and is.infinite read values, not raw bits", {
 })
 
 test_that("conversions to complex, raw and dates go through the values", {
-  # base's own conversion: R before 4.4 gives NA an NA imaginary part
+  # base's own conversion of the doubles, NA included, on every R version
   expect_identical(as.complex(int128(c(-5, NA))), as.complex(c(-5, NA)))
   expect_identical(as.raw(uint64(c(5, 255))), as.raw(c(5, 255)))
   expect_identical(as.Date(int64(1)), as.Date(1))

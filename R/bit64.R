@@ -16,11 +16,9 @@ zu_is_finite <- function(x) !zu_is_na(x)
 
 zu_is_infinite <- zu_is_nan
 
-zu_as_complex <- function(x, ...) {
-  out <- complex(real = zu_as_double(x))
-  out[zu_is_na(x)] <- NA
-  out
-}
+# Through the doubles, so an NA is base's as.complex(NA_real_) on every R:
+# assigning a logical NA gave an NA imaginary part before R 4.4.
+zu_as_complex <- function(x, ...) as.complex(zu_as_double(x))
 
 zu_as_raw <- function(x) as.raw(zu_as_integer(x))
 
