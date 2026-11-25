@@ -1,0 +1,16 @@
+# Holds .agents/assurance.md to the portfolio standard (r-skills
+# rules/assurance.md). Seconds; runs on every change, because the file it
+# checks is Markdown the docs gate would skip.
+on:
+  pull_request:
+  # No `push:`: a pull request already checks its merge with main.
+  workflow_dispatch:
+
+name: assurance
+
+permissions:
+  contents: read
+
+jobs:
+  assurance:
+    uses: pedrobtz/r-actions/.github/workflows/assurance.yml@v1

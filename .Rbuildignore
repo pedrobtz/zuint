@@ -9,3 +9,8 @@
 ^README\.Rmd$
 ^doc$
 ^Meta$
+^\.superpowers$
+^\.claude$
+^AGENTS\.md$
+^CRAN-SUBMISSION$
+^cran-comments\.md$
