@@ -11,7 +11,7 @@
  * coefficient crosses this header as zuint_i128, two's complement in two
  * 64-bit words, low word first: the layout of DuckDB's hugeint_t.
  *
- * Every function gives DuckDB 2.0.0's answer, with two exceptions where
+ * Every function gives DuckDB 2.0.1's answer, with two exceptions where
  * DuckDB's is wrong (zuint design 2.2): a text DuckDB reads as a value with
  * more than p digits is refused, and the digits DuckDB drops past its
  * storage width are kept.
@@ -89,8 +89,8 @@ typedef struct {
      * always enough. */
     int (*dec_format)(zuint_i128 c, int p, int s, char *buf, size_t cap, size_t *len);
 
-    /* Casts DECIMAL(p, s) to double: c / 10^s correctly rounded, except at
-     * scale 0 with p > 18, where DuckDB sums the two words as doubles. */
+    /* Casts DECIMAL(p, s) to double: c / 10^s correctly rounded, ties to
+     * even. */
     int (*dec_to_double)(zuint_i128 c, int p, int s, double *out);
 
     /* Casts a double to DECIMAL(p, s) as DuckDB does: round(x * 1e<s>) in

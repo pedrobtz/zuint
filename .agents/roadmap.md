@@ -682,6 +682,11 @@ the tests require each difference to be one of the two. Comparison across
 scales has gmp and Python as oracles, not DuckDB, which can fail with a
 conversion error there.
 
+**Deviation (2026-11-26).** The oracle is DuckDB 2.0.1, not 2.0.0: CI
+installed 2.0.1, whose cast to double at scale 0 past 18 digits is
+correctly rounded where 2.0.0's was one unit in the last place off for
+some values. zuint now rounds correctly at every scale (design §2.2).
+
 ## Stage 9.2 — The decimal128 vector class
 
 **Issue.** [#104](https://github.com/pedrobtz/zuint/issues/104), sub-issue
@@ -710,13 +715,13 @@ a digit or its type.
 
 **Exit criteria.**
 - For every (p, s) pair the tests generate, the result type and value of
-  each operator and cast match DuckDB 2.0.0.
+  each operator and cast match DuckDB 2.0.1.
 - The vector protocol tests that run for the integer types run for
   `decimal128`, with and without bit64 attached.
 - `R CMD check` 0/0/0 on the quick profile.
 
 **Tests.**
-- Operator result types and values: DuckDB 2.0.0, compared as text.
+- Operator result types and values: DuckDB 2.0.1, compared as text.
 - Construction from text, integers and doubles: the Stage 9.1 core and
   DuckDB's casts.
 - `c()` and `vec_ptype2()` of different scales: DuckDB's common type.

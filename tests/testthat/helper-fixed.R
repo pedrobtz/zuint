@@ -1,10 +1,10 @@
 # The fixed-point core (design 2.2) through its internal entry points, and
-# its two oracles: gmp for the exact value, and DuckDB 2.0.0's SQL casts.
+# its two oracles: gmp for the exact value, and DuckDB 2.0.1's SQL casts.
 
 # A DuckDB connection with no zuarrow needed, closed when the test ends.
 local_duckdb_plain <- function(env = parent.frame()) {
   testthat::skip_if_not_installed("DBI")
-  testthat::skip_if_not_installed("duckdb", minimum_version = "2.0.0")
+  testthat::skip_if_not_installed("duckdb", minimum_version = "2.0.1")
   con <- DBI::dbConnect(duckdb::duckdb(shared_home = FALSE))
   withr::defer(DBI::dbDisconnect(con, shutdown = TRUE), envir = env)
   con
@@ -237,7 +237,7 @@ fx_coefs <- function(n, p, seed) {
     r <- gmp::urand.bigz(n, ceiling(p * log2(10)) + 1, seed = seed)
   )
   r <- r %% (top + 1)
-  neg <- sample(c(TRUE, FALSE), n, TRUE)
+  neg <- withr::with_seed(seed, sample(c(TRUE, FALSE), n, TRUE))
   r[neg] <- -r[neg]
   # c() dispatches on its first argument, so that one is a bigz
   half <- fx_pow10(p - 1) * 5

@@ -283,20 +283,13 @@ static void fuzz_decimal_value(zuf_i128 c, int p, int s, const char *text)
     int cmp;
     bool small = m.high == 0 && m.low < UINT64_C(1000000000000000);
 
-    /* to double: correctly rounded, so strtod() of the text, except
-       DuckDB's sum of the two words at scale 0 past 18 digits */
+    /* to double: correctly rounded, so strtod() of the text;
+       zuf_parse_f64() reads ".50" and "-.05", and takes no '+' */
     CHECK(zu_fx_to_double(c, p, s, &d) == ZU_FX_OK);
-    if (s == 0 && p > 18) {
-        int64_t hi;
-        memcpy(&hi, &c.high, sizeof hi);
-        want = hi == -1 ? -(double)(UINT64_MAX - c.low) - 1 : (double)c.low + (double)hi * 18446744073709551616.0;
-    } else {
-        /* zuf_parse_f64() reads ".50" and "-.05", and takes no '+' */
-        {
-            const char *end = text + strlen(text);
-            zuf_result pr = zuf_parse_f64(text, end, &want);
-            CHECK(pr.status == ZUF_OK && pr.ptr == end);
-        }
+    {
+        const char *end = text + strlen(text);
+        zuf_result pr = zuf_parse_f64(text, end, &want);
+        CHECK(pr.status == ZUF_OK && pr.ptr == end);
     }
     CHECK(memcmp(&d, &want, sizeof d) == 0 || (d == 0 && want == 0));
 

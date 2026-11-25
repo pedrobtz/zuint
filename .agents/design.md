@@ -245,10 +245,12 @@ fixed-point is a small layer on top.
     and `ZUINT_ERR_OVERFLOW` when it is inside it.
   - **Text out.** `1.50`, `-0.05`, and no integer part when p == s:
     `.50`, `-.05`.
-  - **To double.** c / 10^s correctly rounded, ties to even, except that
-    at scale 0 with p > 18 DuckDB adds the two 64-bit words as doubles
-    (`CastBigintToFloating`), which can be one unit in the last place
-    off; zuint does the same, so the function takes the precision.
+  - **To double.** c / 10^s correctly rounded, ties to even, at every
+    precision and scale. DuckDB 2.0.0 added the two 64-bit words as
+    doubles at scale 0 with p > 18, one unit in the last place off for
+    some values; 2.0.1 rounds correctly, and zuint follows 2.0.1
+    (2026-11-26: CI's 2.0.1 disagreed with the 2.0.0 formula). The
+    function keeps the precision argument, which it validates.
   - **From double.** `round(x * 1e<s>)` in double arithmetic, half away
     from zero, refused at or beyond the double `1e<p>`; so 2.675 is 2.68
     and 1.005 is 1.00 at scale 2. NaN and infinity are invalid.

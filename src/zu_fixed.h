@@ -4,7 +4,7 @@
  *
  * A value is a signed coefficient c with a precision p (1 to 38) and a
  * scale s (0 to p): the number c / 10^s, with |c| < 10^p. That is DuckDB's
- * DECIMAL, and every function here gives DuckDB 2.0.0's answer.
+ * DECIMAL, and every function here gives DuckDB 2.0.1's answer.
  *
  * This file and zu_fixed.c never include an R header and never call R:
  * the C test binary (tools/fixed/), the fuzz harness and other packages
@@ -59,10 +59,8 @@ int zu_fx_parse(const char *text, size_t len, int p, int s, zuf_i128 *out);
    is too small; ZU_FX_MAX_CHARS is always enough. */
 int zu_fx_format(zuf_i128 c, int p, int s, char *buf, size_t cap, size_t *len);
 
-/* DuckDB's cast from DECIMAL(p, s) to DOUBLE: c / 10^s rounded to the
-   nearest double, ties to even. The one exception is DuckDB's: at scale 0
-   with p > 18 it adds the two 64-bit halves as doubles, which can be one
-   unit in the last place off, and this does the same. */
+/* DuckDB 2.0.1's cast from DECIMAL(p, s) to DOUBLE: c / 10^s rounded to
+   the nearest double, ties to even, at every precision and scale. */
 int zu_fx_to_double(zuf_i128 c, int p, int s, double *out);
 
 /* DuckDB's cast from DOUBLE to DECIMAL(p, s): round(x * 1e<s>) in double

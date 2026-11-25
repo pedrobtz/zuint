@@ -554,14 +554,6 @@ int zu_fx_to_double(zuf_i128 c, int p, int s, double *out)
     double v;
     if (!out) return ZU_FX_ARGUMENT;
     if (zu_fx_type_check(p, s) != ZU_FX_OK) return ZU_FX_TYPE;
-    if (s == 0 && p > 18) {
-        /* DuckDB's hugeint_t storage: CastBigintToFloating<double>() */
-        int64_t upper;
-        memcpy(&upper, &c.high, sizeof upper);
-        if (upper == -1) *out = -(double)(UINT64_MAX - c.low) - 1;
-        else *out = (double)c.low + (double)upper * 18446744073709551616.0;
-        return ZU_FX_OK;
-    }
     m = fx_mag(c, &neg);
     if (fx_zero(m)) {
         *out = 0.0;

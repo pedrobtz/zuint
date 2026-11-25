@@ -124,12 +124,6 @@ def case_rescale(r):
 
 
 def to_double(c, p, s):
-    if s == 0 and p > 18:
-        # DuckDB's CastBigintToFloating<double>: the two words as doubles
-        hi, lo = c >> 64, c & (2 ** 64 - 1)
-        if hi == -1:
-            return -float(2 ** 64 - 1 - lo) - 1.0
-        return float(lo) + float(hi) * 18446744073709551616.0
     return c / 10 ** s  # int / int is correctly rounded
 
 
