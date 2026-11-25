@@ -152,6 +152,28 @@
   [`seq_zu()`](https://pedrobtz.github.io/zuint/reference/seq_zu.md).
 - [`summary()`](https://rdrr.io/r/base/summary.html) adds the median and
   the mean.
+- [`rep()`](https://rdrr.io/r/base/rep.html) of an empty vector pads
+  with the type’s `NA`
+  ([\#55](https://github.com/pedrobtz/zuint/issues/55));
+  [`range()`](https://rdrr.io/r/base/range.html) takes `finite`, which
+  drops `NA` ([\#56](https://github.com/pedrobtz/zuint/issues/56));
+  under `options(zuint.double = "allow")`,
+  [`sum()`](https://rdrr.io/r/base/sum.html),
+  [`prod()`](https://rdrr.io/r/base/prod.html),
+  [`min()`](https://rdrr.io/r/base/Extremes.html),
+  [`max()`](https://rdrr.io/r/base/Extremes.html) and
+  [`range()`](https://rdrr.io/r/base/range.html) give base R’s double
+  answer ([\#60](https://github.com/pedrobtz/zuint/issues/60));
+  [`zu_match()`](https://pedrobtz.github.io/zuint/reference/zu_match.md)
+  and `%zin%` treat a value the common type cannot hold as no match, as
+  [`match()`](https://rdrr.io/r/base/match.html) does
+  ([\#58](https://github.com/pedrobtz/zuint/issues/58));
+  [`seq_zu()`](https://pedrobtz.github.io/zuint/reference/seq_zu.md)
+  counts in the elements’ own type, so it reaches the top of the
+  unsigned ranges ([\#59](https://github.com/pedrobtz/zuint/issues/59)).
+- The Arrow import refuses a schema whose format is not the array’s own
+  (`zuint_arrow_error`), which would have read past the data
+  ([\#61](https://github.com/pedrobtz/zuint/issues/61)).
 - With vctrs, dplyr and tibble: zuint columns combine by the promotion
   order, cast exactly, arrange, group, summarise, bind and print.
   data.table keys on `int64` natively.
