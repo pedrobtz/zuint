@@ -79,8 +79,9 @@ SEXP zu_dec_parse_c(SEXP x, SEXP p, SEXP s)
         else zu_set_na(val, ZU_INT128, i);
         INTEGER(st)[i] = r;
     }
+    val = dec_pair(val, st);
     UNPROTECT(2);
-    return dec_pair(val, st);
+    return val;
 }
 
 SEXP zu_dec_format_c(SEXP x, SEXP p, SEXP s)
@@ -129,8 +130,9 @@ SEXP zu_dec_rescale_c(SEXP x, SEXP s, SEXP p_to, SEXP s_to)
         else zu_set_na(val, ZU_INT128, i);
         INTEGER(st)[i] = k;
     }
+    val = dec_pair(val, st);
     UNPROTECT(2);
-    return dec_pair(val, st);
+    return val;
 }
 
 SEXP zu_dec_to_double_c(SEXP x, SEXP p, SEXP s)
@@ -176,8 +178,9 @@ SEXP zu_dec_from_double_c(SEXP x, SEXP p, SEXP s)
         else zu_set_na(val, ZU_INT128, i);
         INTEGER(st)[i] = k;
     }
+    val = dec_pair(val, st);
     UNPROTECT(2);
-    return dec_pair(val, st);
+    return val;
 }
 
 /* Elementwise over equal lengths; NA where either side is NA. */
@@ -230,8 +233,9 @@ SEXP zu_dec_arith_c(SEXP op, SEXP a, SEXP b)
         else zu_set_na(val, ZU_INT128, i);
         INTEGER(st)[i] = k;
     }
+    val = dec_pair(val, st);
     UNPROTECT(2);
-    return dec_pair(val, st);
+    return val;
 }
 
 /* The table as another package sees it, through zuint-r.h: list(abi
