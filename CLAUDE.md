@@ -342,8 +342,15 @@ entry.
 - **The pretest is automated and does not read `cran-comments.md`.** A NOTE
   that is explained but not fixed gets the upload archived. Fix the NOTE, as
   under Vendored native code, instead of justifying it.
-- **After acceptance,** tag `v0.1.0`, publish the GitHub release, bump to
-  `0.1.0.9000`, and close the version's parent issue.
+- **Submit with `devtools::submit_cran()`, then commit `CRAN-SUBMISSION`**
+  on a branch and merge it. The file is in `.Rbuildignore`, never
+  `.gitignore`. Its push to `main` runs `cran-release.yaml`, which tags the
+  submitted commit with the bare version (`0.1.0`, not `v0.1.0`), creates
+  the GitHub release from that version's `NEWS.md` section, and opens a
+  pull request bumping `main` to `0.1.0.9000`. A resubmission's new
+  `CRAN-SUBMISSION` moves the tag.
+- **After acceptance,** merge the bump pull request, never before (see
+  Versioning), and close the version's parent issue.
 
 ## Editing rules
 
@@ -370,9 +377,10 @@ This package calls `r-cmd-check.yml@v1` with `nosuggests` and `nold` on
 `rchk.yml`, `analyzers.yml` and `cran-special.yml` (from
 `native-checks.yml`); and `coverage.yml`, pinned to
 the v1 commit, with its badge on `gh-pages` because `main` takes no direct
-pushes (from `coverage.yaml`). `pkgdown.yaml` is the r-lib example workflow,
-not a shared one; its deploy uses `force: false` so it cannot overwrite a
-badge commit. Until zufast 0.1.1 is on CRAN, `rchk.yml` installs it
+pushes (from `coverage.yaml`); `pkgdown.yml`, which keeps `CLAUDE.md` and
+`AGENTS.md` off the site (from `pkgdown.yaml`); and `cran-release.yml`, also
+pinned to a commit because it holds a write token (from
+`cran-release.yaml`). Until zufast 0.1.1 is on CRAN, `rchk.yml` installs it
 through `github-packages`.
 
 The engine Suggests (arrow, duckdb) have no R-devel binaries, and building
