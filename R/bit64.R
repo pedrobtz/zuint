@@ -24,12 +24,23 @@ zu_as_raw <- function(x) as.raw(zu_as_integer(x))
 
 zu_as_date <- function(x, ...) as.Date(zu_as_double(x), ...)
 
-zu_as_posixct <- function(x, tz = "", ...) as.POSIXct(zu_as_double(x), tz = tz, ...)
+zu_as_posixct <- function(x, tz = "", ...) {
+  as.POSIXct(zu_as_double(x), tz = tz, ...)
+}
 
-zu_as_posixlt <- function(x, tz = "", ...) as.POSIXlt(zu_as_double(x), tz = tz, ...)
+zu_as_posixlt <- function(x, tz = "", ...) {
+  as.POSIXlt(zu_as_double(x), tz = tz, ...)
+}
 
 # seq() on a zuint `from`: seq_zu(), with along.with as base seq() has it.
-zu_seq <- function(from, to = NULL, by = NULL, length.out = NULL, along.with = NULL, ...) {
+zu_seq <- function(
+  from,
+  to = NULL,
+  by = NULL,
+  length.out = NULL,
+  along.with = NULL,
+  ...
+) {
   if (!is.null(along.with)) {
     length.out <- length(along.with)
   }
@@ -50,10 +61,18 @@ zu_seq <- function(from, to = NULL, by = NULL, length.out = NULL, along.with = N
 # how they differ. Tolerances mean nothing for integers.
 zu_all_equal <- function(target, current, ...) {
   if (is.na(zu_code(current))) {
-    return(sprintf("target is %s, current is %s", zu_type_name(target), zu_kind_label(current)))
+    return(sprintf(
+      "target is %s, current is %s",
+      zu_type_name(target),
+      zu_kind_label(current)
+    ))
   }
   if (zu_code(current) != zu_code(target)) {
-    return(sprintf("Types differ: %s vs %s", zu_type_name(target), zu_type_name(current)))
+    return(sprintf(
+      "Types differ: %s vs %s",
+      zu_type_name(target),
+      zu_type_name(current)
+    ))
   }
   if (length(target) != length(current)) {
     return(sprintf("Lengths (%d, %d) differ", length(target), length(current)))
@@ -62,7 +81,10 @@ zu_all_equal <- function(target, current, ...) {
   if (!identical(names(target), names(current))) {
     msg <- "names differ"
   }
-  differ <- sum(xor(zu_is_na(target), zu_is_na(current)) | (!is.na(target == current) & !(target == current)))
+  differ <- sum(
+    xor(zu_is_na(target), zu_is_na(current)) |
+      (!is.na(target == current) & !(target == current))
+  )
   if (differ > 0) {
     msg <- c(msg, sprintf("%d of %d values differ", differ, length(target)))
   }
@@ -80,11 +102,19 @@ zu_unsupported <- function(x, ...) {
 }
 
 zu_quantile <- function(x, ...) {
-  zu_abort("quantile() for zuint vectors comes after zuint 0.1.0.", "unsupported", call = sys.call())
+  zu_abort(
+    "quantile() for zuint vectors comes after zuint 0.1.0.",
+    "unsupported",
+    call = sys.call()
+  )
 }
 
 zu_matrix_unsupported <- function(...) {
-  zu_abort("zuint vectors do not form matrices.", "unsupported", call = sys.call())
+  zu_abort(
+    "zuint vectors do not form matrices.",
+    "unsupported",
+    call = sys.call()
+  )
 }
 
 # bit64's as.integer64() for the wider types, registered when bit64 loads.

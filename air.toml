@@ -1,0 +1,5 @@
+# The R formatter (#75): `air format .` is what the portfolio runs, and
+# format.yaml checks it on every pull request that changes code.
+[format]
+line-width = 80
+indent-width = 2

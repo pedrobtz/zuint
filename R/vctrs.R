@@ -7,7 +7,9 @@ zu_classes_all <- c("zu_int64", "zu_uint64", "zu_int128", "zu_uint128")
 
 zu_register_vctrs <- function(...) {
   ns <- asNamespace("vctrs")
-  reg <- function(generic, cls, fun) registerS3method(generic, cls, fun, envir = ns)
+  reg <- function(generic, cls, fun) {
+    registerS3method(generic, cls, fun, envir = ns)
+  }
   others <- c("integer", "logical", "double", "integer64")
   for (cl in zu_classes_all) {
     reg("vec_cast", paste0("double.", cl), zu_vec_cast_base)
@@ -96,7 +98,14 @@ zu_vec_cast <- function(x, to, ..., x_arg = "", to_arg = "") {
   )
   lossy <- zu_is_na(out) & !is.na(x)
   if (any(lossy)) {
-    return(vctrs::maybe_lossy_cast(out, x, to, lossy = lossy, x_arg = x_arg, to_arg = to_arg))
+    return(vctrs::maybe_lossy_cast(
+      out,
+      x,
+      to,
+      lossy = lossy,
+      x_arg = x_arg,
+      to_arg = to_arg
+    ))
   }
   out
 }
@@ -113,7 +122,14 @@ zu_vec_cast_base <- function(x, to, ..., x_arg = "", to_arg = "") {
     # a rounded double casts back to a different value; a lost integer is NA
     back <- suppressWarnings(zu_cast(out, zu_code(x)))
     lossy <- !zu_is_na(x) & (is.na(out) | !(back == x) %in% TRUE)
-    return(vctrs::maybe_lossy_cast(out, x, to, lossy = lossy, x_arg = x_arg, to_arg = to_arg))
+    return(vctrs::maybe_lossy_cast(
+      out,
+      x,
+      to,
+      lossy = lossy,
+      x_arg = x_arg,
+      to_arg = to_arg
+    ))
   }
   out
 }
@@ -121,7 +137,10 @@ zu_vec_cast_base <- function(x, to, ..., x_arg = "", to_arg = "") {
 zu_pillar_shaft <- function(x, ...) {
   out <- zu_as_character(x)
   out[is.na(out)] <- NA
-  pillar::new_pillar_shaft_simple(ifelse(is.na(out), pillar::style_na("NA"), out), align = "right")
+  pillar::new_pillar_shaft_simple(
+    ifelse(is.na(out), pillar::style_na("NA"), out),
+    align = "right"
+  )
 }
 
 #' Helpers for code that drops the class
@@ -159,7 +178,9 @@ zu_ifelse <- function(test, yes, no) {
   # a double follows the rule of c() and the operators: integral and in
   # range, or a zuint_double_error
   for (v in list(yes, no)) {
-    if (zu_kind(v) == zu_kind_dbl && zu_convert(v, zu_kind_dbl, code)[[2L]] > 0) {
+    if (
+      zu_kind(v) == zu_kind_dbl && zu_convert(v, zu_kind_dbl, code)[[2L]] > 0
+    ) {
       zu_double_problem(zu_types[[code]], call)
       return(ifelse(test, zu_dbl_quiet(yes), zu_dbl_quiet(no)))
     }
@@ -186,11 +207,18 @@ zu_vapply <- function(X, FUN, FUN.VALUE, ...) {
   res <- lapply(X, function(el) {
     r <- FUN(el, ...)
     if (length(r) != k) {
-      zu_abort(sprintf("Each result must have length %d.", k), "type", call = call)
+      zu_abort(
+        sprintf("Each result must have length %d.", k),
+        "type",
+        call = call
+      )
     }
     zu_unclass(zu_cast(r, code, call = call))
   })
-  out <- zu_new(if (length(res)) unlist(lapply(res, zu_bare)) else zu_alloc_empty(code), code)
+  out <- zu_new(
+    if (length(res)) unlist(lapply(res, zu_bare)) else zu_alloc_empty(code),
+    code
+  )
   if (k == 1L) {
     names(out) <- names(X)
   }

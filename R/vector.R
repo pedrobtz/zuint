@@ -94,7 +94,7 @@ zu_type_name <- function(x) zu_types[[zu_code(x)]]
 zu_out_of_range <- function(x, i) {
   if (is.numeric(i) && !is.object(i)) {
     if (any(i < 0, na.rm = TRUE)) {
-      return(NULL)   # negative indices never pad
+      return(NULL) # negative indices never pad
     }
     i <- i[is.na(i) | i >= 1]
     return(is.na(i) | i >= length(x) + 1)
@@ -118,7 +118,9 @@ zu_index <- function(i) {
 }
 
 zu_subset <- function(x, i, ...) {
-  if (!missing(i)) i <- zu_index(i)
+  if (!missing(i)) {
+    i <- zu_index(i)
+  }
   code <- zu_code(x)
   s <- zu_unclass(x)
   if (missing(i)) {
@@ -131,7 +133,9 @@ zu_subset <- function(x, i, ...) {
 }
 
 zu_subset2 <- function(x, i, ...) {
-  if (!missing(i)) i <- zu_index(i)
+  if (!missing(i)) {
+    i <- zu_index(i)
+  }
   code <- zu_code(x)
   s <- zu_unclass(x)
   out <- s[[i, ...]]
@@ -154,7 +158,9 @@ zu_padded <- function(x, i, double = FALSE) {
 }
 
 zu_subassign <- function(x, i, ..., value) {
-  if (!missing(i)) i <- zu_index(i)
+  if (!missing(i)) {
+    i <- zu_index(i)
+  }
   code <- zu_code(x)
   if (...length() > 0L) {
     zu_abort("zuint vectors have one dimension.", "type", call = sys.call())
@@ -173,7 +179,9 @@ zu_subassign <- function(x, i, ..., value) {
 }
 
 zu_subassign2 <- function(x, i, ..., value) {
-  if (!missing(i)) i <- zu_index(i)
+  if (!missing(i)) {
+    i <- zu_index(i)
+  }
   code <- zu_code(x)
   value <- zu_unclass(zu_cast(value, code, call = sys.call()))
   s <- zu_unclass(x)
@@ -204,7 +212,10 @@ zu_c <- function(...) {
   kinds <- vapply(args, zu_kind, integer(1))
   if (anyNA(kinds)) {
     zu_abort(
-      sprintf("Can't combine %s with a zuint vector.", zu_kind_label(args[[which(is.na(kinds))[[1L]]]])),
+      sprintf(
+        "Can't combine %s with a zuint vector.",
+        zu_kind_label(args[[which(is.na(kinds))[[1L]]]])
+      ),
       "type",
       call = call
     )
@@ -339,7 +350,11 @@ zu_print <- function(x, ..., max = NULL) {
   shown <- if (n > max) x[seq_len(max)] else x
   print(zu_format(shown), quote = FALSE, ...)
   if (n > max) {
-    cat(" [ reached 'max' / getOption(\"max.print\") -- omitted", n - max, "entries ]\n")
+    cat(
+      " [ reached 'max' / getOption(\"max.print\") -- omitted",
+      n - max,
+      "entries ]\n"
+    )
   }
   invisible(x)
 }
