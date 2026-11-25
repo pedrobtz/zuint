@@ -16,6 +16,12 @@ Readiness is renumbered to Stage 10 and a Review stage is appended. The
 first release still does not link to `zubin`; that edge arrives with the
 zero-copy work under [After 0.1.0](#after-010).
 
+Re-planned 2026-11-25: fixed-point decimals (#88, design §2.2) move into
+0.1.0 as Stages 9.1 and 9.2, ahead of readiness. #88 had placed them after
+the first release; the maintainer moved them because Stage 10 waits on
+zufast 0.1.1's release anyway (not before 2026-12-02), and shipping the C
+table in the first release fixes its layout from the start.
+
 The design numbers its milestones v0.1 (core semantics), v0.2 (interop) and
 v0.3 (vector toolkit, first CRAN release). This roadmap takes all three to
 0.1.0: Stages 1 to 3 are the design's v0.1, Stages 4 and 5 its v0.2, and
@@ -42,6 +48,8 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | [#22](https://github.com/pedrobtz/zuint/pull/22) | 2026-10-16 |
 | 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | [#23](https://github.com/pedrobtz/zuint/pull/23) | 2026-10-16 |
 | 9 | [Arrow bridge handover](#stage-9--arrow-bridge-handover) | full — compiled code removed and a new Suggests guard | [#52](https://github.com/pedrobtz/zuint/issues/52) | [#89](https://github.com/pedrobtz/zuint/pull/89) | 2026-11-25 |
+| 9.1 | [Fixed-point core and the C table](#stage-91--fixed-point-core-and-the-c-table) | full — new compiled code, a public C ABI and a thread contract | [#103](https://github.com/pedrobtz/zuint/issues/103) | | |
+| 9.2 | [The decimal128 vector class](#stage-92--the-decimal128-vector-class) | quick | [#104](https://github.com/pedrobtz/zuint/issues/104) | | |
 | 10 | [v0.1.0 readiness](#stage-10--v010-readiness) | full | [#11](https://github.com/pedrobtz/zuint/issues/11) | | |
 | 11 | [Review](#stage-11--review) | full | [#53](https://github.com/pedrobtz/zuint/issues/53) | | |
 
@@ -602,6 +610,115 @@ to X5.
 - A sentinel value under `lossy = "character"` is an error, as under
   `"error"` (design §9.1).
 
+## Stage 9.1 — Fixed-point core and the C table
+
+**Issue.** [#103](https://github.com/pedrobtz/zuint/issues/103), sub-issue
+of [v0.1.0](https://github.com/pedrobtz/zuint/issues/1); part of
+[#88](https://github.com/pedrobtz/zuint/issues/88).
+
+**CI.** `full — new compiled code, a public C ABI other packages call
+through, and a thread contract`.
+
+**Goal.** DuckDB's fixed-point `DECIMAL(p, s)` arithmetic exists in C,
+without R, behind a versioned table another package can resolve.
+
+**Work.**
+- `src/zu_fixed.c` and `zu_fixed.h`, R-free: the precision check, rescale
+  up and down (half away from zero), parse and format, conversion to and
+  from double, and checked add, subtract, multiply and compare (design
+  §2.2). Each is checked against DuckDB 2.0.0, and each choice DuckDB's
+  behaviour makes (exponents and whitespace in text, digits past the scale,
+  the double conversions' rounding) is written into design §2.2.
+- `inst/include/zuint.h` (the table, `zuint_i128`, the statuses, the
+  thread contract and the append rule) and `inst/include/zuint-r.h` (the
+  resolver), after zukomp's pair; `src/zu_api.c` builds the table and
+  `init.c` registers `zuint_get_api`.
+- A C test binary in `tools/fixed/`, built without R: the General Decimal
+  Arithmetic cases that apply to fixed-point (`.decTest` files fetched from
+  CPython at a pinned tag, checked by SHA-256, never committed), a random
+  differential run against Python's `decimal` at 100 digits, the limits,
+  and a run of several threads through the table compared with one
+  thread.
+- `fixed.yaml`, the package's own workflow, gated by `changes.yml`: the
+  binary under ASan and UBSan, then under TSan for the threads, then with
+  `ZUF_NO_INT128`. A quick profile runs a small differential sample; the
+  full one runs millions.
+- The fuzz harness gains the decimal parser with a reference written from
+  the spec, and the mutation driver with it.
+- R tests through internal entry points, against DuckDB SQL; a header
+  probe that compiles `zuint.h` with no R headers on the include path; a
+  consumer fixture that resolves the table through `zuint-r.h`.
+- `.agents/assurance.md` rows; `CLAUDE.md` invariants (the core never calls
+  R; the table only grows); `NEWS.md`.
+
+**Exit criteria.**
+- The C binary passes every applicable `.decTest` case and the
+  differential run, with no sanitizer report, with and without
+  `ZUF_NO_INT128`.
+- Parse, format, rescale and the double conversions agree with DuckDB
+  2.0.0 for every (p, s) at the edges named below.
+- `zuint.h` compiles alone, with no R headers, and `zuint_api()` returns
+  the table from another translation unit.
+- The full profile and the `fixed.yaml` jobs are green.
+
+**Tests.**
+- Applicable `.decTest` cases: the suite's expected results.
+- Random parse, format, rescale, add, subtract, multiply and compare:
+  Python's `decimal` at 100 digits, quantized half up.
+- Parse, format, cast and the double conversions: DuckDB 2.0.0's SQL
+  casts.
+- Precision 37, 38 and 39; scale p - 1, p and p + 1; rescale at the
+  overflow edge minus one, at it and plus one; `10^p - 1`, `10^p`,
+  `±(2^127 - 1)` and the halfway points at each scale: both oracles above.
+- Threads: one thread's results.
+- The parser under fuzzing: the reference parser.
+
+**Design.** §2.2, §10.
+
+## Stage 9.2 — The decimal128 vector class
+
+**Issue.** [#104](https://github.com/pedrobtz/zuint/issues/104), sub-issue
+of [v0.1.0](https://github.com/pedrobtz/zuint/issues/1); part of
+[#88](https://github.com/pedrobtz/zuint/issues/88).
+
+**CI.** `quick`.
+
+**Goal.** R users and zugodb hold a `DECIMAL(p, s)` column without losing
+a digit or its type.
+
+**Work.**
+- `decimal128()`, `is_decimal128()`, the `precision` and `scale`
+  accessors, and the base vector methods of `R/vector.R` for the new class
+  (design §2.2), padding with the type's `NA` as the others do.
+- `Ops`: `+`, `-`, `*` with DuckDB's result types, exact comparison across
+  scales, `/` and `Math` as doubles; integer and zuint operands by DuckDB's
+  implicit casts; doubles under `zuint.double`.
+- `c()`, vctrs and pillar with DuckDB's common type; `format()`, `print()`,
+  `as.character()`, `as.double()`, conversion to and from the integer
+  types (exact, or `NA` with a warning).
+- `sort()`, `unique()`, `match()`, `sum()`, `min()`, `max()`, `range()`
+  and `mean()` on the coefficients.
+- `NEWS.md`, the README's type table and the Get started article.
+- The DuckDB rules this stage follows are written into design §2.2.
+
+**Exit criteria.**
+- For every (p, s) pair the tests generate, the result type and value of
+  each operator and cast match DuckDB 2.0.0.
+- The vector protocol tests that run for the integer types run for
+  `decimal128`, with and without bit64 attached.
+- `R CMD check` 0/0/0 on the quick profile.
+
+**Tests.**
+- Operator result types and values: DuckDB 2.0.0, compared as text.
+- Construction from text, integers and doubles: the Stage 9.1 core and
+  DuckDB's casts.
+- `c()` and `vec_ptype2()` of different scales: DuckDB's common type.
+- `NA` padding, subsetting and assignment: the `int128` tests' oracles.
+- Sorting, hashing and reductions: the same operations on the decimal
+  text through gmp.
+
+**Design.** §2.2.
+
 ## Stage 10 — v0.1.0 readiness
 
 **Issue.** [#11](https://github.com/pedrobtz/zuint/issues/11), sub-issue of
@@ -681,12 +798,8 @@ itself is left.
 - **Schema fidelity** for uint32 and the small integer types is `zuarrow`'s,
   carried by the schema handle at export (review X7, 2026-10-23); no class
   here.
-- **Fixed-point decimals and the R-free C table** (design §2.2,
-  [#88](https://github.com/pedrobtz/zuint/issues/88)): `DECIMAL(p, s)` on
-  `int128` with p ≤ 38, the `zuint_api_v1` table, and an R class, for
-  zugodb (libzugodb#55, zugodb#72). Decided 2026-11-20; it replaces the
-  `decimal` bridge that was planned here. The R class's shape is a design
-  open question to settle first.
+- **The Arrow mapping of `decimal128`** (design §15): a `d:*` key in
+  zuarrow's registry, settled with zuarrow.
 - **`saturating_*` operations, `mean_exact()` and `quantile()`** (design §6,
   §7, §13): cheap, but not needed for the engine round trip.
 - A blog post with the before/after table and benchmarks, at release.
