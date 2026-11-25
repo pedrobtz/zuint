@@ -1,15 +1,15 @@
 # The C layer under UBSan, ASan, valgrind, LTO, gctorture and rchk, plus
-# GCC's analyzer and CRAN's special checks. Quick on each push to a pull
-# request, full after merge; the full-ci label runs the full set on a pull
-# request. `profile` goes to the four workflows it changes: quick skips the
+# GCC's analyzer and CRAN's special checks. Quick on pull requests; full on
+# a manual dispatch and on a pull request labelled `full-ci`. `profile` goes to the four workflows it changes: quick skips the
 # asan containers, valgrind and cran-special, and runs gctorture at step 500
 # instead of 20.
 on:
-  # No `push:`: a pull request already checks its merge with main,
-  # and the schedule checks main (r-actions README, "Pushes to main").
+  # No `push:`: a pull request already checks its merge with main. No
+  # `schedule:` either, since the repository went private (CLAUDE.md,
+  # Continuous integration); run main on demand with workflow_dispatch.
   workflow_dispatch:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 name: native-checks
 
@@ -33,14 +33,14 @@ jobs:
       # sanitizer (PR #89's first full run timed out).
       pre-install: Rscript tools/ci-binaries.R
       timeout-minutes: 90
-      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+      profile: auto
 
   valgrind:
     uses: pedrobtz/r-actions/.github/workflows/valgrind.yml@v1
     with:
       # arrow's worker threads, loaded by the engine tests; see the file
       suppressions: tools/valgrind.supp
-      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+      profile: auto
 
   lto:
     uses: pedrobtz/r-actions/.github/workflows/lto.yml@v1
@@ -48,7 +48,7 @@ jobs:
   gctorture:
     uses: pedrobtz/r-actions/.github/workflows/gctorture.yml@v1
     with:
-      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+      profile: auto
 
   rchk:
     uses: pedrobtz/r-actions/.github/workflows/rchk.yml@v1
@@ -64,7 +64,7 @@ jobs:
   cran-special:
     uses: pedrobtz/r-actions/.github/workflows/cran-special.yml@v1
     with:
-      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+      profile: auto
 
   # src/vendor/arrow/abi.h is the pinned upstream file: tools/verify-vendor
   # re-downloads it and compares checksums, and a pull request that changes

@@ -1,10 +1,12 @@
 on:
-  # No `push:`: a pull request already checks its merge with main,
-  # and the schedule checks main (r-actions README, "Pushes to main").
+  # No `push:`: a pull request already checks its merge with main. No
+  # `schedule:` either, since the repository went private (CLAUDE.md,
+  # Continuous integration); run main on demand with workflow_dispatch.
   workflow_dispatch:
-  # `labeled` so that adding `full-ci` to a pull request reruns it in full.
+  # `labeled`/`unlabeled` so that adding or removing a CI label (`full-ci`,
+  # `ci:minimal`, `skip-ci:<workflow>`) reruns it.
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 name: R-CMD-check
 
@@ -37,9 +39,9 @@ jobs:
       # __int128; test-storage.R checks.
       env: |
         ZUINT_EXPECT_INT128=true
-      # Quick on each push to a pull request, full after merge. The
-      # `full-ci` label runs the full set on a pull request before merging.
-      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+      # Quick on pull requests; full on a manual dispatch and on a pull
+      # request labelled `full-ci`.
+      profile: auto
 
   # zufast/wide.h's portable fallback, forced: src/Makevars passes
   # ZUINT_CPPFLAGS to the compiler, and test-storage.R checks that the build
@@ -53,4 +55,4 @@ jobs:
       env: |
         ZUINT_CPPFLAGS=-DZUF_NO_INT128
         ZUINT_EXPECT_INT128=false
-      profile: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'quick' || 'full' }}
+      profile: auto
