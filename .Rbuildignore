@@ -14,3 +14,5 @@
 ^AGENTS\.md$
 ^CRAN-SUBMISSION$
 ^cran-comments\.md$
+^air\.toml$
+^\.git-blame-ignore-revs$

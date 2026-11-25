@@ -1,0 +1,39 @@
+# The R formatter (#75): air.toml configures it, and code it would change
+# fails here rather than turning up as noise in the next contributor's diff.
+# No schedule, as for the package's other workflows (CLAUDE.md, Continuous
+# integration).
+on:
+  pull_request:
+  workflow_dispatch:
+
+name: format.yaml
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # ci.md: a documentation-only pull request skips the job below.
+  changes:
+    # Labels are decided here, without a runner (ci.md, Labels).
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'full-ci')
+      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
+        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
+        || contains(github.event.pull_request.labels.*.name, 'skip-ci:format'))
+    uses: pedrobtz/r-actions/.github/workflows/changes.yml@v1
+    with:
+      name: format
+
+  air-format:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.result != 'skipped' && needs.changes.outputs.docs-only != 'true' }}
+    runs-on: ubuntu-latest
+    name: R code is air-formatted
+    steps:
+      - uses: actions/checkout@v6
+      - uses: posit-dev/setup-air@v1
+      - run: air format . --check
