@@ -184,7 +184,7 @@ static long dt_checked, dt_skipped;
 static int dectest_file(const char *path)
 {
     FILE *f = fopen(path, "r");
-    char line[4096], rounding[32] = "half_up";
+    char line[4096], rounding[64] = "half_up";
     if (!f) {
         fprintf(stderr, "fixed: cannot open %s\n", path);
         return 1;

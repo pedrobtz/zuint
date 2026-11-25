@@ -1,6 +1,6 @@
 # The fixed-point core (design 2.2, Stage 9.1) through its internal entry
 # points. Two oracles: gmp computes each exact answer from parts the test
-# chose, and DuckDB 2.0.0's casts give the engine's. zuint differs from
+# chose, and DuckDB 2.0.1's casts give the engine's. zuint differs from
 # DuckDB in two recorded ways (design 2.2), and every difference the tests
 # see must be one of them.
 
@@ -133,7 +133,7 @@ test_that("a refused text is invalid or out of range, by its grammar", {
 })
 
 test_that("the two deviations from DuckDB are the ones the design records", {
-  # DuckDB 2.0.0 reads "1.234e4" as DECIMAL(4, 0) 12340, five digits
+  # DuckDB 2.0.1 reads "1.234e4" as DECIMAL(4, 0) 12340, five digits
   expect_identical(fx_parse("1.234e4", 4L, 0L)$status, fx_overflow)
   expect_identical(fx_parse("1.234e4", 5L, 0L)$coef, "12340")
   # and "0.0000000001234e10" as DECIMAL(5, 2) 0.00, its digits dropped
@@ -435,13 +435,22 @@ test_that("zuint.h compiles alone, with no R headers on the path", {
     ),
     src
   )
-  # -nostdinc keeps everything but the compiler's own headers off the path
-  cmd <- paste(
+  # only the installed include directory is on the path
+  # system2(), not system(): Windows runs no shell, so "2>&1" would reach
+  # the compiler as a file name
+  # CC can carry flags ("clang -arch arm64"), and system2() quotes the
+  # command, so split them off
+  cc <- strsplit(trimws(cc[1L]), "[[:space:]]+")[[1L]]
+  out <- suppressWarnings(system2(
     cc[1L],
-    "-std=c99 -Wall -Wextra -Werror -pedantic -fsyntax-only",
-    shQuote(paste0("-I", inc)),
-    shQuote(src)
-  )
-  out <- suppressWarnings(system(paste(cmd, "2>&1"), intern = TRUE))
+    c(
+      cc[-1L],
+      "-std=c99 -Wall -Wextra -Werror -pedantic -fsyntax-only",
+      shQuote(paste0("-I", inc)),
+      shQuote(src)
+    ),
+    stdout = TRUE,
+    stderr = TRUE
+  ))
   expect_null(attr(out, "status"), label = paste(out, collapse = "\n"))
 })
