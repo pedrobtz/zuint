@@ -30,9 +30,9 @@ vctrs, pillar and gmp are Suggests used in tests and lazily registered
 methods; arrow, duckdb, DBI and nanoarrow are test oracles only. It does not
 fork bit64, do arithmetic on small integer types, offer arbitrary precision,
 or do matrix algebra. Fixed-point `DECIMAL(p, s)` on `int128`, with an
-R-free C table for zugodb, is planned after 0.1.0 (design §2.2, #88,
-decided 2026-11-20); until then decimals are out, and zuint does not
-depend on the `decimal` package, nor it on zuint.
+R-free C table for zugodb, is in 0.1.0 as roadmap Stages 9.1 and 9.2
+(design §2.2, #88). zuint does not depend on the `decimal` package, nor
+it on zuint.
 
 The specification is [`.agents/design.md`](.agents/design.md), adopted from
 [RFC 0009](https://github.com/pedrobtz/packages/blob/main/rfcs/started/0009-zuint-wide-integers.md).
@@ -43,7 +43,8 @@ It outranks this file: `CLAUDE.md` orients, the design doc decides.
 Stages 0 to 9 of [`.agents/roadmap.md`](.agents/roadmap.md) are done
 (2026-11-25): the four types, arithmetic, text and bits, sorting, hashing
 and reductions, vctrs and pillar, and the Arrow bridge handed to zuarrow.
-Stage 10 (v0.1.0 readiness) and Stage 11 (Review) remain. The design's
+Stages 9.1 and 9.2 (fixed-point decimals, added 2026-11-25), Stage 10
+(v0.1.0 readiness) and Stage 11 (Review) remain. The design's
 milestones number versions differently (its first CRAN release is "v0.3");
 the roadmap maps them onto 0.1.0.
 
@@ -52,8 +53,9 @@ the roadmap maps them onto 0.1.0.
 The current version's parent issue is
 [#1](https://github.com/pedrobtz/zuint/issues/1) for `v0.1.0`. Sibling
 packages that depend on this one before CRAN does: zuspark (Suggests,
-through `Remotes:`). After 0.1.0, zugodb's engine and R package
-(libzugodb#55, zugodb#72) are to use the fixed-point C table (#88).
+through `Remotes:`). zugodb's engine and R package (libzugodb#55,
+zugodb#72) are to use the fixed-point C table (#88) once zuint is on
+CRAN.
 
 zuint itself waits on two siblings, so both must be on CRAN before zuint is
 submitted:
