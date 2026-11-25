@@ -9,10 +9,10 @@ CFLAGS ?= -g -O1 -fno-omit-frame-pointer -fsanitize=address,undefined
 R_INCLUDE := $(shell R RHOME)/include
 ZUFAST_INCLUDE ?= $(shell Rscript -e 'cat(system.file("include", package = "zufast"))')
 CPPFLAGS += -I../../src -I$(R_INCLUDE) -I$(ZUFAST_INCLUDE)
-OBJS := harness.o driver.o zu_parse.o zu_metadata.o
+OBJS := harness.o driver.o zu_parse.o zu_metadata.o zu_fixed.o
 
 driver: $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) -o $@
+	$(CC) $(CFLAGS) $(OBJS) -o $@ -lm
 
 harness.o: harness.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c harness.c -o $@
@@ -22,6 +22,8 @@ zu_parse.o: ../../src/zu_parse.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c ../../src/zu_parse.c -o $@
 zu_metadata.o: ../../src/zu_metadata.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c ../../src/zu_metadata.c -o $@
+zu_fixed.o: ../../src/zu_fixed.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c ../../src/zu_fixed.c -o $@
 
 clean:
 	rm -f driver $(OBJS)

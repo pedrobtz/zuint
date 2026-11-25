@@ -1,4 +1,6 @@
-# Mutates the text parser and the Arrow metadata reader and runs
+# Mutates the text parser, the Arrow metadata reader and the fixed-point
+# core (src/zu_fixed.c, whose fuzz target checks its parser and invariants
+# of the rest; tools/fixed/ and the R tests are its full oracles) and runs
 # tools/fuzz/driver against each mutant (#92): the fuzz harness over a
 # plain main(), which replays tools/fuzz/corpus and 200,000 generated
 # inputs and traps when either reader disagrees with its reference. A
@@ -32,5 +34,6 @@ jobs:
       include: |
         .*/src/zu_parse\.c$
         .*/src/zu_metadata\.c$
+        .*/src/zu_fixed\.c$
       mutant-timeout: 5000
       timeout-minutes: 90

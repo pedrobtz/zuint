@@ -1,6 +1,7 @@
-# The text parser (src/zu_parse.c) and the Arrow metadata reader
-# (src/zu_metadata.c), each against a reference written from its spec in
-# tools/fuzz/harness.c (#93). R's headers only: embed-r is there for
+# The text parser (src/zu_parse.c), the Arrow metadata reader
+# (src/zu_metadata.c) and the DECIMAL text parser with the rest of the
+# fixed-point core (src/zu_fixed.c, design 2.2), each against a reference
+# written from its spec in tools/fuzz/harness.c (#93). R's headers only: embed-r is there for
 # `R CMD config --cppflags`, since zu_wide.h includes R.h; nothing calls R.
 # zufast's headers come through github-packages until it is on CRAN.
 #
@@ -32,6 +33,7 @@ jobs:
       sources: |
         src/zu_parse.c
         src/zu_metadata.c
+        src/zu_fixed.c
       cflags: >-
         -g -O1 -fno-omit-frame-pointer -Isrc
         -I.github-packages/zufast/inst/include
