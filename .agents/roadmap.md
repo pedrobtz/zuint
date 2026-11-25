@@ -41,7 +41,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 6 | [Sorting, hashing and reductions](#stage-6--sorting-hashing-and-reductions) | quick | [#8](https://github.com/pedrobtz/zuint/issues/8) | [#21](https://github.com/pedrobtz/zuint/pull/21) | 2026-10-16 |
 | 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | [#22](https://github.com/pedrobtz/zuint/pull/22) | 2026-10-16 |
 | 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | [#23](https://github.com/pedrobtz/zuint/pull/23) | 2026-10-16 |
-| 9 | [Arrow bridge handover](#stage-9--arrow-bridge-handover) | full — compiled code removed and a new Suggests guard | [#52](https://github.com/pedrobtz/zuint/issues/52) | | |
+| 9 | [Arrow bridge handover](#stage-9--arrow-bridge-handover) | full — compiled code removed and a new Suggests guard | [#52](https://github.com/pedrobtz/zuint/issues/52) | [#89](https://github.com/pedrobtz/zuint/pull/89) | 2026-11-25 |
 | 10 | [v0.1.0 readiness](#stage-10--v010-readiness) | full | [#11](https://github.com/pedrobtz/zuint/issues/11) | | |
 | 11 | [Review](#stage-11--review) | full | [#53](https://github.com/pedrobtz/zuint/issues/53) | | |
 
@@ -585,6 +585,22 @@ representation contract.
 
 **Design.** §0, §2.1, §4.3, §9, §13, §15 of design.md; review decisions X1
 to X5.
+
+**Deviations (2026-11-25).**
+- `zuarrow::arrow_duckdb()` does not exist: zuarrow dropped it on
+  2026-11-04 (its design §6.12), because moving data out of an engine is
+  transport. Wherever this stage says `arrow_duckdb()`, the route is
+  `SET arrow_lossless_conversion = true`, then
+  `zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))`, and the exit
+  criteria are checked through it. The write-back into DuckDB registers an
+  arrow Table read from `zuarrow::arrow_write()`'s IPC stream.
+- `nanoarrow` stays in `Suggests`: the tests' DuckDB route calls
+  `DBI::dbGetQueryArrow()`, which needs it. `arrow`, `DBI` and `duckdb`
+  stay for the round-trip matrix. No test calls nanoarrow directly.
+- The `decimal = TRUE` export form is dropped, not kept as an option
+  (design §9.1).
+- A sentinel value under `lossy = "character"` is an error, as under
+  `"error"` (design §9.1).
 
 ## Stage 10 — v0.1.0 readiness
 

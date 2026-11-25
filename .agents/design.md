@@ -52,8 +52,13 @@ Success criteria:
 1. A DuckDB/Arrow → R → DuckDB/Arrow round trip preserves both the schema and
    every value, for every type in the table. The one documented exception is
    a value equal to the type's NA sentinel (§4, §9.1).
-2. One-line adoption: `nanoarrow::convert_array(x, zuint::uint64())`, and
-   eventually a duckdb option.
+2. One-line adoption: `zuarrow::arrow_to_r()` and `zuarrow::arrow_read()`
+   return zuint columns once zuint is loaded, and so does a DuckDB result
+   through `zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))` with
+   `arrow_lossless_conversion` on. Changed 2026-11-25 (Stage 9): the Arrow
+   surface is zuarrow's, and zuint registers with it (review X1, X2);
+   zuarrow's `arrow_duckdb()` was dropped on 2026-11-04, so the DuckDB line
+   is two calls.
 3. Not slower than bit64 on int64 operations.
 4. Code written for `integer64` runs unchanged on `int64`, with the same
    answers wherever bit64's answer is exact (§0.1).
@@ -165,12 +170,14 @@ load or use zuint.
   anything there (testthat, withr, gmp as the oracle, and the engines for
   the round-trip matrix), skipped when absent. Outside the tests, a Suggests
   package appears only in lazily registered methods on its own generics
-  (bit64, nanoarrow, arrow, duckdb, vctrs, pillar), and the core, including
-  the Arrow bridge, never calls into one.
-- **The Arrow bridge is self-contained.** zuint speaks the Arrow C Data
-  Interface through the vendored `abi.h` (§9.1) and exchanges `ArrowArray`
-  and `ArrowSchema` structs as external pointers. nanoarrow, arrow and duckdb
-  glue is sugar on top of that, not a requirement.
+  (bit64, vctrs, pillar) and in the zuarrow registrations (§9), and the core
+  never calls into one.
+- **The Arrow bridge is zuarrow's** (2026-11-25, Stage 9; review X1, X2(b)).
+  zuarrow is a Suggests. When it loads, zuint registers `to` and `from`
+  handlers with `zuarrow::arrow_register()`. The handlers are zuint's C
+  kernels over the vendored `abi.h` structs (§9.1); every R-level Arrow and
+  engine function is zuarrow's. nanoarrow, arrow and duckdb remain test
+  oracles only.
 - **`decimal` depends on zuint, never the reverse.** Both bridge functions in
   §9.2 live in `decimal`.
 
@@ -264,12 +271,25 @@ ALTREP details:
 Option `zuint.serialize = "exact"` (default) or `"double"`. The latter writes
 the materialised doubles, so files load without zuint (lossy beyond 2⁵³).
 
-### 4.3 Escape hatch
+### 4.3 The representation contract
 
-`zu_storage(x)` returns the raw payload (REALSXP or CPLXSXP with bits) for C
-consumers, and `zu_from_storage(payload, type)` reverses it. Keeping the
-representation behind these accessors means a future native R int64 type can be
-adopted by changing only them.
+Decided 2026-11-25 (Stage 9; review X3): `zu_storage(x)` and
+`zu_from_storage(payload, type)` are the public representation contract,
+not an escape hatch. A package that builds zuint vectors in C (zuarrow
+under X3(b), later a zero-copy reader over `zubin`) relies on them, and
+`?zu_storage` states the contract:
+
+- the payload is a REALSXP of 64-bit integer bits for `int64` and
+  `uint64`, and a CPLXSXP for `int128` and `uint128` whose real part is the
+  low word and imaginary part the high word, in machine byte order;
+- the NA bit patterns are `INT64_MIN`, `UINT64_MAX`, `INT128_MIN` and
+  `UINT128_MAX`, so the engine value at that pattern has no zuint form;
+- names are kept, no other attribute is;
+- the shapes and patterns change only under the rule the R API follows,
+  with a deprecation announced in `NEWS.md`.
+
+A future native R int64 type, or the ALTREP payloads of §4.2, would change
+what these accessors do inside, not the shapes they promise.
 
 ## 5. Promotion lattice
 
@@ -356,11 +376,13 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
 
 ## 9. Interop (the headline feature)
 
-### 9.1 One bridge: the Arrow C Data Interface
+### 9.1 One bridge: the Arrow C Data Interface, through zuarrow
 
 All engine interop goes through the **Arrow C Data Interface** (`ArrowSchema` /
-`ArrowArray` structs). One C code path then serves arrow, duckdb (which imports
-and exports Arrow streams), ADBC drivers and polars.
+`ArrowArray` structs). Since Stage 9 (2026-11-25) the R surface for it is
+zuarrow's: zuint registers its C conversion with zuarrow's registry and has
+no Arrow functions of its own (§9.4). One C code path then serves arrow,
+duckdb (which imports and exports Arrow streams), ADBC drivers and polars.
 
 - **Import** (`ArrowArray` → zuint): read the format string and the validity
   bitmap. Verified on duckdb 1.5.4.1 and arrow 24.0.0 (2026-10-15):
@@ -386,28 +408,56 @@ and exports Arrow streams), ADBC drivers and polars.
 - **Export** (zuint → `ArrowArray`): produce a buffer plus a validity bitmap
   from NA sentinels, with the correct format string, so write-back keeps the
   type. int64 and uint64 export as `l` and `L`. int128 and uint128 export as
-  the `arrow.opaque` extension above by default, because DuckDB turns a
-  `decimal128(38, 0)` column into `DECIMAL(38,0)`, not HUGEINT. `decimal =
-  TRUE` exports `d:38,0` instead for consumers without extension support,
-  with an error when a value has more than 38 digits.
-- **NA ↔ null:** sentinel values map to null bits both ways. A real value equal
-  to a sentinel (e.g. UINT64_MAX in an engine column) is imported as NA with a
-  warning; documented as the one lossy edge.
-- The bridge's own R surface is `zu_from_arrow(array, schema)` and
-  `zu_to_arrow(x)`, taking and returning the structs as external pointers.
-  When `nanoarrow` is loaded, zuint registers `convert_array()` targets and
-  `as_nanoarrow_array()` methods on top of it (lazily, via
-  `setHook(packageEvent("nanoarrow", "onLoad"), …)`); nothing in the core
-  calls nanoarrow, arrow or duckdb (§2.1).
+  the `arrow.opaque` extension above, because DuckDB turns a
+  `decimal128(38, 0)` column into `DECIMAL(38,0)`, not HUGEINT. The export
+  is an array handle in nanoarrow's `r.h` layout (the array's external
+  pointer, classed `nanoarrow_array`, with the schema's in its tag), the
+  form a zuarrow `from` handler returns.
+- **No `decimal128(38, 0)` export** (decided 2026-11-25, Stage 9; review
+  X5). The former `decimal = TRUE` form of `zu_to_arrow()` is gone with that
+  function. A zuarrow `from` handler has one form per class, DuckDB reads
+  the extension back as HUGEINT, and a consumer that wants a decimal can
+  cast in its own engine. Reopen when a consumer is found that needs it.
+- **NA ↔ null:** sentinel values map to null bits both ways. A real value
+  equal to a sentinel (e.g. UINT64_MAX in an engine column) cannot be held,
+  and zuarrow's `lossy` policy decides (2026-11-25; review X4): an error
+  under `"error"`, NA with a warning under `"warn"`, NA under `"allow"`.
+  Under `"character"` it is an error too, because the handler returns one
+  class for every batch and text for only the batches that hold such a
+  value could not be combined. The conditions are zuarrow's classes
+  (`zuarrow_lossy_error`, `zuarrow_lossy_warning`), so a caller handles
+  them with the rest of zuarrow's.
+
+### 9.4 The zuarrow registrations
+
+Decided 2026-11-25 (Stage 9). In `.onLoad()`, zuint sets a
+`packageEvent("zuarrow", "onLoad")` hook, as for its other Suggests, and
+registers with `package = "zuint"`, so zuarrow drops the entries when zuint
+unloads:
+
+| Key | `to` reads | `from` class | `from` writes |
+| --- | --- | --- | --- |
+| `l` | `int64` | `zu_int64` | `l` |
+| `L` | `uint64` | `zu_uint64` | `L` |
+| `arrow.opaque` | `hugeint` → `int128`, `uhugeint` → `uint128`; any other opaque type through zuarrow's own conversion | `zu_int128`, `zu_uint128` | the extension of §9.1 |
+
+All three are exact. There is no `d:*` registration (review X5): a decimal
+column is the `decimal` package's, and `to = int128()` is the opt-in that
+reads a `decimal128(p, 0)` with `p` up to 38 as its bits. When a caller
+names a zuint prototype for a column of another format, zuarrow calls that
+class's handler, which reads the column, through zuarrow's built-in
+conversion if zuint does not read the format itself, and casts it to the
+prototype's type under zuint's rules. The `arrow.opaque` handler serves
+two classes, so it casts nothing.
 
 ### 9.2 Per-partner mapping
 
 | Partner | Mapping |
 | --- | --- |
 | bit64 `integer64` | zero-copy both ways (`as_integer64()`, and `int64()` on an integer64 only swaps the class) |
-| Arrow | `int64` ↔ int64, `uint64` ↔ uint64, `decimal128(p, 0)` → int128 (bits as-is, §9.1), int128/uint128 → `arrow.opaque` hugeint/uhugeint by default or `decimal128(38, 0)` on request. `decimal128(p, s>0)` goes to the `decimal` package. arrow R today converts uint64, uint32 and decimal128 to double. Methods: `as_arrow_array()`, `infer_type()` |
-| DuckDB | BIGINT ↔ int64, UBIGINT ↔ uint64, HUGEINT ↔ int128, UHUGEINT ↔ uint128, via DuckDB's Arrow export/import (`duckdb_fetch_arrow` / `duckdb_register_arrow`). Helper `zu_duckdb_query(con, sql)` sets `arrow_lossless_conversion = true` on the connection first, since the default export loses UHUGEINT values ≥ 2¹²⁷ (§9.1), and returns a data frame with zuint columns. Today the R client's `bigint` option accepts only `"numeric"` and `"integer64"`; HUGEINT and UHUGEINT always arrive as doubles |
-| nanoarrow | `convert_array(x, zuint::uint64())` etc.; `as_nanoarrow_array()` for zuint vectors. Today `convert_array(uint64_array, bit64::integer64())` clamps 2⁶³ and above to 2⁶³ − 1 |
+| Arrow | through zuarrow (§9.4): `int64` ↔ int64, `uint64` ↔ uint64, `arrow.opaque` hugeint/uhugeint ↔ int128/uint128; `decimal128(p, 0)` → int128 only with `to = int128()`. `decimal128(p, s>0)` goes to the `decimal` package. arrow R today converts uint64, uint32 and decimal128 to double. Since Stage 9 zuint registers no methods on arrow's generics |
+| DuckDB | BIGINT ↔ int64, UBIGINT ↔ uint64, HUGEINT ↔ int128, UHUGEINT ↔ uint128, via DuckDB's Arrow export and zuarrow: `SET arrow_lossless_conversion = true`, since the default export loses UHUGEINT values ≥ 2¹²⁷ (§9.1), then `zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))`. The former `zu_duckdb_query()` and `zu_duckdb_register()` are gone (Stage 9). Today the R client's `bigint` option accepts only `"numeric"` and `"integer64"`; HUGEINT and UHUGEINT always arrive as doubles |
+| nanoarrow | zuarrow reads and writes nanoarrow handles; zuint registers no nanoarrow methods since Stage 9. Today `convert_array(uint64_array, bit64::integer64())` clamps 2⁶³ and above to 2⁶³ − 1 |
 | decimal | `as_decimal(int128, scale)` and `as_int128(decimal)` (exact or error), both implemented in `decimal`, which depends on zuint (§2.1) |
 | data.table | int64 works natively. Other types: `as.character()` or `as_integer64()` before keyed joins; documented |
 | vctrs / dplyr / tibble | `vec_ptype2`/`vec_cast`/`vec_proxy` registered lazily; `vec_proxy` returns the payload for exact equality and ordering |
@@ -416,8 +466,10 @@ and exports Arrow streams), ADBC drivers and polars.
 
 - **duckdb R client (Kirill Müller):** propose `bigint = "zuint"` (or a
   type-mapping hook) so UBIGINT/HUGEINT/UHUGEINT come back as zuint types.
-- **nanoarrow / arrow R (Dewey Dunnington et al.):** list zuint as the
-  documented conversion target for `uint64` and 128-bit values.
+  It would build zuint vectors through the representation contract of §4.3.
+- *Removed 2026-11-25 (Stage 9):* listing zuint as nanoarrow's or arrow's
+  conversion target. The Arrow route is zuarrow's, so that ask, if any, is
+  zuarrow's to make.
 - Approach both only after v0.3, with the round-trip matrix (§12) green and
   benchmarks published.
 
@@ -497,12 +549,12 @@ zu_storage(int128(1))        # raw CPLXSXP payload
    or CPLXSXP plus class); construction, parsing, formatting, arithmetic with
    policies, comparison, the promotion lattice. Gets the semantics right before
    the ALTREP work.
-2. **v0.2 interop: the headline feature.** Arrow C Data Interface import/export
-   (`zu_arrow.c`, copying every buffer), nanoarrow `convert_array()` /
-   `as_nanoarrow_array()` methods, the bit64 class-swap bridge, a
-   `zu_duckdb_query()` helper, and the **round-trip matrix green in CI**.
-   With this the package is demo-able, even before the full vector toolkit
-   exists.
+2. **v0.2 interop: the headline feature.** *Superseded 2026-11-25 (Stage
+   9).* It shipped in Stages 4 and 5 as zuint's own bridge (`zu_arrow.c`,
+   nanoarrow methods, `zu_duckdb_query()`), and Stage 9 handed the R
+   surface to zuarrow (review X1). What remains of it is the C kernels
+   behind the registrations (§9.4), the bit64 class-swap bridge, and the
+   round-trip matrix, now run through zuarrow.
 3. **v0.3 vector toolkit.** sort/order, unique/match, reductions with int128
    accumulation, bit operations, vctrs/pillar registration. **First CRAN release
    here**, with the README before/after table, benchmarks vs bit64, and a blog
@@ -529,8 +581,8 @@ zu_storage(int128(1))        # raw CPLXSXP payload
 | Conflicts with bit64 methods | Never register on bare `integer64`; only on `zu_*` classes |
 | Behaviour depends on whether bit64 is loaded | zuint defines every method bit64 defines for `integer64` (§4.1); the suite runs with and without bit64 attached |
 | `zu_int64 + integer64` falls back to double arithmetic on the bits ("incompatible methods") | `chooseOpsMethod()` claims precedence for `zu_*` classes; `R (>= 4.3.0)` |
-| DuckDB's default Arrow export reads UHUGEINT ≥ 2¹²⁷ as negative, and `decimal128(38, 0)` writes back as DECIMAL | Export 128-bit types as the `arrow.opaque` hugeint/uhugeint extension; `zu_duckdb_query()` enables `arrow_lossless_conversion` (§9.1) |
-| Engine value equal to an NA sentinel (e.g. UINT64_MAX in a UBIGINT column) | Import as NA with a warning; documented as the single lossy edge; `zu_sentinel_check()` reports affected columns |
+| DuckDB's default Arrow export reads UHUGEINT ≥ 2¹²⁷ as negative, and `decimal128(38, 0)` writes back as DECIMAL | Export 128-bit types as the `arrow.opaque` hugeint/uhugeint extension; document `arrow_lossless_conversion` on the connection (§9.1) |
+| Engine value equal to an NA sentinel (e.g. UINT64_MAX in a UBIGINT column) | zuarrow's `lossy` policy: an error by default, NA with a warning under `"warn"` (§9.1, review X4) |
 | Engine behaviour changes (duckdb/arrow type mapping, HUGEINT export format) | Round-trip matrix runs against current and dev versions of duckdb and arrow in CI |
 | Upstream maintainers prefer their own solution | Keep zuint useful standalone (nanoarrow path needs no upstream changes); offer integration, don't depend on it |
 
@@ -541,9 +593,16 @@ Open:
 - Should the DuckDB bridge use DuckDB's C API directly (no R duckdb dependency)
   or go through duckdb's Arrow export? Arrow export is the plan (§9.1); the C
   API would add a non-zu runtime dependency (§2.1).
-- Should schema-fidelity classes for small types live in zuint or in a separate
-  tiny package?
-- Name check: `zuint` on CRAN, r-universe and PyPI.
+
+
+Resolved on 2026-11-25 (Stage 9):
+
+- **Schema-fidelity classes** for the small and `uint32` types are
+  zuarrow's, carried by the schema handle passed back at export
+  (`arrow_array(x, schema =)`), not classes in zuint or a separate package
+  (review X7).
+- **Name check:** `zuint` is free on CRAN, r-universe and PyPI (checked
+  2026-10-23 by the joint review).
 
 Resolved on 2026-10-15:
 

@@ -254,7 +254,8 @@ test_that("is.nan, is.finite and is.infinite read values, not raw bits", {
 })
 
 test_that("conversions to complex, raw and dates go through the values", {
-  expect_identical(as.complex(int128(c(-5, NA))), c(-5 + 0i, NA))
+  # base's own conversion of the doubles, NA included, on every R version
+  expect_identical(as.complex(int128(c(-5, NA))), as.complex(c(-5, NA)))
   expect_identical(as.raw(uint64(c(5, 255))), as.raw(c(5, 255)))
   expect_identical(as.Date(int64(1)), as.Date(1))
   expect_identical(as.POSIXct(int64(0), tz = "UTC"), as.POSIXct(0, tz = "UTC"))

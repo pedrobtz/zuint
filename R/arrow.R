@@ -1,96 +1,181 @@
-#' Arrow C Data Interface
+#' zuint columns from Arrow, through zuarrow
 #'
-#' Convert between zuint vectors and Arrow arrays through the Arrow C Data
-#' Interface, with no R package in between. The arrays and schemas are
-#' external pointers to `ArrowArray` and `ArrowSchema` structs, the form
-#' nanoarrow's `nanoarrow_array` and `nanoarrow_schema` objects take.
+#' zuint has no Arrow functions of its own. When the
+#' [zuarrow](https://github.com/pedrobtz/zuarrow) package is installed, zuint
+#' registers its four types with zuarrow's registry as soon as both are
+#' loaded, and from then on `zuarrow::arrow_to_r()`, `zuarrow::arrow_read()`
+#' and `zuarrow::arrow_array()` read and write zuint columns exactly.
+#' `zuarrow::arrow_registry()` lists the entries:
 #'
-#' | zuint | Arrow format |
-#' | --- | --- |
-#' | `int64` | `int64` (`l`) |
-#' | `uint64` | `uint64` (`L`) |
-#' | `int128` | DuckDB's `arrow.opaque` `hugeint` extension (`w:16`); with `decimal = TRUE`, `decimal128(38, 0)` |
-#' | `uint128` | DuckDB's `arrow.opaque` `uhugeint` extension (`w:16`) |
+#' | Key | Arrow type | zuint type |
+#' | --- | --- | --- |
+#' | `l` | `int64` | `int64` |
+#' | `L` | `uint64` | `uint64` |
+#' | `arrow.opaque` | DuckDB's `hugeint` extension (`w:16`) | `int128` |
+#' | `arrow.opaque` | DuckDB's `uhugeint` extension (`w:16`) | `uint128` |
 #'
-#' `zu_from_arrow()` also reads any `decimal128(p, 0)` with `p` up to 38 as
-#' `int128`, taking the 128 bits as they are, which is how DuckDB exports
-#' `HUGEINT` by default. It copies the data and leaves the structs to their
-#' owner. A null becomes `NA` and an `NA` becomes a null. A valid value that
-#' happens to equal a type's `NA` bit pattern (for example `UINT64_MAX`)
-#' cannot be told from `NA`: it imports as `NA` with a warning of class
-#' `zuint_cast_warning`. `zu_sentinel_check()` counts those values without
-#' importing.
+#' Other `arrow.opaque` types, which DuckDB uses for types Arrow has no
+#' form for, keep zuarrow's own conversion.
 #'
-#' `zu_to_arrow()` exports `int128` as the extension by default because
-#' DuckDB reads `decimal128(38, 0)` back as `DECIMAL(38,0)`, not `HUGEINT`.
-#' `decimal = TRUE` is for consumers without extension support; a value with
-#' more than 38 digits is then an error.
+#' A `decimal128(p, 0)` column is a decimal, not an integer, so zuint does
+#' not register for it. Asking for `int128` with `to = int128()` in
+#' `zuarrow::arrow_to_r()` reads one with `p` up to 38 as the 128 bits it
+#' holds. DuckDB writes `HUGEINT` that way unless its
+#' `arrow_lossless_conversion` setting is on, so turn the setting on, and
+#' `HUGEINT` and `UHUGEINT` arrive as the extension:
 #'
-#' When nanoarrow is installed, `nanoarrow::convert_array(array, int64())`
-#' and the other constructors' prototypes import through this bridge, and
-#' `nanoarrow::as_nanoarrow_array()` exports zuint vectors.
+#' ```r
+#' DBI::dbExecute(con, "SET arrow_lossless_conversion = true")
+#' zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))
+#' ```
 #'
-#' @param array An external pointer to an `ArrowArray`, such as a
-#'   `nanoarrow_array`.
-#' @param schema An external pointer to the array's `ArrowSchema`.
-#' @param x A zuint vector.
-#' @param decimal Export `int128` as `decimal128(38, 0)`.
-#' @return `zu_from_arrow()` returns a zuint vector; `zu_to_arrow()` a list
-#'   of external pointers named `array` and `schema`, which release their
-#'   structs when garbage collected unless a consumer moved them out;
-#'   `zu_sentinel_check()` the number of values that would import as `NA`
-#'   though they are not null.
-#' @examples
-#' x <- uint64(c("18446744073709551614", NA, "1"))
-#' a <- zu_to_arrow(x)
-#' zu_from_arrow(a$array, a$schema)
+#' A null reads as `NA` and an `NA` writes as a null. A valid value equal to
+#' a type's `NA` bit pattern, such as `UINT64_MAX` in a `UBIGINT` column,
+#' cannot be held. zuarrow's `lossy` policy decides what happens to it:
 #'
-#' b <- zu_to_arrow(int128(-1), decimal = TRUE)
-#' zu_from_arrow(b$array, b$schema)
+#' * `"error"` and `"character"` raise `zuarrow_lossy_error`, naming the
+#'   value. `"character"` would give the column as text only when every
+#'   batch held such a value, so it fails like `"error"` instead.
+#' * `"warn"` reads it as `NA` with one `zuarrow_lossy_warning` per batch.
+#' * `"allow"` reads it as `NA` silently.
+#'
+#' Writing never loses a value: `int128` and `uint128` are written as the
+#' DuckDB extension, which DuckDB reads back as `HUGEINT` and `UHUGEINT`.
+#'
 #' @name zuint-arrow
+#' @seealso [zu_storage()] for the representation, the contract a package
+#'   that builds zuint vectors in C relies on.
 NULL
 
-#' @rdname zuint-arrow
-#' @export
-zu_from_arrow <- function(array, schema) {
-  call <- sys.call()
-  zu_check_xptrs(array, schema, call)
-  res <- zu_arrow_try(.Call(zu_from_arrow_c, array, schema), call)
-  code <- res[[3L]]
-  zu_warn_lost(res[[2L]], zu_types[[code]], call = sys.call())
-  zu_new(res[[1L]], code)
+zu_register_zuarrow <- function(...) {
+  zuarrow::arrow_register(
+    "l",
+    to = zu_arrow_to(1L),
+    from = zu_arrow_from,
+    class = "zu_int64",
+    package = "zuint"
+  )
+  zuarrow::arrow_register(
+    "L",
+    to = zu_arrow_to(2L),
+    from = zu_arrow_from,
+    class = "zu_uint64",
+    package = "zuint"
+  )
+  zuarrow::arrow_register(
+    "arrow.opaque",
+    to = zu_arrow_to(NA_integer_),
+    from = zu_arrow_from,
+    class = c("zu_int128", "zu_uint128"),
+    package = "zuint"
+  )
 }
 
-#' @rdname zuint-arrow
-#' @export
-zu_to_arrow <- function(x, decimal = FALSE) {
-  code <- zu_code(x)
-  if (is.na(code)) {
-    zu_abort("`x` must be a zuint vector.", "type", call = sys.call())
+# A `to` handler for zuarrow. `target` is the zuint type code of the
+# registration, or NA for arrow.opaque, whose type comes from the schema.
+# zuarrow also calls a handler when a caller names its class as the
+# prototype (`to = int128()`), with a column of another format: the import
+# is then cast to the registration's type.
+zu_arrow_to <- function(target) {
+  force(target)
+  function(array, schema, lossy) {
+    code <- zu_arrow_type(schema)
+    if (is.na(code)) {
+      # zuarrow's own conversion: an arrow.opaque type that is not hugeint
+      # or uhugeint, or a column zuint does not read, such as int32 under
+      # `to = int64()`, which is then cast as the caller asked
+      x <- zuarrow::arrow_to_r(array, lossy = lossy)
+      if (is.na(target)) {
+        return(x)
+      }
+      return(zu_cast(x, target, call = sys.call()))
+    }
+    res <- zu_arrow_try(.Call(zu_from_arrow_c, array, schema), sys.call())
+    if (res[[2L]] > 0) {
+      zu_arrow_lost(res[[2L]], code, zu_arrow_format(schema), lossy)
+    }
+    x <- zu_new(res[[1L]], code)
+    if (!is.na(target) && code != target) {
+      x <- zu_cast(x, target, call = sys.call())
+    }
+    x
   }
-  if (!isTRUE(decimal) && !isFALSE(decimal)) {
-    zu_abort("`decimal` must be TRUE or FALSE.", "type", call = sys.call())
-  }
-  if (decimal && code != 3L) {
-    zu_abort("`decimal = TRUE` is for int128 only.", "type", call = sys.call())
-  }
-  out <- zu_arrow_try(.Call(zu_to_arrow_c, x, code, decimal), sys.call())
-  names(out) <- c("array", "schema")
-  out
 }
 
-#' @rdname zuint-arrow
-#' @export
-zu_sentinel_check <- function(array, schema) {
-  call <- sys.call()
-  zu_check_xptrs(array, schema, call)
-  as.integer(zu_arrow_try(.Call(zu_sentinel_check_c, array, schema), call)[[2L]])
+zu_arrow_from <- function(x) {
+  zu_arrow_try(.Call(zu_to_arrow_c, x, zu_code(x)), sys.call())
 }
 
-zu_check_xptrs <- function(array, schema, call) {
-  if (typeof(array) != "externalptr" || typeof(schema) != "externalptr") {
-    zu_abort("`array` and `schema` must be external pointers.", "type", call = call)
+# Values equal to the type's NA bit pattern, under zuarrow's policy
+# (review X4). zuarrow's own condition classes, so a caller handles them
+# with the rest of zuarrow's.
+zu_arrow_lost <- function(n, code, format, lossy) {
+  type <- zu_types[[code]]
+  sentinel <- zu_sentinel_value(code)
+  if (lossy %in% c("error", "character")) {
+    stop(structure(
+      class = c("zuarrow_lossy_error", "zuarrow_error", "error", "condition"),
+      list(
+        message = sprintf(
+          paste(
+            "%.0f value%s of an Arrow `%s` column equal%s %s, the bit",
+            "pattern of %s's NA, and cannot be read as %s.",
+            "Use `lossy = \"warn\"` to read %s as NA."
+          ),
+          n,
+          if (n == 1) "" else "s",
+          format,
+          if (n == 1) "s" else "",
+          sentinel,
+          type,
+          type,
+          if (n == 1) "it" else "them"
+        ),
+        call = NULL,
+        arrow_type = format,
+        package = "zuint"
+      )
+    ))
   }
+  if (lossy == "warn") {
+    warning(structure(
+      class = c(
+        "zuarrow_lossy_warning",
+        "zuarrow_warning",
+        "warning",
+        "condition"
+      ),
+      list(
+        message = sprintf(
+          "%.0f value%s equal to %s, the bit pattern of %s's NA, read as NA.",
+          n,
+          if (n == 1) "" else "s",
+          sentinel,
+          type
+        ),
+        call = NULL,
+        arrow_type = format
+      )
+    ))
+  }
+  invisible()
+}
+
+# The value whose bits are a type's NA, as the type would hold it unsigned
+# or signed: INT64_MIN, UINT64_MAX, INT128_MIN, UINT128_MAX.
+zu_sentinel_value <- function(code) {
+  switch(
+    code,
+    "-9223372036854775808",
+    "18446744073709551615",
+    "-170141183460469231731687303715884105728",
+    "340282366920938463463374607431768211455"
+  )
+}
+
+zu_arrow_format <- function(schema) {
+  f <- .Call(zu_arrow_format_c, schema)
+  if (is.character(f)) f else "?"
 }
 
 # Arrow-level failures from C (a released struct, an unsupported format)
@@ -98,9 +183,14 @@ zu_check_xptrs <- function(array, schema, call) {
 zu_arrow_try <- function(expr, call) {
   tryCatch(
     expr,
-    error = function(e) zu_abort(sub("^zuint: ", "", conditionMessage(e)), "arrow", call = call)
+    error = function(e) {
+      zu_abort(sub("^zuint: ", "", conditionMessage(e)), "arrow", call = call)
+    }
   )
 }
+
+# The schema in an array handle's tag (nanoarrow's r.h layout).
+zu_arrow_tag <- function(array) .Call(zu_arrow_schema_c, array)
 
 # The zuint type code an ArrowSchema maps to, or NA.
 zu_arrow_type <- function(schema) {

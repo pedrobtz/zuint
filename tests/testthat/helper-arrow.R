@@ -1,22 +1,56 @@
-# The first column of a DuckDB query, fetched through DuckDB's Arrow export
-# as a nanoarrow array. Skips without duckdb, DBI, arrow and nanoarrow.
-duckdb_column <- function(sql, lossless = FALSE) {
-  for (pkg in c("duckdb", "DBI", "arrow", "nanoarrow")) {
+# zuint reaches Arrow only through zuarrow's registry (design 9). These
+# helpers skip without zuarrow, and the engine ones without the engines.
+
+skip_without_zuarrow <- function() {
+  testthat::skip_if_not_installed("zuarrow")
+  # loading zuarrow runs zuint's registration hook
+  loadNamespace("zuarrow")
+}
+
+skip_without_engines <- function() {
+  skip_without_zuarrow()
+  # DBI::dbGetQueryArrow() needs nanoarrow
+  for (pkg in c("duckdb", "DBI", "nanoarrow")) {
     testthat::skip_if_not_installed(pkg)
   }
-  con <- DBI::dbConnect(duckdb::duckdb())
-  on.exit(DBI::dbDisconnect(con, shutdown = TRUE))
+}
+
+# A DuckDB connection whose state stays in a temporary directory (#74),
+# closed when the calling test ends.
+local_duckdb <- function(lossless = TRUE, env = parent.frame()) {
+  skip_without_engines()
+  con <- DBI::dbConnect(duckdb::duckdb(shared_home = FALSE))
+  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE), envir = env)
   if (lossless) {
     DBI::dbExecute(con, "SET arrow_lossless_conversion = true")
   }
-  res <- DBI::dbSendQuery(con, sql, arrow = TRUE)
-  stream <- nanoarrow::as_nanoarrow_array_stream(duckdb::duckdb_fetch_arrow(
-    res
-  ))
-  batch <- stream$get_next()
-  DBI::dbClearResult(res)
-  col <- batch$children[[1L]]
-  list(array = col, schema = nanoarrow::infer_nanoarrow_schema(col))
+  con
+}
+
+# A query's result through DuckDB's Arrow export and zuarrow.
+duckdb_to_r <- function(con, sql, ...) {
+  zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql), ...)
+}
+
+# A data frame registered with DuckDB through an Arrow Table: DuckDB scans
+# a registered reader only once. The table is built from zuarrow's IPC
+# stream, so arrow never makes an R object of the arrow.opaque type
+# (apache/arrow#53951).
+duckdb_register_df <- function(con, name, df) {
+  testthat::skip_if_not_installed("arrow")
+  table <- arrow_table_of(df)
+  duckdb::duckdb_register_arrow(con, name, table)
+}
+
+arrow_table_of <- function(df) {
+  testthat::skip_if_not_installed("arrow")
+  raw <- zuarrow::arrow_write(df, NULL, format = "stream")
+  arrow::read_ipc_stream(raw, as_data_frame = FALSE)
+}
+
+# An arrow Table back through zuarrow, by the same IPC route.
+arrow_table_to_r <- function(table) {
+  zuarrow::arrow_read(arrow::write_to_raw(table, format = "stream"))
 }
 
 # Collect until the Arrow release count stops moving, so that a count taken
@@ -48,18 +82,10 @@ matrix_values <- function(type) {
   c(v, rep(NA, 60L - length(v)))
 }
 
-skip_without_engines <- function() {
-  for (pkg in c("duckdb", "DBI", "arrow", "nanoarrow")) {
-    testthat::skip_if_not_installed(pkg)
-  }
-}
-
 # A DuckDB connection with a table `src` holding one column per engine type,
 # filled from matrix_values(); closed when the calling test ends.
 duckdb_matrix_source <- function(env = parent.frame()) {
-  skip_without_engines()
-  con <- DBI::dbConnect(duckdb::duckdb())
-  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE), envir = env)
+  con <- local_duckdb(env = env)
   vals <- lapply(structure(engine_types, names = engine_types), matrix_values)
   n <- length(vals[[1L]])
   cols <- vapply(

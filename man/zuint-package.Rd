@@ -4,9 +4,9 @@
 \name{zuint-package}
 \alias{zuint}
 \alias{zuint-package}
-\title{zuint: Lossless 64- And 128-Bit Integers for 'Arrow' and 'DuckDB'}
+\title{zuint: Lossless Signed and Unsigned 64- And 128-Bit Integers}
 \description{
-Wide integer vectors, signed and unsigned 64-bit and 128-bit, matching the integer types of 'Apache Arrow' and 'DuckDB'. The four types share one 'C' core and one lossless promotion order, with exact arithmetic, comparison, parsing and formatting, and explicit overflow policies. The signed 64-bit type keeps the 'bit64' 'integer64' storage layout, and every type converts exactly to and from the 'Arrow' 'C' Data Interface.
+Wide integer vectors, signed and unsigned 64-bit and 128-bit, matching the integer types of databases and columnar formats. The four types share one 'C' core and one lossless promotion order, with exact arithmetic, comparison, parsing and formatting, and explicit overflow policies. The signed 64-bit type keeps the 'bit64' 'integer64' storage layout. With 'zuarrow' installed, the types read and write Arrow columns exactly.
 }
 \seealso{
 Useful links:

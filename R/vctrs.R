@@ -196,3 +196,6 @@ zu_vapply <- function(X, FUN, FUN.VALUE, ...) {
   }
   out
 }
+
+# A zero-length payload of a type's storage.
+zu_alloc_empty <- function(code) if (code <= 2L) double() else complex()

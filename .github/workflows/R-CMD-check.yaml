@@ -28,6 +28,11 @@ jobs:
       # No container in the quick profile: the containers are R-devel, which
       # builds arrow and duckdb from source. The full profile runs all three.
       quick-containers: '[]'
+      # duckdb from r-universe's R-devel binaries when it has them, and 90
+      # minutes, not 45, for a cold cache that builds duckdb from source
+      # (PR #89's first full run timed out building it).
+      pre-install: Rscript tools/ci-binaries.R
+      timeout-minutes: 90
       # Every leg is 64-bit gcc or clang, so every leg must build on
       # __int128; test-storage.R checks.
       env: |
