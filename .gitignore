@@ -48,3 +48,7 @@ po/*~
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# tools/fuzz build output
+tools/fuzz/driver
+tools/fuzz/*.o

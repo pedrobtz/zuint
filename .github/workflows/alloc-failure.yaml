@@ -1,0 +1,32 @@
+# Fails each allocation tools/alloc-exercise.R makes after zuint is loaded,
+# one per run (#91): native memory held across an R allocation that can
+# longjmp, and a failed malloc in the Arrow export. The sweep restarts R
+# once per allocation, so it runs on demand only, like the rest of zuint's
+# full set while the repository has no schedule (CLAUDE.md):
+# `gh workflow run alloc-failure.yaml --ref <branch>`.
+#
+# expect-pattern: an injected failure must surface as zuint's own
+# "zuint: out of memory" error, or as R's or bash's allocation error, matched
+# by its wording. target-pattern counts the failures that reached zuint's C;
+# min-target-hits stays 0 until the first sweep has shown the count, then
+# goes a little under it so a sweep that stops reaching zuint goes red.
+on:
+  workflow_dispatch:
+
+name: alloc-failure
+
+permissions:
+  contents: read
+
+jobs:
+  alloc-failure:
+    uses: pedrobtz/r-actions/.github/workflows/alloc-failure.yml@v1
+    with:
+      run: R_ENABLE_JIT=0 Rscript tools/alloc-exercise.R
+      baseline-run: R_ENABLE_JIT=0 Rscript -e 'suppressPackageStartupMessages(library(zuint))'
+      max-allocations: 12000
+      expect-pattern: "zuint: out of memory|cannot allocate (vector|memory block|[0-9]+ bytes)|[Cc]ould not allocate|memory exhausted|out of virtual memory|cannot open file '[^']*\\.rdb': Cannot allocate memory"
+      target-pattern: "alloc-exercise: .*zuint: out of memory"
+      min-target-hits: 0
+      ignore-crash-pattern: "^ 1: (grepl?|sub|gsub|regexpr|gregexpr|strsplit|gzfile)\\("
+      timeout-minutes: 150

@@ -1,0 +1,36 @@
+# Mutates the text parser and the Arrow metadata reader and runs
+# tools/fuzz/driver against each mutant (#92): the fuzz harness over a
+# plain main(), which replays tools/fuzz/corpus and 200,000 generated
+# inputs and traps when either reader disagrees with its reference. A
+# mutant that survives is a change to the reader no input notices; an
+# equivalent one (the `0x` prefix's length test) survives by definition.
+#
+# Reported, never gated: on demand, `gh workflow run mutation.yaml --ref
+# <branch>`, and read the survivors in the run's summary. CFLAGS is emptied
+# so $MULL_CC's -O0 -g stands; the Makefile compiles each source on its
+# own, as Mull requires. The runner has no R: the build installs R's
+# headers (zu_wide.h includes R.h, though nothing here calls R) and clones
+# zufast for its headers.
+on:
+  workflow_dispatch:
+
+name: mutation
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    uses: pedrobtz/r-actions/.github/workflows/mutation.yml@v1
+    with:
+      build: >-
+        sudo apt-get install -y -q r-base-dev &&
+        git clone --depth 1 https://github.com/pedrobtz/zufast /tmp/zufast &&
+        make -C tools/fuzz driver CC="$MULL_CC" CFLAGS=
+        ZUFAST_INCLUDE=/tmp/zufast/inst/include
+      tests: tools/fuzz/driver
+      include: |
+        .*/src/zu_parse\.c$
+        .*/src/zu_metadata\.c$
+      mutant-timeout: 5000
+      timeout-minutes: 90

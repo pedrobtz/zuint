@@ -236,3 +236,54 @@ test_that("corrupt schema metadata reads as no metadata", {
   expect_null(get(good[1:10]))
   expect_null(get(raw(2)))
 })
+
+test_that("the metadata entry cap is 4096, straddled", {
+  i32 <- function(v) {
+    writeBin(as.integer(v), raw(), size = 4, endian = .Platform$endian)
+  }
+  # n entries, the wanted key last
+  md <- function(n) {
+    filler <- c(i32(1), charToRaw("k"), i32(1), charToRaw("v"))
+    key <- "ARROW:extension:name"
+    c(
+      i32(n),
+      rep(filler, n - 1),
+      i32(nchar(key)),
+      charToRaw(key),
+      i32(12),
+      charToRaw("arrow.opaque")
+    )
+  }
+  get <- function(n) .Call(zu_metadata_get_c, md(n), "ARROW:extension:name")
+  expect_identical(get(4095), "arrow.opaque")
+  expect_identical(get(4096), "arrow.opaque")
+  expect_null(get(4097))
+})
+
+test_that("decimal128 imports up to precision 38, straddled", {
+  skip_if_not_installed("nanoarrow")
+  s <- nanoarrow::na_decimal128(38L, 0L)
+  type_of <- function(format) {
+    zu_arrow_type(nanoarrow::nanoarrow_schema_modify(s, list(format = format)))
+  }
+  for (f in c("d:37,0", "d:38,0", "d:37,0,128", "d:38,0,128")) {
+    expect_identical(type_of(f), 3L, label = f)
+  }
+  # nanoarrow refuses to build precision 39, so the format is edited
+  for (f in c("d:39,0", "d:39,0,128", "d:0,0")) {
+    expect_identical(type_of(f), NA_integer_, label = f)
+  }
+  # the values at both precisions zuint reads
+  to <- zu_arrow_to(NA_integer_)
+  for (p in c(37L, 38L)) {
+    a <- nanoarrow::as_nanoarrow_array(
+      c(1, -2, NA),
+      schema = nanoarrow::na_decimal128(p, 0L)
+    )
+    expect_identical(
+      to(a, nanoarrow::infer_nanoarrow_schema(a), "error"),
+      int128(c(1, -2, NA)),
+      label = p
+    )
+  }
+})
