@@ -228,8 +228,15 @@ zu_c <- function(...) {
   zu_new(do.call(c, parts), code)
 }
 
+# rep() of an empty vector pads with base R's NA, whose bits are a value
+# here (#55): those slots get the type's NA.
 zu_rep <- function(x, ...) {
-  zu_new(rep(zu_unclass(x), ...), zu_code(x))
+  code <- zu_code(x)
+  out <- rep(zu_unclass(x), ...)
+  if (length(x) == 0L && length(out) > 0L) {
+    out <- zu_fill_na(out, code, rep(TRUE, length(out)))
+  }
+  zu_new(out, code)
 }
 
 zu_rev <- function(x) {

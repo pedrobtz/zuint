@@ -280,3 +280,105 @@ test_that("short and long sorts agree", {
     sort(v[1:50], decreasing = TRUE)
   )
 })
+
+test_that("range()'s finite is an argument, not data (#56)", {
+  for (type in zu_all_types) {
+    x <- zu_ctor(type)(c(5, NA, 7))
+    expect_identical(
+      range(x, finite = TRUE),
+      zu_ctor(type)(c(5, 7)),
+      label = type
+    )
+    expect_identical(range(x, finite = FALSE), zu_na(type, 2), label = type)
+    expect_identical(
+      range(zu_ctor(type)(c(5, 7)), na.rm = TRUE, finite = TRUE),
+      zu_ctor(type)(c(5, 7)),
+      label = type
+    )
+  }
+})
+
+test_that("zu_match() and %zin% give base match()'s answers for lost values (#58)", {
+  cases <- list(
+    list(1.5, int64(c(1, NA)), c(1, NA)),
+    list(-1L, uint64(c(3, NA)), c(3, NA)),
+    list(c(NA, 1.5, 2), int64(c(2, NA)), c(2, NA)),
+    # a table value the type can't hold must not match an NA either
+    list(int64(c(NA, 1)), c(1.5, NA, 1), c(1.5, NA, 1)),
+    list(int64(NA), c(1.5, 2), c(1.5, 2))
+  )
+  for (cs in cases) {
+    x <- cs[[1]]
+    want <- match(if (is.object(x)) as.double(x) else x, cs[[3]])
+    expect_no_warning(got <- zu_match(x, cs[[2]]))
+    expect_identical(got, want)
+    expect_identical(x %zin% cs[[2]], !is.na(want))
+  }
+  expect_identical(zu_match(1.5, int64(1), nomatch = 0L), 0L)
+})
+
+test_that("seq_zu() runs to the top of each unsigned range (#59)", {
+  for (type in c("uint64", "uint128")) {
+    top <- as.character(oracle_range(type)$max)
+    to <- zu_ctor(type)(top)
+    from <- to - 3L
+    expect_identical(
+      as.character(seq_zu(from, to)),
+      as.character(gmp::as.bigz(top) - 3:0),
+      label = type
+    )
+    expect_identical(
+      seq_zu(to, from, by = -1L),
+      rev(seq_zu(from, to)),
+      label = type
+    )
+  }
+  expect_error(
+    seq_zu(uint128(0), uint128("340282366920938463463374607431768211454")),
+    class = "zuint_type_error"
+  )
+})
+
+test_that("Summary methods give base R's answer when zuint.double allows double (#60)", {
+  withr::local_options(zuint.double = "allow")
+  expect_warning(r <- sum(int64(1), 0.5), class = "zuint_double_warning")
+  expect_identical(r, 1.5)
+  expect_warning(r <- prod(int64(3), 0.5), class = "zuint_double_warning")
+  expect_identical(r, 1.5)
+  expect_warning(r <- min(uint64(1), 0.5), class = "zuint_double_warning")
+  expect_identical(r, 0.5)
+  expect_warning(r <- max(int128(1), 2.5), class = "zuint_double_warning")
+  expect_identical(r, 2.5)
+  expect_warning(
+    r <- range(int64(c(1, NA)), 2.5, finite = TRUE),
+    class = "zuint_double_warning"
+  )
+  expect_identical(r, c(1, 2.5))
+})
+
+test_that("prod() and median() with NA and nothing to reduce (#64)", {
+  for (type in zu_all_types) {
+    expect_identical(prod(zu_ctor(type)(c(2, NA))), zu_na(type), label = type)
+    expect_identical(
+      prod(zu_ctor(type)(c(2, NA)), na.rm = TRUE),
+      zu_ctor(type)(2),
+      label = type
+    )
+    expect_identical(median(zu_ctor(type)(c(1, NA, 3))), median(c(1, NA, 3)))
+    expect_identical(median(zu_ctor(type)()), median(numeric()))
+  }
+})
+
+test_that("seq_zu() refuses what it can't step and stops at length.out = 0 (#64)", {
+  bad <- list(
+    list(int64(1:2), int64(5)),
+    list(int64(NA), int64(5)),
+    list(int64(1), int64(NA)),
+    list(int64(1), int64(5), by = NA_integer_),
+    list(int64(0), int64("9000000000000000000"))
+  )
+  for (args in bad) {
+    expect_error(do.call(seq_zu, args), class = "zuint_type_error")
+  }
+  expect_identical(seq_zu(uint64(1), length.out = 0), uint64())
+})

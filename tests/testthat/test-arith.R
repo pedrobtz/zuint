@@ -410,3 +410,65 @@ test_that("checked_idiv and checked_mod error on a zero divisor", {
   }
   expect_identical(int64(5) %/% 0L, NA_int64_)
 })
+
+test_that("NA integer and logical operands give NA where they are NA (#57)", {
+  for (type in zu_all_types) {
+    x <- zu_ctor(type)(c(7, 7, 7))
+    want_na <- c(TRUE, FALSE, FALSE)
+    for (y in list(c(NA, 2L, 3L), c(NA, TRUE, TRUE))) {
+      for (op in c("+", "-", "*", "%/%", "%%", "^")) {
+        f <- get(op)
+        r1 <- suppressWarnings(f(x, y))
+        r2 <- suppressWarnings(f(y, x))
+        # NA where the operand is NA; elsewhere what the same operation
+        # gives without it (which may itself overflow to NA, as 2 - 7 does
+        # in an unsigned type)
+        expect_true(is.na(r1[1]) && is.na(r2[1]), label = paste(type, op))
+        expect_identical(
+          r1[-1],
+          suppressWarnings(f(x[-1], y[-1])),
+          label = paste(type, op)
+        )
+        expect_identical(
+          r2[-1],
+          suppressWarnings(f(y[-1], x[-1])),
+          label = paste(type, op, "reversed")
+        )
+      }
+      for (f in list(
+        checked_add,
+        checked_mul,
+        wrapping_add,
+        wrapping_sub,
+        wrapping_mul,
+        wrapping_pow,
+        checked_pow
+      )) {
+        expect_true(is.na(f(x, y)[1]), label = type)
+        expect_identical(f(x, y)[-1], f(x[-1], y[-1]), label = type)
+      }
+      for (f in list(bit_and, bit_or, bit_xor)) {
+        expect_identical(is.na(f(x, y)), want_na, label = type)
+        expect_identical(f(x, y)[-1], f(x[-1], y[-1]), label = type)
+      }
+      cmp <- x == y
+      expect_identical(cmp, c(NA, x[-1] == y[-1]), label = type)
+    }
+  }
+  expect_identical(int64(1) + c(NA_integer_, 5L), int64(c(NA, 6)))
+})
+
+test_that("^ with a base the type can't hold, and operator edges (#64)", {
+  # -2 has no uint64 value; (-2)^3 = -8 doesn't fit either
+  expect_warning(r <- (-2L)^uint64(3), class = "zuint_overflow_warning")
+  expect_identical(r, NA_uint64_)
+  expect_error(checked_pow(-2L, uint64(3)), class = "zuint_overflow_error")
+  # modulo 2^64: 2^64 - 8
+  expect_identical(wrapping_pow(-2L, uint64(3)), uint64("18446744073709551608"))
+  # a negative operand to an unsigned type is itself out of range (design
+  # section 6), even where the exact result would fit
+  expect_warning(r <- (-2L)^uint64(2), class = "zuint_overflow_warning")
+  expect_identical(r, NA_uint64_)
+  expect_identical(int64(1) + NULL, int64())
+  expect_error(1.5^int64(2), class = "zuint_double_error")
+})

@@ -112,3 +112,20 @@ test_that("bit operations mix types by the promotion order and reject doubles", 
   expect_error(popcount(1L), class = "zuint_type_error")
   expect_identical(names(bit_xor(uint64(c(a = 1, b = 2)), 1L)), c("a", "b"))
 })
+
+test_that("bit operations give NA for NA operands (#64)", {
+  for (type in zu_all_types) {
+    x <- zu_ctor(type)(c(NA, 3))
+    one <- zu_ctor(type)(1)
+    for (f in list(bit_and, bit_or, bit_xor)) {
+      expect_identical(f(x, one), c(zu_na(type), f(x[2], one)), label = type)
+    }
+    expect_identical(is.na(bit_not(x)), c(TRUE, FALSE), label = type)
+    expect_identical(is.na(shift_left(x, 1L)), c(TRUE, FALSE), label = type)
+    expect_identical(is.na(shift_right(x, 1L)), c(TRUE, FALSE), label = type)
+    expect_identical(shift_left(one, NA_integer_), zu_na(type), label = type)
+    expect_identical(popcount(x), c(NA, 2L), label = type)
+    expect_identical(is.na(clz(x)), c(TRUE, FALSE), label = type)
+    expect_identical(is.na(ctz(x)), c(TRUE, FALSE), label = type)
+  }
+})

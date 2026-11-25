@@ -175,3 +175,28 @@ bit64_parity <- function(name) {
   res <- bit64_parity_cache$res
   list(attached = res$attached[[name]], absent = res$absent[[name]])
 }
+
+# The names a parity topic's value must have: those of the list() its code
+# ends with. An error anywhere in a topic turns its value into the error's
+# class in both processes, which would compare equal (#63), so every topic
+# is held to these names as well as to parity.
+bit64_parity_names <- function(name) {
+  ex <- parse(text = bit64_parity_code[[name]])
+  last <- ex[[length(ex)]]
+  stopifnot(identical(last[[1L]], as.name("list")))
+  names(as.list(last))[-1L]
+}
+
+expect_bit64_parity <- function(name) {
+  res <- bit64_parity(name)
+  testthat::expect_identical(res$attached, res$absent, label = name)
+  for (state in c("attached", "absent")) {
+    testthat::expect_type(res[[state]]$value, "list")
+    testthat::expect_identical(
+      names(res[[state]]$value),
+      bit64_parity_names(name),
+      label = paste(name, state)
+    )
+  }
+  invisible(res)
+}
