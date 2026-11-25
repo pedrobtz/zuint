@@ -681,7 +681,12 @@ itself is left.
 - **Schema fidelity** for uint32 and the small integer types is `zuarrow`'s,
   carried by the schema handle at export (review X7, 2026-10-23); no class
   here.
-- **The `decimal` bridge** for scale > 0 decimals, implemented in `decimal`.
+- **Fixed-point decimals and the R-free C table** (design §2.2,
+  [#88](https://github.com/pedrobtz/zuint/issues/88)): `DECIMAL(p, s)` on
+  `int128` with p ≤ 38, the `zuint_api_v1` table, and an R class, for
+  zugodb (libzugodb#55, zugodb#72). Decided 2026-11-20; it replaces the
+  `decimal` bridge that was planned here. The R class's shape is a design
+  open question to settle first.
 - **`saturating_*` operations, `mean_exact()` and `quantile()`** (design §6,
   §7, §13): cheap, but not needed for the engine round trip.
 - A blog post with the before/after table and benchmarks, at release.
