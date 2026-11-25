@@ -40,7 +40,11 @@ zu_bit_binary <- function(op, x, y, call) {
   kinds <- c(zu_kind(x), zu_kind(y))
   zu_check_operands(kinds, list(x, y), call)
   if (any(kinds == zu_kind_dbl)) {
-    zu_abort("Bit operations take integer operands, not doubles.", "type", call = call)
+    zu_abort(
+      "Bit operations take integer operands, not doubles.",
+      "type",
+      call = call
+    )
   }
   zu_check_recycling(x, y)
   code <- zu_common_code(kinds, call)

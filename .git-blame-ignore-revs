@@ -1,0 +1,4 @@
+# Formatting-only commits. GitHub reads this file; locally run
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+# air format . over the whole repository (#75)
+1e70103d0913ff6e4512c4131f24b5fce1db03d4

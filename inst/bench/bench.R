@@ -22,10 +22,19 @@ time_ms <- function(expr) {
   expr <- substitute(expr)
   env <- parent.frame()
   k <- max(1L, as.integer(1e7 / get("n", env)))
-  t <- vapply(seq_len(reps), function(i) {
-    gc(FALSE)
-    system.time(for (j in seq_len(k)) eval(expr, env))[["elapsed"]] / k
-  }, numeric(1))
+  t <- vapply(
+    seq_len(reps),
+    function(i) {
+      gc(FALSE)
+      system.time(
+        for (j in seq_len(k)) {
+          eval(expr, env)
+        }
+      )[["elapsed"]] /
+        k
+    },
+    numeric(1)
+  )
   stats::median(t) * 1000
 }
 

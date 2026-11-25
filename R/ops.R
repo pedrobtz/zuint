@@ -7,7 +7,14 @@ zu_policy_checked <- 1L
 zu_policy_wrap <- 2L
 
 zu_arith_ops <- c("+" = 1L, "-" = 2L, "*" = 3L, "%/%" = 4L, "%%" = 5L)
-zu_compare_ops <- c("==" = 1L, "!=" = 2L, "<" = 3L, "<=" = 4L, ">" = 5L, ">=" = 6L)
+zu_compare_ops <- c(
+  "==" = 1L,
+  "!=" = 2L,
+  "<" = 3L,
+  "<=" = 4L,
+  ">" = 5L,
+  ">=" = 6L
+)
 
 zu_ops <- function(e1, e2) {
   op <- .Generic
@@ -68,13 +75,20 @@ zu_check_operands <- function(kinds, args, call) {
   bad <- is.na(kinds) | kinds == zu_kind_chr
   if (any(bad)) {
     zu_abort(
-      sprintf("Can't use %s in zuint arithmetic.", zu_kind_label(args[[which(bad)[[1L]]]])),
+      sprintf(
+        "Can't use %s in zuint arithmetic.",
+        zu_kind_label(args[[which(bad)[[1L]]]])
+      ),
       "type",
       call = call
     )
   }
   if (!any(kinds > 0L)) {
-    zu_abort("At least one operand must be a zuint vector.", "type", call = call)
+    zu_abort(
+      "At least one operand must be a zuint vector.",
+      "type",
+      call = call
+    )
   }
 }
 
@@ -84,7 +98,10 @@ zu_check_operands <- function(kinds, args, call) {
 zu_double_problem <- function(type, call) {
   if (zu_double_policy() == "allow") {
     zu_warn(
-      sprintf("A double is not an integral value in range of %s; computing in double.", type),
+      sprintf(
+        "A double is not an integral value in range of %s; computing in double.",
+        type
+      ),
       "double",
       call = call
     )
@@ -111,7 +128,10 @@ zu_operand <- function(x, kind, code) {
     }
     # into a signed type, or without negatives, an integer converts exactly
     # and the C code takes its fast path
-    if ((code == 1L || code == 3L || !any(x < 0L, na.rm = TRUE)) && length(x) <= 1L) {
+    if (
+      (code == 1L || code == 3L || !any(x < 0L, na.rm = TRUE)) &&
+        length(x) <= 1L
+    ) {
       return(list(value = zu_convert(x, kind, code)[[1L]], kind = code))
     }
     return(list(value = x, kind = 0L))
@@ -130,14 +150,21 @@ zu_dbl_quiet <- function(x) {
 # Names as base arithmetic gives them: the first operand's when it is as
 # long as the result, else the second's.
 zu_result_names <- function(x, y, n) {
-  if (length(x) == n && !is.null(names(x))) names(x) else if (length(y) == n) names(y)
+  if (length(x) == n && !is.null(names(x))) {
+    names(x)
+  } else if (length(y) == n) {
+    names(y)
+  }
 }
 
 zu_check_recycling <- function(x, y) {
   nx <- length(x)
   ny <- length(y)
   if (nx > 0L && ny > 0L && max(nx, ny) %% min(nx, ny) != 0L) {
-    zu_warn("longer object length is not a multiple of shorter object length", "recycling")
+    zu_warn(
+      "longer object length is not a multiple of shorter object length",
+      "recycling"
+    )
   }
 }
 
@@ -164,8 +191,12 @@ zu_arith <- function(op, x, y, policy, call) {
   kinds <- c(zu_kind(x), zu_kind(y))
   zu_check_operands(kinds, list(x, y), call)
   zu_check_recycling(x, y)
-  if (policy == zu_policy_checked && op %in% c("%/%", "%%") && length(x) > 0L &&
-    isTRUE(any(y == 0L, na.rm = TRUE))) {
+  if (
+    policy == zu_policy_checked &&
+      op %in% c("%/%", "%%") &&
+      length(x) > 0L &&
+      isTRUE(any(y == 0L, na.rm = TRUE))
+  ) {
     zu_abort("Division by zero.", "division", call = call)
   }
   code <- zu_common_code(kinds, call)
@@ -175,7 +206,16 @@ zu_arith <- function(op, x, y, policy, call) {
     zu_double_problem(zu_types[[code]], call)
     return(get(op, baseenv())(zu_dbl_quiet(x), zu_dbl_quiet(y)))
   }
-  res <- .Call(zu_arith_c, zu_arith_ops[[op]], ox$value, ox$kind, oy$value, oy$kind, code, policy)
+  res <- .Call(
+    zu_arith_c,
+    zu_arith_ops[[op]],
+    ox$value,
+    ox$kind,
+    oy$value,
+    oy$kind,
+    code,
+    policy
+  )
   zu_report_overflow(res[[2L]], policy, call)
   out <- res[[1L]]
   names(out) <- zu_result_names(x, y, length(out))
@@ -238,12 +278,23 @@ zu_pow <- function(x, y, policy, call) {
 # out of range: 1.5 is compared as 1.5.
 zu_compare <- function(op, x, y, call) {
   # NULL compares as a zero-length vector, as in base R
-  if (is.null(x)) x <- integer()
-  if (is.null(y)) y <- integer()
+  if (is.null(x)) {
+    x <- integer()
+  }
+  if (is.null(y)) {
+    y <- integer()
+  }
   kinds <- c(zu_kind(x), zu_kind(y))
   zu_check_operands(kinds, list(x, y), call)
   zu_check_recycling(x, y)
-  out <- .Call(zu_compare_c, zu_compare_ops[[op]], x, kinds[[1L]], y, kinds[[2L]])
+  out <- .Call(
+    zu_compare_c,
+    zu_compare_ops[[op]],
+    x,
+    kinds[[1L]],
+    y,
+    kinds[[2L]]
+  )
   names(out) <- zu_result_names(x, y, length(out))
   out
 }
@@ -296,11 +347,15 @@ checked_mul <- function(x, y) zu_arith("*", x, y, zu_policy_checked, sys.call())
 
 #' @rdname zuint-arith
 #' @export
-checked_idiv <- function(x, y) zu_arith("%/%", x, y, zu_policy_checked, sys.call())
+checked_idiv <- function(x, y) {
+  zu_arith("%/%", x, y, zu_policy_checked, sys.call())
+}
 
 #' @rdname zuint-arith
 #' @export
-checked_mod <- function(x, y) zu_arith("%%", x, y, zu_policy_checked, sys.call())
+checked_mod <- function(x, y) {
+  zu_arith("%%", x, y, zu_policy_checked, sys.call())
+}
 
 #' @rdname zuint-arith
 #' @export
@@ -399,7 +454,11 @@ zu_narrow <- function(x, code, call) {
   out <- withCallingHandlers(
     zu_cast(x, code),
     zuint_cast_warning = function(w) {
-      zu_warn("A rounded value is out of range. NA produced.", "overflow", call = call)
+      zu_warn(
+        "A rounded value is out of range. NA produced.",
+        "overflow",
+        call = call
+      )
       invokeRestart("muffleWarning")
     }
   )

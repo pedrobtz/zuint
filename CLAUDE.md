@@ -328,6 +328,10 @@ The shared workflows this package calls:
   `mutation.yml` runs `tools/fuzz/driver` against each mutant of the two
   readers, and `alloc-failure.yml` fails each allocation of
   `tools/alloc-exercise.R` in turn.
+- `format.yaml`, the package's own: `air format . --check`, gated by
+  `changes.yml`. Run `air format .` before pushing R code; `air.toml`
+  sets the width, and `.git-blame-ignore-revs` lists formatting-only
+  commits.
 
 Two deliberate deviations from the shared CI rules:
 

@@ -26,7 +26,11 @@ zu_kind <- function(x) {
 }
 
 zu_kind_label <- function(x) {
-  if (is.object(x)) paste0("<", paste(class(x), collapse = "/"), ">") else paste("a", typeof(x), "vector")
+  if (is.object(x)) {
+    paste0("<", paste(class(x), collapse = "/"), ">")
+  } else {
+    paste("a", typeof(x), "vector")
+  }
 }
 
 # x, of kind `kind`, as a bare payload of type `code`, and how many values

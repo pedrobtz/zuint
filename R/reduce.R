@@ -22,7 +22,11 @@ zu_summary_group <- function(..., na.rm = FALSE) {
     return(get(.Generic, baseenv())(x, na.rm = na.rm))
   }
   if (is.na(code)) {
-    x <- zu_cast(x, zu_common_code(vapply(args, zu_kind, integer(1)), call), call = call)
+    x <- zu_cast(
+      x,
+      zu_common_code(vapply(args, zu_kind, integer(1)), call),
+      call = call
+    )
     code <- zu_code(x)
   }
   p <- x
@@ -32,7 +36,10 @@ zu_summary_group <- function(..., na.rm = FALSE) {
     prod = zu_reduce_result(.Call(zu_prod_c, p, code, na.rm), code, call),
     min = zu_extreme(x, code, na.rm, 1L, call),
     max = zu_extreme(x, code, na.rm, 2L, call),
-    range = c(zu_extreme(x, code, na.rm, 1L, call), zu_extreme(x, code, na.rm, 2L, call)),
+    range = c(
+      zu_extreme(x, code, na.rm, 1L, call),
+      zu_extreme(x, code, na.rm, 2L, call)
+    ),
     any = any(zu_as_logical(x), na.rm = na.rm),
     all = all(zu_as_logical(x), na.rm = na.rm)
   )
@@ -51,7 +58,11 @@ zu_extreme <- function(x, code, na.rm, which, call) {
   }
   if (length(x) == 0L || all(zu_is_na(x))) {
     zu_warn(
-      sprintf("no non-missing arguments to %s; returning %s", c("min", "max")[[which]], c("Inf", "-Inf")[[which]]),
+      sprintf(
+        "no non-missing arguments to %s; returning %s",
+        c("min", "max")[[which]],
+        c("Inf", "-Inf")[[which]]
+      ),
       "empty"
     )
     return(c(Inf, -Inf)[[which]])
@@ -62,7 +73,11 @@ zu_extreme <- function(x, code, na.rm, which, call) {
 
 zu_mean <- function(x, trim = 0, na.rm = FALSE, ...) {
   if (!identical(trim, 0) && !identical(trim, 0L)) {
-    zu_abort("mean() with `trim` is not supported for zuint vectors.", "unsupported", call = sys.call())
+    zu_abort(
+      "mean() with `trim` is not supported for zuint vectors.",
+      "unsupported",
+      call = sys.call()
+    )
   }
   .Call(zu_mean_c, x, zu_code(x), isTRUE(na.rm))
 }
@@ -205,7 +220,11 @@ zu_diff <- function(x, lag = 1L, differences = 1L, ...) {
 seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
   call <- sys.call()
   args <- list(from, to, by)
-  kinds <- vapply(args, function(a) if (is.null(a)) 0L else zu_kind(a), integer(1))
+  kinds <- vapply(
+    args,
+    function(a) if (is.null(a)) 0L else zu_kind(a),
+    integer(1)
+  )
   zu_check_operands(kinds, args, call)
   # the elements' type comes from `from` and `to`; `by` only steps, and may be
   # negative for an unsigned type
@@ -215,7 +234,11 @@ seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
   }
   from <- zu_cast(from, code, call = call)
   if (length(from) != 1L || is.na(from) || length(by) != 1L || is.na(by)) {
-    zu_abort("`from` and `by` must be single non-missing values.", "type", call = call)
+    zu_abort(
+      "`from` and `by` must be single non-missing values.",
+      "type",
+      call = call
+    )
   }
   if (by == 0L) {
     zu_abort("`by` must not be zero.", "type", call = call)
@@ -225,7 +248,11 @@ seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
   step <- withCallingHandlers(
     zu_cast(abs(by), code, call = call),
     zuint_cast_warning = function(w) {
-      zu_abort("`by` is out of range of the sequence's type.", "type", call = call)
+      zu_abort(
+        "`by` is out of range of the sequence's type.",
+        "type",
+        call = call
+      )
     }
   )
   if (is.null(length.out)) {
@@ -234,7 +261,11 @@ seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
       zu_abort("`to` must be a single non-missing value.", "type", call = call)
     }
     if ((to > from && down) || (to < from && !down)) {
-      zu_abort("`by` goes the wrong way from `from` to `to`.", "type", call = call)
+      zu_abort(
+        "`by` goes the wrong way from `from` to `to`.",
+        "type",
+        call = call
+      )
     }
     length.out <- zu_seq_count(from, to, step, down, call)
   }
@@ -277,4 +308,3 @@ zu_seq_count <- function(from, to, step, down, call) {
   }
   zu_dbl_quiet(dq) - as.double(hi %% step < lo %% step) + 1
 }
-
