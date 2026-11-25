@@ -52,3 +52,4 @@ po/*~
 # tools/fuzz build output
 tools/fuzz/driver
 tools/fuzz/*.o
+tests/testthat/_problems/
