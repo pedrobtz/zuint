@@ -48,7 +48,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | [#22](https://github.com/pedrobtz/zuint/pull/22) | 2026-10-16 |
 | 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | [#23](https://github.com/pedrobtz/zuint/pull/23) | 2026-10-16 |
 | 9 | [Arrow bridge handover](#stage-9--arrow-bridge-handover) | full — compiled code removed and a new Suggests guard | [#52](https://github.com/pedrobtz/zuint/issues/52) | [#89](https://github.com/pedrobtz/zuint/pull/89) | 2026-11-25 |
-| 9.1 | [Fixed-point core and the C table](#stage-91--fixed-point-core-and-the-c-table) | full — new compiled code, a public C ABI and a thread contract | [#103](https://github.com/pedrobtz/zuint/issues/103) | | 2026-11-25 |
+| 9.1 | [Fixed-point core and the C table](#stage-91--fixed-point-core-and-the-c-table) | full — new compiled code, a public C ABI and a thread contract | [#103](https://github.com/pedrobtz/zuint/issues/103) | [#106](https://github.com/pedrobtz/zuint/pull/106) | 2026-11-25 |
 | 9.2 | [The decimal128 vector class](#stage-92--the-decimal128-vector-class) | quick | [#104](https://github.com/pedrobtz/zuint/issues/104) | | |
 | 10 | [v0.1.0 readiness](#stage-10--v010-readiness) | full | [#11](https://github.com/pedrobtz/zuint/issues/11) | | |
 | 11 | [Review](#stage-11--review) | full | [#53](https://github.com/pedrobtz/zuint/issues/53) | | |
