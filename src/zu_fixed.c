@@ -482,6 +482,7 @@ int zu_fx_parse(const char *text, size_t len, int p, int s, zuf_i128 *out)
     fx_number x;
     if (!out || (!text && len)) return ZU_FX_ARGUMENT;
     if (zu_fx_type_check(p, s) != ZU_FX_OK) return ZU_FX_TYPE;
+    if (!text) b = (const unsigned char *)""; /* NULL + 0 is undefined in C */
     if (!dk_accepts(b, len, p, s)) return fx_grammar(b, b + len) ? ZU_FX_OVERFLOW : ZU_FX_INVALID;
     fx_read(b, b + len, &x);
     return fx_exact(&x, p, s, out);

@@ -168,7 +168,8 @@ SEXP zu_dec_from_double_c(SEXP x, SEXP p, SEXP s)
         double v = REAL(x)[i];
         zuf_i128 c;
         int k;
-        if (ISNA(v)) {
+        /* NaN is NA, as in the integer types' casts */
+        if (ISNAN(v)) {
             zu_set_na(val, ZU_INT128, i);
             INTEGER(st)[i] = NA_INTEGER;
             continue;
