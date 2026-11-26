@@ -38,7 +38,10 @@ a logical vector.
 
 Both arguments take their common type first (see
 [`zu_common_type()`](https://pedrobtz.github.io/zuint/reference/zu_common_type.md));
-`NA` matches `NA`.
+`NA` matches `NA`. A
+[`decimal128()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+matches by value, whatever the scales: `1.0` matches `1.00` and the
+integer `1`.
 
 ## Examples
 

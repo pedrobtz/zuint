@@ -187,14 +187,27 @@
   [`decimal_precision()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
   and
   [`decimal_scale()`](https://pedrobtz.github.io/zuint/reference/decimal128.md).
-  `+`, `-`, `*`, [`c()`](https://rdrr.io/r/base/c.html) and vctrs give
-  DuckDB’s result types; comparison is exact across scales; `/`,
-  [`mean()`](https://rdrr.io/r/base/mean.html) and the `Math` functions
-  give doubles; and sorting, hashing,
+  `+`, `-`, `*`, [`round()`](https://rdrr.io/r/base/Round.html),
+  [`floor()`](https://rdrr.io/r/base/Round.html),
+  [`ceiling()`](https://rdrr.io/r/base/Round.html),
+  [`trunc()`](https://rdrr.io/r/base/Round.html),
+  [`cumsum()`](https://rdrr.io/r/base/cumsum.html),
+  [`c()`](https://rdrr.io/r/base/c.html), `x[i] <- value` and vctrs give
+  DuckDB’s result types, and only
+  [`decimal128()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+  rounds a value into one; comparison is exact across scales and with
+  any integer or double; [`match()`](https://rdrr.io/r/base/match.html),
+  `%in%` and
+  [`zu_match()`](https://pedrobtz.github.io/zuint/reference/zu_match.md)
+  find equal values whatever their scales; `/`,
+  [`mean()`](https://rdrr.io/r/base/mean.html) and the other `Math`
+  functions give doubles; and sorting, hashing,
   [`sum()`](https://rdrr.io/r/base/sum.html),
   [`min()`](https://rdrr.io/r/base/Extremes.html) and
   [`max()`](https://rdrr.io/r/base/Extremes.html) work on the
-  coefficients ([\#104](https://github.com/pedrobtz/zuint/issues/104)).
+  coefficients ([\#104](https://github.com/pedrobtz/zuint/issues/104),
+  [\#108](https://github.com/pedrobtz/zuint/issues/108) to
+  [\#129](https://github.com/pedrobtz/zuint/issues/129)).
 - With vctrs, dplyr and tibble: zuint columns combine by the promotion
   order, cast exactly, arrange, group, summarise, bind and print.
   data.table keys on `int64` natively.
@@ -203,6 +216,7 @@
   [`zu_vapply()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
   keep the type where [`ifelse()`](https://rdrr.io/r/base/ifelse.html)
   and [`vapply()`](https://rdrr.io/r/base/lapply.html) would read raw
-  bits.
+  bits. [`unique()`](https://rdrr.io/r/base/unique.html) drops names, as
+  base R’s does.
 - A getting-started vignette, and benchmarks against bit64 in the
   README.

@@ -72,7 +72,8 @@ as numbers. These helpers do the same jobs and keep the type.</p>
 
 
 <dt id="arg-fun-value">FUN.VALUE<a class="anchor" aria-label="anchor" href="#arg-fun-value"></a></dt>
-<dd><p>A zuint vector of the length each result must have.</p></dd>
+<dd><p>A zuint or <code>decimal128</code> vector of the length each result
+must have.</p></dd>
 
 
 <dt id="arg--">...<a class="anchor" aria-label="anchor" href="#arg--"></a></dt>
@@ -89,7 +90,13 @@ as numbers. These helpers do the same jobs and keep the type.</p>
 <code><a href="zu_common_type.html">zu_common_type()</a></code>) and is <code>NA</code> where <code>test</code> is. <code>zu_vapply()</code> calls
 <code>FUN</code> on each element of <code>X</code> and requires each result to have the length
 of <code>FUN.VALUE</code>, a zuint prototype such as <code>int64(0)</code>; the results take its
-type.</p>
+type. Both take <code><a href="decimal128.html">decimal128()</a></code> vectors too: <code>zu_ifelse()</code> combines <code>yes</code>
+and <code>no</code> as <code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code> does, and <code>zu_vapply()</code> converts each result to the
+type of <code>FUN.VALUE</code> as <code>x[i] &lt;- value</code> does, exactly or <code>NA</code>.</p>
+<p>The same goes for <code><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum()</a></code>, <code><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min()</a></code>, <code><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max()</a></code>, <code><a href="https://rdrr.io/r/base/range.html" class="external-link">range()</a></code> and the other
+<code>Summary</code> functions, which R dispatches on their first argument only:
+<code>sum(int128(5), 1L)</code> is exact, while <code>sum(1L, int128(5))</code> reads the raw
+bits. Put the zuint vector first.</p>
     </div>
 
     <div class="section level2">

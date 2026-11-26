@@ -79,7 +79,8 @@ on long vectors.</p>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>Both arguments take their common type first (see <code><a href="zu_common_type.html">zu_common_type()</a></code>); <code>NA</code>
-matches <code>NA</code>.</p>
+matches <code>NA</code>. A <code><a href="decimal128.html">decimal128()</a></code> matches by value, whatever the scales:
+<code>1.0</code> matches <code>1.00</code> and the integer <code>1</code>.</p>
     </div>
 
     <div class="section level2">

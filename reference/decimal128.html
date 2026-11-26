@@ -63,7 +63,9 @@ column, or one written to it, keeps every digit and its type.</p>
 
 
 <dl><dt id="arg-x">x<a class="anchor" aria-label="anchor" href="#arg-x"></a></dt>
-<dd><p>A vector to convert.</p></dd>
+<dd><p>For <code>decimal128()</code>, a vector to convert; for <code>is_decimal128()</code>,
+any object; for <code>decimal_precision()</code> and <code>decimal_scale()</code>, a
+<code>decimal128</code> vector.</p></dd>
 
 
 <dt id="arg-precision">precision<a class="anchor" aria-label="anchor" href="#arg-precision"></a></dt>
@@ -91,25 +93,34 @@ and blank strings are <code>NA</code>.</p></li>
 <li><p>A double is rounded to the scale, half away from zero, as DuckDB's
 cast does: <code>decimal128(2.675, 5, 2)</code> is <code>2.68</code>.</p></li>
 <li><p>A <code>decimal128</code> of another type is rescaled, rounding half away from
-zero. With neither <code>precision</code> nor <code>scale</code> given it is returned as it
-is.</p></li>
+zero. Without <code>precision</code> or <code>scale</code> it keeps its own: <code>decimal128(x, 20)</code> changes only the precision. With neither it is returned as it is.</p></li>
 </ul><p>A value that does not fit <code>precision</code> digits becomes <code>NA</code> with a warning
 of class <code>zuint_cast_warning</code>. Names are kept.</p>
 <p>Arithmetic follows DuckDB's types: <code>+</code> and <code>-</code> keep the larger scale
 and grow the precision by one, <code>*</code> adds precisions and scales, and
 <code>precision</code> stops at 38. As in DuckDB, a product of two operands of at
-most 18 digits stops at 18 unless its scale is 18 or more. A result that does not fit is <code>NA</code> with a
-<code>zuint_overflow_warning</code>. An integer operand counts as
-<code>DECIMAL(10, 0)</code>, <code>int64</code> as <code>DECIMAL(19, 0)</code>, <code>uint64</code> as
-<code>DECIMAL(20, 0)</code> and the 128-bit types as <code>DECIMAL(38, 0)</code>; a whole
-double is an integer operand, and any other double follows
-<code>options(zuint.double)</code>. Comparison is exact across scales. <code>/</code>, <code>%%</code>,
-<code>%/%</code>, <code>^</code> and the <code>Math</code> functions other than <code><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs()</a></code> compute in double,
-as does <code><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean()</a></code>; <code><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum()</a></code> is a <code>DECIMAL(38, scale)</code>.</p>
-<p><code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code> and vctrs combine vectors in DuckDB's common type: the largest
-scale and the most integer digits, and the scale cut when both do not
-fit 38 digits. A value the common type cannot hold exactly is <code>NA</code> with
-a <code>zuint_cast_warning</code>.</p>
+most 18 digits stops at 18 unless its scale is 18 or more. A result that
+does not fit is <code>NA</code> with a <code>zuint_overflow_warning</code>. An integer operand
+counts as <code>DECIMAL(10, 0)</code>, <code>int64</code> as <code>DECIMAL(19, 0)</code>, <code>uint64</code> as
+<code>DECIMAL(20, 0)</code> and the 128-bit types as <code>DECIMAL(38, 0)</code>. A whole
+double is an integer operand, typed as DuckDB types an integer literal;
+any other double follows <code>options(zuint.double)</code>.</p>
+<p>Comparison is exact across scales, and with every integer and whole
+double, even one too large for 38 digits. <code>/</code>, <code>%%</code>, <code>%/%</code> and <code>^</code>
+compute in double, as do <code><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean()</a></code>, <code><a href="https://rdrr.io/r/stats/median.html" class="external-link">median()</a></code>, <code><a href="https://rdrr.io/r/base/prod.html" class="external-link">prod()</a></code> and the <code>Math</code>
+functions other than those below; <code>!</code>, <code>&amp;</code> and <code>|</code> give logicals.</p>
+<p>These keep a decimal type, DuckDB's:</p><ul><li><p><code><a href="https://rdrr.io/r/base/MathFun.html" class="external-link">abs()</a></code>, <code><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cummax()</a></code> and <code><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cummin()</a></code> keep the type, and <code><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum()</a></code> and
+<code><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cumsum()</a></code> are <code>DECIMAL(38, scale)</code>.</p></li>
+<li><p><code>round(x, digits)</code> rounds half away from zero to <code>DECIMAL(precision, digits)</code>, and is <code>x</code> when <code>digits</code> is the scale or more. A negative
+<code>digits</code> gives scale 0, with one more digit at scale 0.</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/Round.html" class="external-link">floor()</a></code>, <code><a href="https://rdrr.io/r/base/Round.html" class="external-link">ceiling()</a></code> and <code><a href="https://rdrr.io/r/base/Round.html" class="external-link">trunc()</a></code> are <code>DECIMAL(precision, 0)</code>.</p></li>
+</ul><p><code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code>, vctrs and <code>x[i] &lt;- value</code> combine values in DuckDB's common type
+(for <code>[&lt;-</code>, <code>x</code>'s type): the largest scale and the most integer digits,
+and the scale cut when both do not fit 38 digits. A value the type
+cannot hold exactly is <code>NA</code> with a <code>zuint_cast_warning</code>; only
+<code>decimal128()</code> rounds. <code><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum()</a></code>, <code><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min()</a></code> and the other <code>Summary</code>
+functions dispatch on their first argument, as R's group generics do, so
+write <code>sum(x, 1L)</code>, not <code>sum(1L, x)</code>.</p>
     </div>
 
     <div class="section level2">

@@ -33,7 +33,7 @@ zu_vapply(X, FUN, FUN.VALUE, ...)
 
 - FUN.VALUE:
 
-  A zuint vector of the length each result must have.
+  A zuint or `decimal128` vector of the length each result must have.
 
 - ...:
 
@@ -49,7 +49,20 @@ A zuint vector.
 [`zu_common_type()`](https://pedrobtz.github.io/zuint/reference/zu_common_type.md))
 and is `NA` where `test` is. `zu_vapply()` calls `FUN` on each element
 of `X` and requires each result to have the length of `FUN.VALUE`, a
-zuint prototype such as `int64(0)`; the results take its type.
+zuint prototype such as `int64(0)`; the results take its type. Both take
+[`decimal128()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+vectors too: `zu_ifelse()` combines `yes` and `no` as
+[`c()`](https://rdrr.io/r/base/c.html) does, and `zu_vapply()` converts
+each result to the type of `FUN.VALUE` as `x[i] <- value` does, exactly
+or `NA`.
+
+The same goes for [`sum()`](https://rdrr.io/r/base/sum.html),
+[`min()`](https://rdrr.io/r/base/Extremes.html),
+[`max()`](https://rdrr.io/r/base/Extremes.html),
+[`range()`](https://rdrr.io/r/base/range.html) and the other `Summary`
+functions, which R dispatches on their first argument only:
+`sum(int128(5), 1L)` is exact, while `sum(1L, int128(5))` reads the raw
+bits. Put the zuint vector first.
 
 ## Examples
 

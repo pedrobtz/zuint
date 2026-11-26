@@ -21,7 +21,9 @@ decimal_scale(x)
 
 - x:
 
-  A vector to convert.
+  For `decimal128()`, a vector to convert; for `is_decimal128()`, any
+  object; for `decimal_precision()` and `decimal_scale()`, a
+  `decimal128` vector.
 
 - precision:
 
@@ -53,8 +55,9 @@ bit64 `integer64` or another `decimal128`.
   cast does: `decimal128(2.675, 5, 2)` is `2.68`.
 
 - A `decimal128` of another type is rescaled, rounding half away from
-  zero. With neither `precision` nor `scale` given it is returned as it
-  is.
+  zero. Without `precision` or `scale` it keeps its own:
+  `decimal128(x, 20)` changes only the precision. With neither it is
+  returned as it is.
 
 A value that does not fit `precision` digits becomes `NA` with a warning
 of class `zuint_cast_warning`. Names are kept.
@@ -65,18 +68,45 @@ grow the precision by one, `*` adds precisions and scales, and
 most 18 digits stops at 18 unless its scale is 18 or more. A result that
 does not fit is `NA` with a `zuint_overflow_warning`. An integer operand
 counts as `DECIMAL(10, 0)`, `int64` as `DECIMAL(19, 0)`, `uint64` as
-`DECIMAL(20, 0)` and the 128-bit types as `DECIMAL(38, 0)`; a whole
-double is an integer operand, and any other double follows
-`options(zuint.double)`. Comparison is exact across scales. `/`, `%%`,
-`%/%`, `^` and the `Math` functions other than
-[`abs()`](https://rdrr.io/r/base/MathFun.html) compute in double, as
-does [`mean()`](https://rdrr.io/r/base/mean.html);
-[`sum()`](https://rdrr.io/r/base/sum.html) is a `DECIMAL(38, scale)`.
+`DECIMAL(20, 0)` and the 128-bit types as `DECIMAL(38, 0)`. A whole
+double is an integer operand, typed as DuckDB types an integer literal;
+any other double follows `options(zuint.double)`.
 
-[`c()`](https://rdrr.io/r/base/c.html) and vctrs combine vectors in
-DuckDB's common type: the largest scale and the most integer digits, and
-the scale cut when both do not fit 38 digits. A value the common type
-cannot hold exactly is `NA` with a `zuint_cast_warning`.
+Comparison is exact across scales, and with every integer and whole
+double, even one too large for 38 digits. `/`, `%%`, `%/%` and `^`
+compute in double, as do [`mean()`](https://rdrr.io/r/base/mean.html),
+[`median()`](https://rdrr.io/r/stats/median.html),
+[`prod()`](https://rdrr.io/r/base/prod.html) and the `Math` functions
+other than those below; `!`, `&` and `|` give logicals.
+
+These keep a decimal type, DuckDB's:
+
+- [`abs()`](https://rdrr.io/r/base/MathFun.html),
+  [`cummax()`](https://rdrr.io/r/base/cumsum.html) and
+  [`cummin()`](https://rdrr.io/r/base/cumsum.html) keep the type, and
+  [`sum()`](https://rdrr.io/r/base/sum.html) and
+  [`cumsum()`](https://rdrr.io/r/base/cumsum.html) are
+  `DECIMAL(38, scale)`.
+
+- `round(x, digits)` rounds half away from zero to
+  `DECIMAL(precision, digits)`, and is `x` when `digits` is the scale or
+  more. A negative `digits` gives scale 0, with one more digit at scale
+  0.
+
+- [`floor()`](https://rdrr.io/r/base/Round.html),
+  [`ceiling()`](https://rdrr.io/r/base/Round.html) and
+  [`trunc()`](https://rdrr.io/r/base/Round.html) are
+  `DECIMAL(precision, 0)`.
+
+[`c()`](https://rdrr.io/r/base/c.html), vctrs and `x[i] <- value`
+combine values in DuckDB's common type (for `[<-`, `x`'s type): the
+largest scale and the most integer digits, and the scale cut when both
+do not fit 38 digits. A value the type cannot hold exactly is `NA` with
+a `zuint_cast_warning`; only `decimal128()` rounds.
+[`sum()`](https://rdrr.io/r/base/sum.html),
+[`min()`](https://rdrr.io/r/base/Extremes.html) and the other `Summary`
+functions dispatch on their first argument, as R's group generics do, so
+write `sum(x, 1L)`, not `sum(1L, x)`.
 
 ## Examples
 
