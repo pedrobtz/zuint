@@ -153,6 +153,11 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   [`inst/include/zuint-r.h`](inst/include/zuint-r.h) resolves.
   [`src/zu_fixed_r.c`](src/zu_fixed_r.c) holds its R entry points, and
   [`tools/fixed/`](tools/fixed) its C tests.
+- [`R/decimal.R`](R/decimal.R) is the `decimal128` class over the
+  fixed-point core: its own methods table, `dec_methods`, registered for
+  `zu_decimal128`, the structural methods through an int128 view of the
+  payload, and DuckDB's result and common types. `zu_ops()`, `zu_c()`,
+  `zu_cast()` and `zu_summary_group()` hand a decimal operand to it.
 - [`R/bit64.R`](R/bit64.R) holds the bit64 methods and `as_integer64()`.
 - [`R/types.R`](R/types.R) has the constructors, the `NA_*_` constants and
   `zu_storage()`; [`R/cast.R`](R/cast.R) is the one conversion path every
@@ -313,6 +318,14 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   machine (`dk_*`, credited in `inst/COPYRIGHTS`); the value comes from
   the digits, exactly. Its two deviations from DuckDB are in design §2.2,
   and `test-fixed.R` allows no other difference.
+- **A decimal128's type is DuckDB's, probed, never derived.** Each rule
+  in `R/decimal.R` (the 18-digit product, the scale cut in the common
+  type) came from DuckDB 2.0.1's `typeof()`, and `test-decimal.R`
+  compares every operator over 121 type pairs with it. Probe before
+  changing one.
+- **`c()` of decimals never rounds.** A value a cut scale cannot hold is
+  `NA` with a `zuint_cast_warning`; only `decimal128(x, p, s)`, the
+  explicit request, rounds.
 - **Native routines are called through their registered symbols.**
   `init.c` calls `R_forceSymbols()`, so `.Call("name", ...)` with a string
   fails; use the symbol `useDynLib(.registration = TRUE)` defines.

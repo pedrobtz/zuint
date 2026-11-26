@@ -62,6 +62,23 @@ try(int64(10) + 0.5)
 int64("9007199254740993") > 2^53
 ```
 
+## Fixed-point decimals
+
+`decimal128()` holds DuckDB's `DECIMAL(precision, scale)`: up to 38
+digits, `scale` of them after the point, kept exactly. Arithmetic gives
+DuckDB's types, so a product's scale is the sum of the operands' scales,
+and comparison is exact across scales:
+
+```{r}
+price <- decimal128(c("19.99", "5.00"), 10, 2)
+qty <- c(3L, 12L)
+price * qty
+sum(price * qty)
+price == decimal128("5", 3, 0)
+```
+
+`/` and functions such as `log()` give doubles, as DuckDB's do.
+
 ## Overflow policies
 
 The operators give `NA` with a warning when a result is out of range, as R's
