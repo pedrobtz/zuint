@@ -236,10 +236,14 @@ fixed-point is a small layer on top.
       type; zuint refuses it. Fixed on DuckDB's main by
       [duckdb#26961](https://github.com/duckdb/duckdb/pull/26961), not
       yet released;
-    - below precision 19 it keeps only 4, 9 or 18 digits, leading zeros
-      after the point included, so `0.0000000001234e10` as DECIMAL(5,2)
-      is 0.00; zuint gives 1.23
+    - with an exponent it keeps only 4, 9, 18 or 38 digits, by precision,
+      leading zeros after the point included, so `0.0000000001234e10` as
+      DECIMAL(5,2) is 0.00, where zuint gives 1.23
       ([duckdb#29395](https://github.com/duckdb/duckdb/issues/29395)).
+      At precision 19 and over the same cut at 38 digits rounds the last
+      one wrong: `-334546177624847.3059360487613332279271164e16` as
+      DECIMAL(38,7) ends `.2792711`, where the exact value ends
+      `.27927116` and zuint gives `.2792712` (2026-11-26, #140).
 
     A refused text is `ZUINT_ERR_INVALID` when it is outside the grammar
     and `ZUINT_ERR_OVERFLOW` when it is inside it.
@@ -294,7 +298,8 @@ fixed-point is a small layer on top.
     core's parser), the integer types and zuint vectors (exact, or `NA`
     with a `zuint_cast_warning` when a value does not fit p digits) and
     doubles (the core's DuckDB rounding: the constructor is the explicit
-    request §5 asks for);
+    request §5 asks for). With a `decimal128` and only one of
+    `precision` and `scale`, the other stays x's (2026-11-26, #124);
   - `+`, `-` and `*` give DuckDB 2.0.1's result types, checked against
     its `typeof()` in the tests (probed 2026-11-26): `+` and `-` take
     the larger scale s and the precision max(p1 - s1, p2 - s2) + s + 1;
@@ -303,11 +308,26 @@ fixed-point is a small layer on top.
     18; every precision stops at 38, and a product needing a scale over
     38 is a `zuint_incompatible_error`, where DuckDB refuses to bind. A
     result that does not fit is `NA` with a `zuint_overflow_warning`
-    (§6), where DuckDB raises. Comparison is exact across scales. `/`,
-    `%%`, `%/%`, `^`, `prod()`, `mean()`, `median()` and the `Math`
-    group other than `abs()` return doubles; DuckDB's `%` stays a
-    decimal, but R's `%%` and DuckDB's disagree on signs, so zuint does
-    not pretend to be either. `abs()` and unary `-` keep the type.
+    (§6), where DuckDB raises. Comparison is exact across scales, and
+    with every operand as §5 has it for the integer types: a double of
+    any value (whole parts first, then the fraction from the double's
+    exact decimal expansion), and an integer beyond 38 digits by its
+    sign (2026-11-26, #113; it had sent fractions to `zuint.double`).
+    `/`, `%%`, `%/%`, `^`, `prod()`, `cumprod()`, `mean()`, `median()`,
+    `signif()` and the other `Math` functions return doubles; DuckDB's
+    `%` stays a decimal, but R's `%%` and DuckDB's disagree on signs, so
+    zuint does not pretend to be either. `abs()`, unary `-`, `cummax()`
+    and `cummin()` keep the type.
+  - The rounding functions keep a decimal type, DuckDB 2.0.1's, probed
+    (2026-11-26, #127; they had returned doubles): `round(x, d)` is
+    `DECIMAL(p, d)` for 0 <= d < s, half away from zero, and x itself
+    for d >= s; a negative d gives `DECIMAL(p, 0)`, or at scale 0
+    `DECIMAL(p + 1, 0)` (at most 38) while -d <= p, since `round(99,
+    -2)` is 100. `floor()`, `ceiling()` and `trunc()` are
+    `DECIMAL(p, 0)`, and `cumsum()` is `DECIMAL(38, s)`, DuckDB's
+    running `sum()`; a running sum past 38 digits is `NA` from there on,
+    with a `zuint_overflow_warning`, as base `cumsum()` does after an
+    overflow.
   - Integer operands take DuckDB's implicit casts: `integer` and
     `logical` as `DECIMAL(10, 0)`, `int64` as `DECIMAL(19, 0)`, `uint64`
     as `DECIMAL(20, 0)`, and `int128` and `uint128` as
@@ -315,16 +335,27 @@ fixed-point is a small layer on top.
     `zuint_cast_warning`. (DuckDB has the `UHUGEINT` cast this section
     first said it lacked.) A whole double is an integer operand, typed
     as DuckDB types an integer literal: `DECIMAL(10, 0)` when every value
-    fits an R integer, else `DECIMAL(19, 0)`; any other double follows
-    `zuint.double`, as elsewhere.
+    fits an R integer, `DECIMAL(19, 0)` when every value fits BIGINT, else
+    `DECIMAL(38, 0)` (2026-11-26, #113); any other double follows
+    `zuint.double`, as elsewhere. With bit64 attached, an `integer64` on
+    the left would run bit64's method, which converts the decimal with
+    `as.integer64()`; that method is a `zuint_incompatible_error` for a
+    decimal, so the answer is never a silent `NA` (2026-11-26, #115).
   - `c()` and vctrs combine in DuckDB's common type: the most integer
     digits e and the largest scale s, with the scale cut to 38 - e when
     e + s passes 38; with an integer type the decimal's scale stays and
     the precision stops at 38. Where DuckDB rounds a value into a cut
     scale, zuint gives `NA` with a `zuint_cast_warning`: `c()` is not a
-    request to round. `decimal128(x, p, s)` is, and rescales half away
-    from zero as DuckDB's `CAST` does. Conversion to the integer types
-    is exact or `NA` with a warning, where DuckDB's `CAST` rounds.
+    request to round. `x[i] <- value` and `x[[i]] <- value` cast the
+    value to x's type by the same rule, and a double that is not whole
+    follows `zuint.double` (2026-11-26, #109; they had rounded). Text is
+    read as `decimal128()` reads it, rounding, in all three. vctrs types
+    prototypes, not values, so it counts a double as `DECIMAL(10, 0)`,
+    as `c()` counts one of int32 values; a larger double is then a lossy
+    cast, not a wider type (2026-11-26, #129). `decimal128(x, p, s)` is
+    the request to round, and rescales half away from zero as DuckDB's
+    `CAST` does. Conversion to the integer types is exact or `NA` with a
+    warning, where DuckDB's `CAST` rounds.
   - `print()` and `format()` show every digit of the scale, under a
     `<decimal128(p, s)[n]>` header; `as.double()` is DuckDB's cast and
     does not warn, since almost every fraction rounds. Sorting, hashing,
@@ -333,7 +364,11 @@ fixed-point is a small layer on top.
     a vector; `mean()` is within an ulp or two of DuckDB's `avg()`,
     whose last bit depends on the platform's `long double`. The
     accessors are `decimal_precision()` and `decimal_scale()`, since
-    base `scale()` is already a generic.
+    base `scale()` is already a generic. `match()`, `%in%` and `table()`
+    compare values, not text at the vector's scale: `mtfrm()` writes a
+    decimal without trailing fractional zeros, so 1.0, 1.00 and the
+    integer 1 meet (2026-11-26, #108); `zu_match()`, `zu_ifelse()` and
+    `zu_vapply()` take decimals (#126).
   - The Arrow mapping waits (§15): review X5 registered no `d:*` key in
     zuarrow, and that decision is zuarrow's as much as zuint's.
 - **Tests:** the General Decimal Arithmetic suite (Cowlishaw's `.decTest`

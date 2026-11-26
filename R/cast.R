@@ -25,6 +25,10 @@ zu_kind <- function(x) {
   )
 }
 
+# A double vector with no class: base data, not a zuint or other classed
+# vector.
+zu_is_bare_double <- function(x) is.double(x) && !is.object(x)
+
 zu_kind_label <- function(x) {
   if (is.object(x)) {
     paste0("<", paste(class(x), collapse = "/"), ">")

@@ -12,12 +12,19 @@ duck_df <- function(con, df, expr) {
   DBI::dbGetQuery(con, sql)$r
 }
 
-# DuckDB's type of an expression, as "DECIMAL(p,s)", or the error class
-# "ERROR" when it refuses to bind.
+# DuckDB's type of an expression, as "DECIMAL(p,s)", or "ERROR" when it
+# refuses to bind the types.
 duck_typeof <- function(con, expr) {
   tryCatch(
     DBI::dbGetQuery(con, sprintf("SELECT typeof(%s) AS t", expr))$t,
-    error = function(e) "ERROR"
+    error = function(e) {
+      # only DuckDB refusing the types (a scale past 38 is out of range); a
+      # broken query is the test's own bug (#136)
+      if (!grepl("^(Binder|Out of Range) Error", conditionMessage(e))) {
+        stop(e)
+      }
+      "ERROR"
+    }
   )
 }
 

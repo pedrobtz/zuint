@@ -2,7 +2,7 @@
 # libFuzzer, for a local run and for mutation testing (each source compiled
 # on its own, as Mull needs). R's headers only: nothing here calls R.
 #
-#   make -C tools/fuzz driver            # then ./tools/fuzz/run-local
+#   make -C tools/fuzz driver            # then tools/fuzz/driver tools/fuzz/corpus/*
 #   make -C tools/fuzz driver CC="$MULL_CC" CFLAGS=
 CC ?= cc
 CFLAGS ?= -g -O1 -fno-omit-frame-pointer -fsanitize=address,undefined

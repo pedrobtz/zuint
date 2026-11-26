@@ -27,7 +27,8 @@
  * report, not a silent read of libFuzzer's buffer.
  *
  * Built by r-actions' fuzz.yml (.github/workflows/fuzz.yaml), and locally by
- * tools/fuzz/run-local for a plain random run without libFuzzer.
+ * `make -C tools/fuzz driver` as tools/fuzz/driver, for a plain random run
+ * without libFuzzer.
  */
 #include <math.h>
 #include <stdbool.h>
@@ -322,7 +323,11 @@ static void fuzz_decimal_value(zuf_i128 c, int p, int s, const char *text)
         {
             zuf_u128 diff = zuf_int_i128_magnitude(scaled), half = zuf_u128_from_u64(5);
             for (int i = 1; i < s; i++) half = zuf_u128_mul_wrap(half, zuf_u128_from_u64(10));
-            CHECK(zuf_u128_cmp(diff, half) <= 0);
+            int t = zuf_u128_cmp(diff, half);
+            CHECK(t <= 0);
+            /* a tie rounds away from zero: up moved from c in c's direction
+               (#130) */
+            if (t == 0) CHECK(zuf_i128_is_neg(scaled) == zuf_i128_is_neg(c));
         }
     }
 

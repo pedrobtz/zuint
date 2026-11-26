@@ -27,6 +27,7 @@
 #ifndef ZUINT_R_H
 #define ZUINT_R_H
 
+#include <string.h>
 #include <R.h>
 #include <Rinternals.h>
 #include <R_ext/Rdynload.h>
@@ -59,15 +60,14 @@ static inline const zuint_api_v1 *zuint_api(void)
 {
     static const zuint_api_v1 *cached = NULL;
     if (cached == NULL) {
-        /* R_GetCCallable() returns DL_FUNC. Going through a union, not a
-           cast, keeps -Wcast-function-type quiet in a consumer's build. */
-        union {
-            DL_FUNC fn;
-            zuint_get_api_fn get;
-        } resolve;
-        resolve.fn = R_GetCCallable("zuint", "zuint_get_api");
-        if (resolve.fn != NULL) {
-            const zuint_api_v1 *api = resolve.get((uint32_t)ZUINT_ABI_VERSION);
+        /* R_GetCCallable() returns DL_FUNC. Copying the bits, not casting,
+           keeps -Wcast-function-type quiet in a consumer's build, and is
+           defined in C++ too, where reading a union's other member is not. */
+        DL_FUNC fn = R_GetCCallable("zuint", "zuint_get_api");
+        zuint_get_api_fn get = NULL;
+        if (fn != NULL && sizeof get == sizeof fn) {
+            memcpy(&get, &fn, sizeof get);
+            const zuint_api_v1 *api = get((uint32_t)ZUINT_ABI_VERSION);
             if (api != NULL && api->struct_size >= (uint32_t)sizeof(zuint_api_v1)) cached = api;
         }
     }

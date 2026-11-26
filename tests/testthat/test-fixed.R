@@ -138,6 +138,17 @@ test_that("the two deviations from DuckDB are the ones the design records", {
   expect_identical(fx_parse("1.234e4", 5L, 0L)$coef, "12340")
   # and "0.0000000001234e10" as DECIMAL(5, 2) 0.00, its digits dropped
   expect_identical(fx_parse("0.0000000001234e10", 5L, 2L)$coef, "123")
+  # the same cut at 38 digits: DuckDB ends this one .2792711 (#140); gmp
+  # gives the exact value, -3345461776248473059360487613332.27927116
+  skip_if_not_installed("gmp")
+  digits <- "-3345461776248473059360487613332279271164"
+  exact <- gmp::as.bigq(gmp::as.bigz(digits), gmp::as.bigz(10)^9)
+  r <- fx_parse("-334546177624847.3059360487613332279271164e16", 38L, 7L)
+  expect_identical(
+    r$coef,
+    as.character(fx_round_half_away(exact * gmp::as.bigz(10)^7))
+  )
+  expect_identical(r$coef, "-33454617762484730593604876133322792712")
 })
 
 test_that("formatting is DuckDB's text", {
@@ -297,10 +308,11 @@ test_that("conversion from double is DuckDB's round(x * 10^s)", {
     ))
     expect_identical(ours$coef, duck, label = sprintf("(%d, %d)", p, s))
   }
+  # NaN is NA, as in the integer types' casts
   r <- fx_from_double(c(NaN, Inf, -Inf, NA, 1e300), 38L, 2L)
   expect_identical(
     r$status,
-    c(fx_invalid, fx_invalid, fx_invalid, NA_integer_, fx_overflow)
+    c(NA_integer_, fx_invalid, fx_invalid, NA_integer_, fx_overflow)
   )
 })
 

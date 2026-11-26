@@ -80,7 +80,9 @@ typedef struct {
      * reads it: surrounding whitespace, a sign, '_' between digits, an
      * exponent; digits past s round half away from zero.
      * ZUINT_ERR_INVALID for text that is not such a number,
-     * ZUINT_ERR_OVERFLOW for one that does not fit. */
+     * ZUINT_ERR_OVERFLOW for one that does not fit, or that has more than
+     * p - s digits before the point as written, before its exponent
+     * applies: DuckDB refuses "1e-38" as DECIMAL(38, 38). */
     int (*dec_parse)(const char *text, size_t len, int p, int s, zuint_i128 *out);
 
     /* Writes DECIMAL(p, s) as DuckDB does ("1.50", "-0.05", and ".50" when
@@ -90,11 +92,13 @@ typedef struct {
     int (*dec_format)(zuint_i128 c, int p, int s, char *buf, size_t cap, size_t *len);
 
     /* Casts DECIMAL(p, s) to double: c / 10^s correctly rounded, ties to
-     * even. */
+     * even. Like dec_from_double, it assumes the calling thread's default
+     * floating-point rounding mode, round to nearest. */
     int (*dec_to_double)(zuint_i128 c, int p, int s, double *out);
 
     /* Casts a double to DECIMAL(p, s) as DuckDB does: round(x * 1e<s>) in
-     * double arithmetic, half away from zero. */
+     * double arithmetic, half away from zero. The double arithmetic uses
+     * the calling thread's rounding mode, which must be the default. */
     int (*dec_from_double)(double x, int p, int s, zuint_i128 *out);
 
     /* *out = -1, 0 or 1 as a / 10^sa <, == or > b / 10^sb, exactly. */

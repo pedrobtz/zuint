@@ -43,6 +43,10 @@ jobs:
     runs-on: ubuntu-latest
     name: fixed-point C tests
     timeout-minutes: 30
+    # bash's pipefail, so that diff.py failing fails the step (#131)
+    defaults:
+      run:
+        shell: bash
     env:
       ZUFAST_INCLUDE: /tmp/zufast/inst/include
       CASES: ${{ needs.changes.outputs.profile == 'full' && '5000000' || '200000' }}

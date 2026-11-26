@@ -87,13 +87,16 @@
   and every member is safe on any thread (#103).
 * `decimal128()` holds DuckDB's `DECIMAL(p, s)` exactly, with
   `is_decimal128()`, `decimal_precision()` and `decimal_scale()`. `+`, `-`,
-  `*`, `c()` and vctrs give DuckDB's result types; comparison is exact
-  across scales; `/`, `mean()` and the `Math` functions give doubles; and
-  sorting, hashing, `sum()`, `min()` and `max()` work on the coefficients
-  (#104).
+  `*`, `round()`, `floor()`, `ceiling()`, `trunc()`, `cumsum()`, `c()`,
+  `x[i] <- value` and vctrs give DuckDB's result types, and only
+  `decimal128()` rounds a value into one; comparison is exact across
+  scales and with any integer or double; `match()`, `%in%` and
+  `zu_match()` find equal values whatever their scales; `/`, `mean()` and
+  the other `Math` functions give doubles; and sorting, hashing, `sum()`,
+  `min()` and `max()` work on the coefficients (#104, #108 to #129).
 * With vctrs, dplyr and tibble: zuint columns combine by the promotion order,
   cast exactly, arrange, group, summarise, bind and print. data.table keys
   on `int64` natively.
 * `zu_ifelse()` and `zu_vapply()` keep the type where `ifelse()` and
-  `vapply()` would read raw bits.
+  `vapply()` would read raw bits. `unique()` drops names, as base R's does.
 * A getting-started vignette, and benchmarks against bit64 in the README.

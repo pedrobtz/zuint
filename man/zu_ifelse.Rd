@@ -18,7 +18,8 @@ zu_vapply(X, FUN, FUN.VALUE, ...)
 
 \item{FUN}{A function.}
 
-\item{FUN.VALUE}{A zuint vector of the length each result must have.}
+\item{FUN.VALUE}{A zuint or \code{decimal128} vector of the length each result
+must have.}
 
 \item{...}{More arguments to \code{FUN}.}
 }
@@ -35,7 +36,14 @@ as numbers. These helpers do the same jobs and keep the type.
 \code{\link[=zu_common_type]{zu_common_type()}}) and is \code{NA} where \code{test} is. \code{zu_vapply()} calls
 \code{FUN} on each element of \code{X} and requires each result to have the length
 of \code{FUN.VALUE}, a zuint prototype such as \code{int64(0)}; the results take its
-type.
+type. Both take \code{\link[=decimal128]{decimal128()}} vectors too: \code{zu_ifelse()} combines \code{yes}
+and \code{no} as \code{\link[=c]{c()}} does, and \code{zu_vapply()} converts each result to the
+type of \code{FUN.VALUE} as \code{x[i] <- value} does, exactly or \code{NA}.
+
+The same goes for \code{\link[=sum]{sum()}}, \code{\link[=min]{min()}}, \code{\link[=max]{max()}}, \code{\link[=range]{range()}} and the other
+\code{Summary} functions, which R dispatches on their first argument only:
+\code{sum(int128(5), 1L)} is exact, while \code{sum(1L, int128(5))} reads the raw
+bits. Put the zuint vector first.
 }
 \examples{
 x <- int64(c("-9223372036854775807", "5", NA))

@@ -328,14 +328,25 @@ zu_as_data_frame <- function(
 # doubles; format.data.frame() passes "left". `big.mark` groups the digits in
 # threes; `width` is the minimum field width.
 zu_format <- function(x, ..., width = 0L, big.mark = "", justify = "right") {
-  s <- zu_as_character(x)
+  zu_format_text(zu_as_character(x), names(x), width, big.mark)
+}
+
+# The exact text `s` of a vector, as format() writes it: NA as "NA", digits
+# grouped by `big.mark`, right-justified in at least `width`.
+zu_format_text <- function(s, nm, width, big.mark) {
   na <- is.na(s)
   if (nzchar(big.mark)) {
-    s[!na] <- prettyNum(s[!na], big.mark = big.mark, preserve.width = "none")
+    # the text always has ".", whatever OutDec says
+    s[!na] <- prettyNum(
+      s[!na],
+      big.mark = big.mark,
+      decimal.mark = ".",
+      preserve.width = "none"
+    )
   }
   s[na] <- "NA"
   out <- formatC(s, width = max(width, nchar(s, "width"), 0L))
-  names(out) <- names(x)
+  names(out) <- nm
   out
 }
 
@@ -349,9 +360,18 @@ zu_print <- function(x, ..., max = NULL) {
     return(invisible(x))
   }
   cat("<", type, "[", n, "]>\n", sep = "")
+  zu_print_values(x, zu_format, max, ...)
+}
+
+# The values of x, formatted by `fmt`, after the caller's header line.
+zu_print_values <- function(x, fmt, max, ...) {
+  n <- length(x)
+  if (n == 0L) {
+    return(invisible(x))
+  }
   max <- if (is.null(max)) getOption("max.print", 99999L) else max
   shown <- if (n > max) x[seq_len(max)] else x
-  print(zu_format(shown), quote = FALSE, ...)
+  print(fmt(shown), quote = FALSE, ...)
   if (n > max) {
     cat(
       " [ reached 'max' / getOption(\"max.print\") -- omitted",
@@ -363,13 +383,19 @@ zu_print <- function(x, ..., max = NULL) {
 }
 
 zu_str <- function(object, ..., vec.len = 4) {
+  zu_str_line(object, zu_type_name(object), zu_as_character, vec.len)
+}
+
+# str()'s one line: the type `label`, the length, and the first values as
+# `as_chr` writes them.
+zu_str_line <- function(object, label, as_chr, vec.len) {
   n <- length(object)
   shown <- object[seq_len(min(n, max(1L, round(2.5 * vec.len))))]
-  vals <- zu_as_character(shown)
+  vals <- as_chr(shown)
   vals[is.na(vals)] <- "NA"
   cat(
     " ",
-    zu_type_name(object),
+    label,
     " ",
     if (n == 1L) "" else paste0("[1:", n, "] "),
     paste(vals, collapse = " "),
@@ -380,6 +406,14 @@ zu_str <- function(object, ..., vec.len = 4) {
   invisible()
 }
 
+# A double of summary(), with "." as the values' own text has it.
+# zu_format_double() is the same text in any session: scipen too.
+zu_format_double <- function(x) {
+  op <- options(scipen = 0L)
+  on.exit(options(op))
+  format(x, digits = 15L, decimal.mark = ".")
+}
+
 # Minimum, median, mean, maximum and the NA count. Quartiles need
 # quantile(), which comes after 0.1.0.
 zu_summary <- function(object, ...) {
@@ -388,8 +422,8 @@ zu_summary <- function(object, ...) {
   n_na <- sum(zu_is_na(object))
   out <- c(
     "Min." = r[[1L]],
-    "Median" = format(zu_median(object, na.rm = TRUE), digits = 15L),
-    "Mean" = format(zu_mean(object, na.rm = TRUE), digits = 15L),
+    "Median" = zu_format_double(zu_median(object, na.rm = TRUE)),
+    "Mean" = zu_format_double(zu_mean(object, na.rm = TRUE)),
     "Max." = r[[2L]]
   )
   if (n_na > 0L) {

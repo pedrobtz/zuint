@@ -71,7 +71,10 @@ fx_bigz <- function(x) {
   gmp::as.bigz(x)
 }
 
-fx_pow10 <- function(k) gmp::as.bigz(10)^k
+fx_pow10 <- function(k) {
+  testthat::skip_if_not_installed("gmp")
+  gmp::as.bigz(10)^k
+}
 
 # Rounds a bigq to an integer, half away from zero.
 fx_round_half_away <- function(q) {
@@ -85,6 +88,7 @@ fx_round_half_away <- function(q) {
 # The coefficient at scale s of sign * int.frac * 10^e, rounded half away
 # from zero.
 fx_exact <- function(neg, int, frac, e, s) {
+  testthat::skip_if_not_installed("gmp") # #120
   # gmp reads a leading 0 as octal, so the zeros go first
   digits <- sub("^0+", "", paste0(int, frac))
   digits[!nzchar(digits)] <- "0"
@@ -96,11 +100,12 @@ fx_exact <- function(neg, int, frac, e, s) {
   r
 }
 
-fx_fits <- function(coef, p) abs(gmp::as.bigz(coef)) < fx_pow10(p)
+fx_fits <- function(coef, p) abs(fx_bigz(coef)) < fx_pow10(p)
 
 # The text DuckDB writes for a coefficient: the rule of its
 # DecimalToString, written out again from the spec.
 fx_format_ref <- function(coef, p, s) {
+  testthat::skip_if_not_installed("gmp") # #120
   c <- gmp::as.bigz(coef)
   neg <- c < 0
   m <- abs(c)
@@ -232,6 +237,7 @@ fx_types <- function() {
 # n random coefficients of DECIMAL(p, s), weighted to the edges: 0, +-1,
 # +-(10^p - 1) and the halfway points.
 fx_coefs <- function(n, p, seed) {
+  testthat::skip_if_not_installed("gmp") # #120
   top <- fx_pow10(p) - 1
   utils::capture.output(
     r <- gmp::urand.bigz(n, ceiling(p * log2(10)) + 1, seed = seed)

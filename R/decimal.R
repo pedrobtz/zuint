@@ -28,8 +28,8 @@ dec_ok <- 0L
 #' * A double is rounded to the scale, half away from zero, as DuckDB's
 #'   cast does: `decimal128(2.675, 5, 2)` is `2.68`.
 #' * A `decimal128` of another type is rescaled, rounding half away from
-#'   zero. With neither `precision` nor `scale` given it is returned as it
-#'   is.
+#'   zero. Without `precision` or `scale` it keeps its own: `decimal128(x,
+#'   20)` changes only the precision. With neither it is returned as it is.
 #'
 #' A value that does not fit `precision` digits becomes `NA` with a warning
 #' of class `zuint_cast_warning`. Names are kept.
@@ -37,21 +37,37 @@ dec_ok <- 0L
 #' Arithmetic follows DuckDB's types: `+` and `-` keep the larger scale
 #' and grow the precision by one, `*` adds precisions and scales, and
 #' `precision` stops at 38. As in DuckDB, a product of two operands of at
-#' most 18 digits stops at 18 unless its scale is 18 or more. A result that does not fit is `NA` with a
-#' `zuint_overflow_warning`. An integer operand counts as
-#' `DECIMAL(10, 0)`, `int64` as `DECIMAL(19, 0)`, `uint64` as
-#' `DECIMAL(20, 0)` and the 128-bit types as `DECIMAL(38, 0)`; a whole
-#' double is an integer operand, and any other double follows
-#' `options(zuint.double)`. Comparison is exact across scales. `/`, `%%`,
-#' `%/%`, `^` and the `Math` functions other than `abs()` compute in double,
-#' as does `mean()`; `sum()` is a `DECIMAL(38, scale)`.
+#' most 18 digits stops at 18 unless its scale is 18 or more. A result that
+#' does not fit is `NA` with a `zuint_overflow_warning`. An integer operand
+#' counts as `DECIMAL(10, 0)`, `int64` as `DECIMAL(19, 0)`, `uint64` as
+#' `DECIMAL(20, 0)` and the 128-bit types as `DECIMAL(38, 0)`. A whole
+#' double is an integer operand, typed as DuckDB types an integer literal;
+#' any other double follows `options(zuint.double)`.
 #'
-#' `c()` and vctrs combine vectors in DuckDB's common type: the largest
-#' scale and the most integer digits, and the scale cut when both do not
-#' fit 38 digits. A value the common type cannot hold exactly is `NA` with
-#' a `zuint_cast_warning`.
+#' Comparison is exact across scales, and with every integer and whole
+#' double, even one too large for 38 digits. `/`, `%%`, `%/%` and `^`
+#' compute in double, as do `mean()`, `median()`, `prod()` and the `Math`
+#' functions other than those below; `!`, `&` and `|` give logicals.
 #'
-#' @param x A vector to convert.
+#' These keep a decimal type, DuckDB's:
+#' * `abs()`, `cummax()` and `cummin()` keep the type, and `sum()` and
+#'   `cumsum()` are `DECIMAL(38, scale)`.
+#' * `round(x, digits)` rounds half away from zero to `DECIMAL(precision,
+#'   digits)`, and is `x` when `digits` is the scale or more. A negative
+#'   `digits` gives scale 0, with one more digit at scale 0.
+#' * `floor()`, `ceiling()` and `trunc()` are `DECIMAL(precision, 0)`.
+#'
+#' `c()`, vctrs and `x[i] <- value` combine values in DuckDB's common type
+#' (for `[<-`, `x`'s type): the largest scale and the most integer digits,
+#' and the scale cut when both do not fit 38 digits. A value the type
+#' cannot hold exactly is `NA` with a `zuint_cast_warning`; only
+#' `decimal128()` rounds. `sum()`, `min()` and the other `Summary`
+#' functions dispatch on their first argument, as R's group generics do, so
+#' write `sum(x, 1L)`, not `sum(1L, x)`.
+#'
+#' @param x For `decimal128()`, a vector to convert; for `is_decimal128()`,
+#'   any object; for `decimal_precision()` and `decimal_scale()`, a
+#'   `decimal128` vector.
 #' @param precision The number of digits, 1 to 38.
 #' @param scale The number of digits after the point, 0 to `precision`.
 #' @return `decimal128()` returns a `decimal128` vector the length of `x`.
@@ -69,8 +85,17 @@ dec_ok <- 0L
 #' @export
 decimal128 <- function(x = character(), precision = 38L, scale = 0L) {
   call <- sys.call()
-  if (is_decimal128(x) && missing(precision) && missing(scale)) {
-    return(x)
+  if (is_decimal128(x)) {
+    if (missing(precision) && missing(scale)) {
+      return(x)
+    }
+    # what is not given stays x's: decimal128(x, 20) keeps the scale
+    if (missing(precision)) {
+      precision <- dec_p(x)
+    }
+    if (missing(scale)) {
+      scale <- min(dec_s(x), precision)
+    }
   }
   type <- dec_check_type(precision, scale, call)
   dec_cast(x, type[[1L]], type[[2L]], call)
@@ -153,6 +178,20 @@ dec_back <- function(v, like) dec_new(zu_unclass(v), dec_p(like), dec_s(like))
 # The count of statuses that lost a value, NA statuses aside.
 dec_lost <- function(status) sum(status != dec_ok, na.rm = TRUE)
 
+dec_is_chr <- function(x) is.character(x) && !is.object(x)
+
+# Text that is NA on purpose: NA, "NA", and blank in the core's whitespace,
+# which is C's isspace() in the C locale.
+dec_blank <- function(x) {
+  t <- trimws(x, whitespace = "[ \t\n\v\f\r]")
+  is.na(x) | t == "" | t == "NA"
+}
+
+# What a cast may lose: the values that are not NA on purpose.
+dec_present <- function(x) {
+  if (dec_is_chr(x)) !dec_blank(x) else !is.na(x)
+}
+
 # x as DECIMAL(p, s), names kept; lost values are NA with a warning
 # reported against `call`.
 dec_cast <- function(x, p, s, call) {
@@ -160,11 +199,10 @@ dec_cast <- function(x, p, s, call) {
   extra <- 0
   if (is_decimal128(x)) {
     res <- .Call(zu_dec_rescale_c, x, dec_s(x), p, s)
-  } else if (is.character(x) && !is.object(x)) {
-    blank <- is.na(x) | x == "NA" | !nzchar(trimws(x))
-    x[blank] <- NA_character_
+  } else if (dec_is_chr(x)) {
+    x[dec_blank(x)] <- NA_character_
     res <- .Call(zu_dec_parse_c, enc2utf8(x), p, s)
-  } else if (is.double(x) && !is.object(x)) {
+  } else if (zu_is_bare_double(x)) {
     res <- .Call(zu_dec_from_double_c, x, p, s)
   } else {
     kind <- zu_kind(x)
@@ -194,23 +232,26 @@ dec_cast <- function(x, p, s, call) {
 # doubles keep their own rules: they are what the user typed.
 dec_cast_exact <- function(x, p, s, call) {
   if (!is_decimal128(x)) {
-    out <- withCallingHandlers(
-      dec_cast(x, p, s, call),
-      zuint_cast_warning = function(w) invokeRestart("muffleWarning")
-    )
-    return(list(out, sum(dec_is_na(out) & !is.na(x))))
+    out <- zu_quiet_cast(dec_cast(x, p, s, call))
+    return(list(out, sum(dec_is_na(out) & dec_present(x))))
   }
   res <- .Call(zu_dec_rescale_c, x, dec_s(x), p, s)
   out <- res[[1L]]
   lost <- !is.na(res[[2L]]) & res[[2L]] != dec_ok
   if (s < dec_s(x)) {
-    same <- .Call(zu_dec_compare_c, out, s, zu_bare(x), dec_s(x)) == 0L
-    frac <- !is.na(same) & !same
+    frac <- dec_changed(out, s, x, dec_s(x))
     out <- zu_fill_na(out, 3L, frac)
     lost <- lost | frac
   }
   names(out) <- names(x)
   list(dec_new(out, p, s), sum(lost))
+}
+
+# Where payload `r` at scale `s` is not the value of `x` at scale `sx`:
+# the values a rescale rounded. NA on either side is not a change.
+dec_changed <- function(r, s, x, sx) {
+  same <- .Call(zu_dec_compare_c, r, s, zu_bare(x), sx) == 0L
+  !is.na(same) & !same
 }
 
 # The values as an int128 payload when they are whole, and how many were
@@ -219,9 +260,7 @@ dec_cast_exact <- function(x, p, s, call) {
 dec_to_int128 <- function(x) {
   s <- dec_s(x)
   r <- .Call(zu_dec_rescale_c, x, s, 38L, 0L)[[1L]]
-  back <- .Call(zu_dec_rescale_c, r, 0L, 38L, s)[[1L]]
-  same <- .Call(zu_dec_compare_c, back, s, zu_bare(x), s) == 0L
-  frac <- !is.na(same) & !same
+  frac <- dec_changed(r, 0L, x, s)
   if (any(frac)) {
     r <- zu_fill_na(r, 3L, frac)
   }
@@ -307,13 +346,32 @@ dec_subset <- function(x, i, ...) dec_back(zu_subset(dec_view(x), i, ...), x)
 dec_subset2 <- function(x, i, ...) dec_back(zu_subset2(dec_view(x), i, ...), x)
 
 dec_subassign <- function(x, i, ..., value) {
-  value <- dec_view(dec_cast(value, dec_p(x), dec_s(x), sys.call()))
+  value <- dec_view(dec_assign_value(value, x, sys.call()))
   dec_back(zu_subassign(dec_view(x), i, ..., value = value), x)
 }
 
 dec_subassign2 <- function(x, i, ..., value) {
-  value <- dec_view(dec_cast(value, dec_p(x), dec_s(x), sys.call()))
+  value <- dec_view(dec_assign_value(value, x, sys.call()))
   dec_back(zu_subassign2(dec_view(x), i, ..., value = value), x)
+}
+
+# A value assigned into x takes x's type by the rules of c(): exact or NA
+# with a warning, never rounded, and a double that is not whole follows
+# zuint.double. Under "allow" it is rounded, since x can't become a double.
+dec_assign_value <- function(value, x, call) {
+  p <- dec_p(x)
+  s <- dec_s(x)
+  if (!dec_is_chr(value)) {
+    op <- dec_operand(value, call, "assignment to a decimal128")
+    if (is.null(op)) {
+      zu_double_problem("decimal128", call)
+      return(dec_cast(value, p, s, call))
+    }
+    value <- op$x
+  }
+  r <- dec_cast_exact(value, p, s, call)
+  zu_warn_lost(r[[2L]], dec_type_label(p, s), call = call)
+  r[[1L]]
 }
 
 dec_set_length <- function(x, value) {
@@ -353,55 +411,38 @@ dec_as_logical <- function(x, ...) zu_as_logical(dec_view(x))
 
 dec_as_complex <- function(x, ...) as.complex(dec_as_double(x))
 
-dec_mtfrm <- function(x) dec_as_character(x)
-
-dec_format <- function(x, ..., width = 0L, big.mark = "", justify = "right") {
-  s <- dec_as_character(x)
-  na <- is.na(s)
-  if (nzchar(big.mark)) {
-    s[!na] <- prettyNum(s[!na], big.mark = big.mark, preserve.width = "none")
+# match(), %in% and table() compare this text, so it must not depend on the
+# scale: 1.0 and 1.00 are one value. Trailing zeros of the fraction go, and
+# a whole value is the integer's text, as int128's mtfrm() writes it.
+dec_mtfrm <- function(x) {
+  out <- dec_as_character(x)
+  if (dec_s(x) > 0L) {
+    out <- sub("\\.?0*$", "", out)
+    out <- sub("^(-?)\\.", "\\10.", out)
+    out[out %in% c("", "-")] <- "0"
   }
-  s[na] <- "NA"
-  out <- formatC(s, width = max(width, nchar(s, "width"), 0L))
-  names(out) <- names(x)
   out
 }
 
+# As zu_format(): `justify` is accepted and numbers stay right-justified.
+dec_format <- function(x, ..., width = 0L, big.mark = "", justify = "right") {
+  zu_format_text(dec_as_character(x), names(x), width, big.mark)
+}
+
+# The header names the type even when x is empty: a zero-length decimal
+# still has one.
 dec_print <- function(x, ..., max = NULL) {
-  n <- length(x)
-  cat("<", dec_type_label(dec_p(x), dec_s(x)), "[", n, "]>\n", sep = "")
-  if (n == 0L) {
-    return(invisible(x))
-  }
-  max <- if (is.null(max)) getOption("max.print", 99999L) else max
-  shown <- if (n > max) x[seq_len(max)] else x
-  print(dec_format(shown), quote = FALSE, ...)
-  if (n > max) {
-    cat(
-      " [ reached 'max' / getOption(\"max.print\") -- omitted",
-      n - max,
-      "entries ]\n"
-    )
-  }
-  invisible(x)
+  cat("<", dec_type_label(dec_p(x), dec_s(x)), "[", length(x), "]>\n", sep = "")
+  zu_print_values(x, dec_format, max, ...)
 }
 
 dec_str <- function(object, ..., vec.len = 4) {
-  n <- length(object)
-  shown <- object[seq_len(min(n, max(1L, round(2.5 * vec.len))))]
-  vals <- dec_as_character(shown)
-  vals[is.na(vals)] <- "NA"
-  cat(
-    " ",
+  zu_str_line(
+    object,
     dec_type_label(dec_p(object), dec_s(object)),
-    " ",
-    if (n == 1L) "" else paste0("[1:", n, "] "),
-    paste(vals, collapse = " "),
-    if (length(shown) < n) " ...",
-    "\n",
-    sep = ""
+    dec_as_character,
+    vec.len
   )
-  invisible()
 }
 
 dec_summary <- function(object, ...) {
@@ -413,7 +454,8 @@ dec_summary <- function(object, ...) {
   }
   out <- c(
     "Min." = ends[[1L]],
-    "Mean" = format(dec_mean(object, na.rm = TRUE), digits = 15L),
+    "Median" = zu_format_double(dec_median(object, na.rm = TRUE)),
+    "Mean" = zu_format_double(dec_mean(object, na.rm = TRUE)),
     "Max." = ends[[2L]]
   )
   n_na <- length(object) - length(keep)
@@ -465,18 +507,24 @@ dec_int_width <- c(10L, 19L, 20L, 38L, 38L)
 
 # An operand as list(x = a decimal128, p, s), or NULL for a double that is
 # not whole (the caller applies zuint.double). A whole double is an
-# integer operand: INTEGER when every value fits one, as DuckDB types an
-# integer literal, else BIGINT.
+# integer operand, typed as DuckDB types an integer literal: INTEGER when
+# every value fits one, BIGINT when every value fits that, else HUGEINT.
 dec_operand <- function(x, call, what = "decimal arithmetic") {
   if (is_decimal128(x)) {
     return(list(x = x, p = dec_p(x), s = dec_s(x)))
   }
-  if (is.double(x) && !is.object(x)) {
+  if (zu_is_bare_double(x)) {
     v <- x[!is.na(x)]
-    if (!all(is.finite(v) & v == trunc(v) & abs(v) < 2^63)) {
+    if (!all(is.finite(v) & v == trunc(v))) {
       return(NULL)
     }
-    w <- if (all(abs(v) <= .Machine$integer.max)) 10L else 19L
+    w <- if (all(abs(v) <= .Machine$integer.max)) {
+      10L
+    } else if (all(v >= -2^63 & v < 2^63)) {
+      19L
+    } else {
+      38L
+    }
     return(list(x = dec_cast(x, w, 0L, call), p = w, s = 0L))
   }
   kind <- zu_kind(x)
@@ -513,7 +561,7 @@ dec_common_int <- function(d, w) {
 dec_common <- function(ops, int) {
   dec <- ops[!int]
   if (!length(dec)) {
-    return(c(max(vapply(ops, function(o) o$p, 1L)), 0L))
+    return(c(max(vapply(ops, function(o) o$p, integer(1))), 0L))
   }
   type <- c(dec[[1L]]$p, dec[[1L]]$s)
   for (o in dec[-1L]) {
@@ -532,39 +580,48 @@ dec_common <- function(ops, int) {
 dec_c <- function(...) {
   args <- list(...)
   call <- sys.call()
+  # c()'s own arguments are not data
+  use_names <- !isFALSE(args[["use.names"]])
+  if (!is.null(names(args))) {
+    args <- args[!names(args) %in% c("use.names", "recursive")]
+  }
   args <- args[!vapply(args, is.null, logical(1))]
-  chr <- vapply(args, function(a) is.character(a) && !is.object(a), logical(1))
+  chr <- vapply(args, dec_is_chr, logical(1))
   ops <- vector("list", length(args))
   for (i in which(!chr)) {
     op <- dec_operand(args[[i]], call, "c() with a decimal128")
     if (is.null(op)) {
       zu_double_problem("decimal128", call)
-      return(unlist(lapply(unname(args), dec_dbl_quiet)))
+      return(do.call(c, lapply(args, dec_dbl_quiet)))
     }
     ops[[i]] <- op
   }
-  int <- vapply(
-    seq_along(args),
-    function(i) !chr[[i]] && !is_decimal128(args[[i]]),
-    logical(1)
-  )
+  int <- !chr & !vapply(args, is_decimal128, logical(1))
   type <- dec_common(ops[!chr], int[!chr])
   lost <- 0
-  parts <- lapply(seq_along(args), function(i) {
+  parts <- vector("list", length(args))
+  for (i in seq_along(args)) {
     v <- if (chr[[i]]) args[[i]] else ops[[i]]$x
     r <- dec_cast_exact(v, type[[1L]], type[[2L]], call)
-    lost <<- lost + r[[2L]]
-    out <- zu_bare(r[[1L]])
-    names(out) <- names(args[[i]])
-    out
-  })
+    lost <- lost + r[[2L]]
+    part <- zu_bare(r[[1L]])
+    names(part) <- names(args[[i]])
+    parts[[i]] <- part
+  }
   zu_warn_lost(lost, dec_type_label(type[[1L]], type[[2L]]), call = call)
   names(parts) <- names(args)
-  dec_new(do.call(c, parts), type[[1L]], type[[2L]])
+  out <- do.call(c, parts)
+  if (!use_names) {
+    names(out) <- NULL
+  }
+  dec_new(out, type[[1L]], type[[2L]])
 }
 
+# The doubles a value stands for, names kept.
 dec_dbl_quiet <- function(x) {
-  if (is_decimal128(x)) dec_as_double(x) else zu_dbl_quiet(x)
+  out <- if (is_decimal128(x)) dec_as_double(x) else zu_dbl_quiet(x)
+  names(out) <- names(x)
+  out
 }
 
 # ---- Ops ------------------------------------------------------------------------
@@ -658,6 +715,9 @@ dec_arith <- function(op, e1, e2, call) {
     return(dec_in_double(op, e1, e2, call))
   }
   zu_check_recycling(e1, e2)
+  # recycled first, so that a value lost in the rescale is counted once
+  # for each result it makes NA
+  pp <- dec_recycle(a$x, b$x)
   lost <- 0
   if (op == "*") {
     p <- a$p + b$p
@@ -677,18 +737,14 @@ dec_arith <- function(op, e1, e2, call) {
         call = call
       )
     }
-    pa <- a$x
-    pb <- b$x
   } else {
     s <- max(a$s, b$s)
     p <- min(38L, max(a$p - a$s, b$p - b$s) + s + 1L)
-    ra <- .Call(zu_dec_rescale_c, a$x, a$s, 38L, s)
-    rb <- .Call(zu_dec_rescale_c, b$x, b$s, 38L, s)
+    ra <- .Call(zu_dec_rescale_c, pp[[1L]], a$s, 38L, s)
+    rb <- .Call(zu_dec_rescale_c, pp[[2L]], b$s, 38L, s)
     lost <- dec_lost(ra[[2L]]) + dec_lost(rb[[2L]])
-    pa <- ra[[1L]]
-    pb <- rb[[1L]]
+    pp <- list(ra[[1L]], rb[[1L]])
   }
-  pp <- dec_recycle(pa, pb)
   r <- .Call(zu_dec_arith_c, match(op, c("+", "-", "*")), pp[[1L]], pp[[2L]])
   fit <- .Call(zu_dec_rescale_c, r[[1L]], s, p, s)
   # an operand lost in the rescale is NA in r, so it is counted once
@@ -699,15 +755,57 @@ dec_arith <- function(op, e1, e2, call) {
   dec_new(out, p, s)
 }
 
-dec_compare <- function(op, e1, e2, call) {
-  a <- dec_operand(e1, call, "a decimal comparison")
-  b <- dec_operand(e2, call, "a decimal comparison")
-  if (is.null(a) || is.null(b)) {
-    return(dec_in_double(op, e1, e2, call))
+# An integer comparison operand as list(x = a decimal128, s, beyond):
+# `beyond` is the sign of each value too large for 38 digits (0 for the
+# others), which is then larger or smaller than every decimal.
+dec_compare_operand <- function(x, call) {
+  if (is_decimal128(x)) {
+    return(list(x = x, s = dec_s(x), beyond = 0L))
   }
+  kind <- zu_kind(x)
+  if (is.na(kind) || kind < 0L) {
+    zu_abort(
+      sprintf("Can't use %s in a decimal comparison.", zu_kind_label(x)),
+      "type",
+      call = call
+    )
+  }
+  d <- zu_quiet_cast(dec_cast(x, 38L, 0L, call))
+  big <- dec_is_na(d) & !is.na(x)
+  beyond <- integer(length(x))
+  if (any(big)) {
+    beyond[big] <- ifelse((x[big] > 0L) %in% TRUE, 1L, -1L)
+  }
+  list(x = d, s = 0L, beyond = beyond)
+}
+
+# Comparison is exact with every operand, doubles included, as for the
+# integer types (design 5).
+dec_compare <- function(op, e1, e2, call) {
   zu_check_recycling(e1, e2)
-  pp <- dec_recycle(a$x, b$x)
-  cmp <- .Call(zu_dec_compare_c, pp[[1L]], a$s, pp[[2L]], b$s)
+  if (zu_is_bare_double(e1) || zu_is_bare_double(e2)) {
+    flip <- zu_is_bare_double(e1)
+    d <- if (flip) e2 else e1
+    pp <- dec_recycle(d, if (flip) e1 else e2)
+    cmp <- dec_compare_double(pp[[1L]], dec_s(d), pp[[2L]])
+    if (flip) {
+      cmp <- -cmp
+    }
+  } else {
+    a <- dec_compare_operand(e1, call)
+    b <- dec_compare_operand(e2, call)
+    pp <- dec_recycle(a$x, b$x)
+    cmp <- .Call(zu_dec_compare_c, pp[[1L]], a$s, pp[[2L]], b$s)
+    n <- length(cmp)
+    # a value beyond 38 digits against a decimal: its sign is the answer,
+    # unless the decimal is NA
+    sides <- list(list(a$beyond, pp[[2L]], 1L), list(b$beyond, pp[[1L]], -1L))
+    for (side in sides) {
+      beyond <- rep_len(side[[1L]], n)
+      at <- beyond != 0L & !.Call(zu_is_na_c, side[[2L]], 3L)
+      cmp[at] <- side[[3L]] * as.integer(beyond[at])
+    }
+  }
   out <- switch(
     op,
     "==" = cmp == 0L,
@@ -721,20 +819,218 @@ dec_compare <- function(op, e1, e2, call) {
   out
 }
 
-# abs() keeps the type, as DuckDB's does; the rest is computed on the
-# doubles.
-dec_math <- function(x, ...) {
-  if (.Generic == "abs") {
-    out <- .Call(zu_abs_sign_c, zu_unclass(x), 3L, FALSE)
-    names(out) <- names(x)
-    return(dec_new(out, dec_p(x), dec_s(x)))
+# The sign of d - v, exactly, for payload `c` at scale `s` and doubles `v`
+# of the same length; NA where either is. Beyond 10^38 the sign of v
+# decides. Below it the whole parts compare first, then the fractions:
+# trunc() is monotone, and a fraction has its value's sign. A double's
+# fraction is exact in its full decimal expansion, at most 1074 digits,
+# which sprintf() writes.
+dec_compare_double <- function(c, s, v) {
+  out <- rep(NA_integer_, length(v))
+  ok <- !.Call(zu_is_na_c, c, 3L) & !is.na(v)
+  big <- ok & abs(v) >= 1e38
+  out[big] <- -as.integer(sign(v[big]))
+  rest <- ok & !big
+  if (!any(rest)) {
+    return(out)
   }
-  out <- do.call(.Generic, list(dec_as_double(x), ...))
-  names(out) <- names(x)
+  v <- v[rest]
+  d <- dec_new(c[rest], 38L, s)
+  vi <- trunc(v)
+  vf <- v - vi
+  di <- dec_whole(d, "trunc")
+  ci <- .Call(
+    zu_dec_compare_c,
+    zu_bare(di),
+    0L,
+    zu_bare(dec_cast(vi, 38L, 0L, NULL)),
+    0L
+  )
+  # d's fraction at scale s, and v's cut to s digits with a flag for more
+  dis <- .Call(zu_dec_rescale_c, di, 0L, 38L, s)[[1L]]
+  df <- .Call(zu_dec_arith_c, 2L, zu_bare(d), dis)[[1L]]
+  txt <- sprintf("%.1080f", abs(vf))
+  more <- grepl("[1-9]", substring(txt, 3L + s))
+  vfs <- if (s == 0L) {
+    complex(length(v))
+  } else {
+    sgn <- ifelse(vf < 0, "-", "")
+    frac <- paste0(sgn, "0.", substr(txt, 3L, 2L + s))
+    zu_bare(dec_cast(frac, 38L, s, NULL))
+  }
+  cf <- .Call(zu_dec_compare_c, df, s, vfs, s)
+  tie <- cf == 0L & more
+  cf[tie] <- ifelse(vf[tie] > 0, -1L, 1L)
+  out[rest] <- ifelse(ci != 0L, ci, cf)
   out
 }
 
+# ---- Math -----------------------------------------------------------------------
+
+# abs(), the rounding functions and the cumulative sums, minima and maxima
+# keep a decimal type, as DuckDB's do; the rest is computed on the doubles.
+dec_math <- function(x, ...) {
+  call <- sys.call()
+  switch(
+    .Generic,
+    abs = {
+      out <- .Call(zu_abs_sign_c, zu_unclass(x), 3L, FALSE)
+      names(out) <- names(x)
+      dec_new(out, dec_p(x), dec_s(x))
+    },
+    round = dec_round(x, ..., call = call),
+    floor = ,
+    ceiling = ,
+    trunc = dec_whole(x, .Generic),
+    cumsum = dec_cumsum(x, call),
+    cummax = ,
+    cummin = {
+      what <- match(.Generic, c("cumsum", "cumprod", "cummax", "cummin"))
+      out <- .Call(zu_cum_c, x, 3L, what)[[1L]]
+      names(out) <- names(x)
+      dec_new(out, dec_p(x), dec_s(x))
+    },
+    {
+      out <- do.call(.Generic, list(dec_as_double(x), ...))
+      names(out) <- names(x)
+      out
+    }
+  )
+}
+
+# round(x, digits), half away from zero, in DuckDB's type: DECIMAL(p,
+# digits) below the scale, x as it is at or above it. A negative `digits`
+# gives scale 0, and at scale 0 one more digit (to 38) while -digits <= p:
+# round(99, -2) is 100.
+dec_round <- function(x, digits = 0, ..., call = NULL) {
+  d <- zu_digits_arg(digits, call)
+  p <- dec_p(x)
+  s <- dec_s(x)
+  if (d >= s) {
+    return(x)
+  }
+  if (d >= 0L) {
+    out <- .Call(zu_dec_rescale_c, x, s, p, d)[[1L]]
+    names(out) <- names(x)
+    return(dec_new(out, p, d))
+  }
+  k <- -d
+  p_out <- if (s == 0L && k <= p) min(38L, p + 1L) else p
+  if (s + k > 38L) {
+    # |x| < 10^(38 - s) <= 10^(k - 1): every value rounds to zero
+    out <- zu_fill_na(complex(length(x)), 3L, dec_is_na(x))
+  } else {
+    # the coefficient read at scale s + k, rounded to a whole number, then
+    # scaled back up by 10^k
+    r <- .Call(zu_dec_rescale_c, x, s + k, 38L, 0L)[[1L]]
+    up <- .Call(zu_dec_rescale_c, r, 0L, 38L, k)
+    fit <- .Call(zu_dec_rescale_c, up[[1L]], 0L, p_out, 0L)
+    zu_report_overflow(
+      dec_lost(up[[2L]]) + dec_lost(fit[[2L]]),
+      zu_policy_default,
+      call
+    )
+    out <- fit[[1L]]
+  }
+  names(out) <- names(x)
+  dec_new(out, p_out, 0L)
+}
+
+# floor(), ceiling() and trunc() as DECIMAL(p, 0): the value rounded half
+# away from zero, then moved one toward the direction asked where that went
+# the wrong way.
+dec_whole <- function(x, how) {
+  s <- dec_s(x)
+  if (s == 0L) {
+    return(x)
+  }
+  r <- zu_new(.Call(zu_dec_rescale_c, x, s, 38L, 0L)[[1L]], 3L)
+  cmp <- .Call(zu_dec_compare_c, zu_bare(r), 0L, zu_bare(x), s)
+  pos <- (r > 0L) %in% TRUE
+  neg <- (r < 0L) %in% TRUE
+  down <- switch(
+    how,
+    floor = cmp > 0L,
+    ceiling = rep(FALSE, length(cmp)),
+    trunc = cmp > 0L & pos
+  ) %in%
+    TRUE
+  up <- switch(
+    how,
+    floor = rep(FALSE, length(cmp)),
+    ceiling = cmp < 0L,
+    trunc = cmp < 0L & neg
+  ) %in%
+    TRUE
+  r[down] <- r[down] - 1L
+  r[up] <- r[up] + 1L
+  out <- zu_unclass(r)
+  names(out) <- names(x)
+  dec_new(out, dec_p(x), 0L)
+}
+
+# cumsum() as DuckDB's running sum(): DECIMAL(38, s). From the first sum
+# past 38 digits on, the sums are NA, as base cumsum() does after an
+# overflow.
+dec_cumsum <- function(x, call) {
+  s <- dec_s(x)
+  res <- .Call(zu_cum_c, x, 3L, 1L)
+  fit <- .Call(zu_dec_rescale_c, res[[1L]], s, 38L, s)
+  out <- fit[[1L]]
+  bad <- which(!is.na(fit[[2L]]) & fit[[2L]] != dec_ok)
+  lost <- res[[2L]]
+  if (length(bad)) {
+    after <- seq_along(out) >= bad[[1L]]
+    lost <- lost + sum(after & !.Call(zu_is_na_c, res[[1L]], 3L))
+    out <- zu_fill_na(out, 3L, after)
+  }
+  zu_report_overflow(lost, zu_policy_default, call)
+  names(out) <- names(x)
+  dec_new(out, 38L, s)
+}
+
 # ---- ordering, hashing, summaries -----------------------------------------------
+
+# zu_match() with a decimal on either side: by value, through the text
+# mtfrm() gives, which does not depend on the scale; a double's is its exact
+# value's. A value that can't be a decimal matches nothing, as in zu_match()
+# of the integers (#58).
+# The exact value of each double as mtfrm() writes a decimal's: every digit
+# of its full expansion, then no trailing zeros. 0.1 is not "0.1".
+dec_double_key <- function(v) {
+  out <- sprintf("%.1080f", v)
+  out <- sub("\\.?0*$", "", out)
+  out[out == "-0"] <- "0"
+  out[is.na(v)] <- NA_character_
+  out[is.infinite(v)] <- "Inf"
+  out
+}
+
+dec_match <- function(x, table, nomatch, call) {
+  key <- function(v) {
+    if (is_decimal128(v)) {
+      return(dec_mtfrm(v))
+    }
+    if (dec_is_chr(v)) {
+      zu_abort(
+        sprintf("Can't use %s in zu_match().", zu_kind_label(v)),
+        "type",
+        call = call
+      )
+    }
+    if (zu_is_bare_double(v)) {
+      return(dec_double_key(v))
+    }
+    dec_mtfrm(zu_quiet_cast(dec_operand(v, call, "zu_match()"))$x)
+  }
+  kx <- key(x)
+  kt <- key(table)
+  # a table value lost in the cast must not match x's NA
+  kt[is.na(kt) & !is.na(table)] <- "lost"
+  res <- match(kx, kt, nomatch)
+  res[is.na(kx) & !is.na(x)] <- nomatch
+  res
+}
 
 # The coefficients share one scale, so int128's code orders and hashes them.
 
@@ -779,30 +1075,22 @@ dec_extreme <- function(x, which) {
 
 dec_summary_group <- function(..., na.rm = FALSE) {
   call <- sys.call()
-  args <- list(...)
-  finite <- FALSE
-  if (.Generic == "range" && "finite" %in% names(args)) {
-    finite <- isTRUE(args[["finite"]])
-    args[names(args) == "finite"] <- NULL
-    na.rm <- na.rm || finite
-  }
-  x <- if (length(args) == 1L) args[[1L]] else do.call(dec_c, args)
+  a <- zu_summary_args(list(...), .Generic, na.rm)
+  na.rm <- a$na.rm
+  x <- if (length(a$args) == 1L) a$args[[1L]] else do.call(dec_c, a$args)
   if (!is_decimal128(x)) {
     # c() fell back to double under options(zuint.double = "allow")
-    if (.Generic == "range") {
-      return(range(x, na.rm = na.rm, finite = finite))
-    }
-    return(get(.Generic, baseenv())(x, na.rm = na.rm))
+    return(zu_summary_double(x, .Generic, na.rm, a$finite))
   }
   switch(
     .Generic,
     sum = dec_sum(x, na.rm, call),
     prod = prod(dec_as_double(x), na.rm = na.rm),
-    min = dec_min_max(x, na.rm, 1L),
-    max = dec_min_max(x, na.rm, 2L),
+    min = dec_min_max(x, na.rm, 1L, call),
+    max = dec_min_max(x, na.rm, 2L, call),
     range = {
-      lo <- dec_min_max(x, na.rm, 1L)
-      hi <- dec_min_max(x, na.rm, 2L)
+      lo <- dec_min_max(x, na.rm, 1L, call)
+      hi <- dec_min_max(x, na.rm, 2L, call)
       if (is_decimal128(lo)) dec_c(lo, hi) else c(lo, hi)
     },
     any = any(dec_as_logical(x), na.rm = na.rm),
@@ -819,7 +1107,7 @@ dec_sum <- function(x, na.rm, call) {
   dec_new(fit[[1L]], 38L, s)
 }
 
-dec_min_max <- function(x, na.rm, which) {
-  out <- zu_extreme(dec_view(x), 3L, na.rm, which, sys.call(-1L))
+dec_min_max <- function(x, na.rm, which, call) {
+  out <- zu_extreme(dec_view(x), 3L, na.rm, which, call)
   if (is.double(out)) out else dec_back(out, x)
 }
