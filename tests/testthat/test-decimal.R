@@ -995,18 +995,20 @@ test_that("the product scale stops at 38, and DuckDB's 18-digit cap at scale 18 
 test_that("a whole double is INTEGER, BIGINT or HUGEINT at DuckDB's thresholds (#121)", {
   con <- local_duckdb_plain()
   a <- decimal128("1.5", 5, 2)
-  lits <- c(
-    "2147483647",
-    "2147483648",
-    "-2147483648",
-    "-2147483649",
-    "9223372036854774784",
-    "9223372036854775808",
-    "-9223372036854775808"
+  # each double built by arithmetic, which is exact everywhere: R's parser
+  # reads 19-digit text inexactly where long double is double (arm64)
+  vals <- list(
+    "2147483647" = 2^31 - 1,
+    "2147483648" = 2^31,
+    "-2147483648" = -2^31,
+    "-2147483649" = -2^31 - 1,
+    "9223372036854774784" = 2^63 - 1024,
+    "9223372036854775808" = 2^63,
+    "-9223372036854775808" = -2^63
   )
-  for (lit in lits) {
+  for (lit in names(vals)) {
     want <- duck_typeof(con, sprintf("%s + %s", dec_sql("'0'", 5, 2), lit))
-    expect_identical(dec_typeof(a + as.numeric(lit)), want, label = lit)
+    expect_identical(dec_typeof(a + vals[[lit]]), want, label = lit)
   }
 })
 
