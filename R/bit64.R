@@ -122,7 +122,7 @@ zu_matrix_unsupported <- function(...) {
 # computes in int64: exact, or NA with a warning, never truncated.
 zu_register_bit64 <- function(...) {
   ns <- asNamespace("bit64")
-  for (cl in c("zu_uint64", "zu_int128", "zu_uint128")) {
+  for (cl in c("zu_uint64", "zu_int128", "zu_uint128", "zu_decimal128")) {
     registerS3method("as.integer64", cl, zu_as_integer64_method, envir = ns)
   }
 }

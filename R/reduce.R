@@ -12,6 +12,10 @@ zu_summary_group <- function(..., na.rm = FALSE) {
     na.rm <- na.rm || finite
   }
   x <- if (length(args) == 1L) args[[1L]] else do.call(zu_c, args)
+  if (is_decimal128(x)) {
+    # min(int64(1), <decimal128>): the decimal's method on the combination
+    return(get(.Generic, baseenv())(x, na.rm = na.rm))
+  }
   code <- zu_code(x)
   if (is.na(code) && is.double(x) && !is.object(x)) {
     # zu_c() fell back to double under options(zuint.double = "allow")

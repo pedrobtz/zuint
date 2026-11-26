@@ -49,7 +49,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | [#23](https://github.com/pedrobtz/zuint/pull/23) | 2026-10-16 |
 | 9 | [Arrow bridge handover](#stage-9--arrow-bridge-handover) | full — compiled code removed and a new Suggests guard | [#52](https://github.com/pedrobtz/zuint/issues/52) | [#89](https://github.com/pedrobtz/zuint/pull/89) | 2026-11-25 |
 | 9.1 | [Fixed-point core and the C table](#stage-91--fixed-point-core-and-the-c-table) | full — new compiled code, a public C ABI and a thread contract | [#103](https://github.com/pedrobtz/zuint/issues/103) | [#106](https://github.com/pedrobtz/zuint/pull/106) | 2026-11-25 |
-| 9.2 | [The decimal128 vector class](#stage-92--the-decimal128-vector-class) | quick | [#104](https://github.com/pedrobtz/zuint/issues/104) | | |
+| 9.2 | [The decimal128 vector class](#stage-92--the-decimal128-vector-class) | quick | [#104](https://github.com/pedrobtz/zuint/issues/104) | [#107](https://github.com/pedrobtz/zuint/pull/107) | 2026-11-26 |
 | 10 | [v0.1.0 readiness](#stage-10--v010-readiness) | full | [#11](https://github.com/pedrobtz/zuint/issues/11) | | |
 | 11 | [Review](#stage-11--review) | full | [#53](https://github.com/pedrobtz/zuint/issues/53) | | |
 
@@ -730,6 +730,16 @@ a digit or its type.
   text through gmp.
 
 **Design.** §2.2.
+
+**Deviation (2026-11-26).** "Each operator and cast match DuckDB 2.0.1"
+holds for the types and for every value DuckDB gives, with four recorded
+choices (design §2.2): an overflow is `NA` with a warning where DuckDB
+raises; `c()` gives `NA` where DuckDB rounds a value into a cut scale;
+conversion to the integer types is exact or `NA`, where DuckDB's `CAST`
+rounds; and `%%` is computed in double. `mean()` is compared with
+DuckDB's `avg()` within four ulps, whose last bit depends on the
+platform. `uint128` takes DuckDB's `UHUGEINT` cast rather than the type
+error the design first named.
 
 ## Stage 10 — v0.1.0 readiness
 
