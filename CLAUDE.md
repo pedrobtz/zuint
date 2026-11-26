@@ -198,7 +198,9 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   `is.numeric()` (TRUE for every zuint type) and then `as.integer64()`,
   whose zuint methods (`R/bit64.R`, registered when bit64 loads) convert
   exactly or give NA with a `zuint_cast_warning`; without them bit64
-  converted an int128 operand through double.
+  converted an int128 operand through double. For a `decimal128` that
+  method is a `zuint_incompatible_error`: bit64 would make every fraction
+  NA (#115).
 - **`test-bit64-parity.R` diffs bit64's method list against ours.** A base
   generic bit64 gives an `integer64` method needs a `zu_int64` method, or an
   entry in that test's allowlist (group generics, functions bit64 masks).
@@ -321,11 +323,15 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
 - **A decimal128's type is DuckDB's, probed, never derived.** Each rule
   in `R/decimal.R` (the 18-digit product, the scale cut in the common
   type) came from DuckDB 2.0.1's `typeof()`, and `test-decimal.R`
-  compares every operator over 121 type pairs with it. Probe before
-  changing one.
-- **`c()` of decimals never rounds.** A value a cut scale cannot hold is
-  `NA` with a `zuint_cast_warning`; only `decimal128(x, p, s)`, the
-  explicit request, rounds.
+  compares `+`, `-` and `*` over 121 type pairs with it, and the rounding
+  functions over ten types. Probe before changing one.
+- **`c()` and `[<-` of decimals never round.** A value a cut scale, or
+  x's type, cannot hold is `NA` with a `zuint_cast_warning`; only
+  `decimal128(x, p, s)`, the explicit request, rounds (#109). Every new
+  way into a decimal vector goes through `dec_cast_exact()`.
+- **A decimal's `mtfrm()` is its value, not its text.** `match()`,
+  `%in%` and `table()` compare it, so it drops trailing fractional zeros
+  and equals the integer types' text for a whole value (#108).
 - **Native routines are called through their registered symbols.**
   `init.c` calls `R_forceSymbols()`, so `.Call("name", ...)` with a string
   fails; use the symbol `useDynLib(.registration = TRUE)` defines.
