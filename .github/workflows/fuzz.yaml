@@ -44,9 +44,10 @@ jobs:
       libfuzzer-args: -max_len=65536 -timeout=10
       # The share of the lines in `sources` the corpus reaches (#94). The
       # first run, on 2026-11-25 (PR #99), reached 100% of 70 lines and
-      # 98.2% of 110 branches. A few points under, so a harness or corpus
-      # change that stops reaching code goes red.
-      reach-floor: 95
+      # 98.2% of 110 branches; 99.5% with zu_fixed.c, on 2026-11-26. Just
+      # under, so a harness or corpus change that stops reaching code goes
+      # red (#133).
+      reach-floor: 99
       profile: auto
       quick-max-total-time: 120
       max-total-time: 1800

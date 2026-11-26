@@ -21,3 +21,6 @@ jobs:
       # goes to gh-pages, which the pkgdown deploy also writes to.
       badge-branch: gh-pages
       badge-path: badges/coverage.svg
+      # 96.8% on 2026-11-26 (#132): a little under, so a change that drops
+      # coverage goes red
+      fail-under: 95
