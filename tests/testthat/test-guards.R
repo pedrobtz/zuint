@@ -66,3 +66,29 @@ test_that("the Arrow import refuses a malformed array as a zuint_arrow_error", {
   expect_error(.Call(zu_arrow_schema_c, 1L), class = "simpleError")
   expect_error(.Call(zu_from_arrow_c, 1L, 1L), class = "simpleError")
 })
+
+test_that("the fixed-point entry points refuse bad arguments (#119)", {
+  p <- zu_bare(int128(1:2))
+  expect_identical(.Call(zu_dec_format_c, p, 5L, 2L), c("0.01", "0.02"))
+  # a payload that is not complex, text that is not character, a non-double
+  expect_error(.Call(zu_dec_format_c, 1, 5L, 2L), class = "simpleError")
+  expect_error(.Call(zu_dec_rescale_c, 1L, 0L, 5L, 2L), class = "simpleError")
+  expect_error(.Call(zu_dec_parse_c, 1, 5L, 2L), class = "simpleError")
+  expect_error(.Call(zu_dec_from_double_c, 1L, 5L, 2L), class = "simpleError")
+  # a type or scale out of range
+  expect_error(.Call(zu_dec_format_c, p, 39L, 2L), class = "simpleError")
+  expect_error(.Call(zu_dec_format_c, p, 5L, 6L), class = "simpleError")
+  expect_error(
+    .Call(zu_dec_format_c, p, NA_integer_, 2L),
+    class = "simpleError"
+  )
+  expect_error(.Call(zu_dec_compare_c, p, -1L, p, 0L), class = "simpleError")
+  expect_error(.Call(zu_dec_compare_c, p, 0L, p, 39L), class = "simpleError")
+  # lengths that differ, an operator code out of range
+  expect_error(.Call(zu_dec_compare_c, p, 0L, p[1], 0L), class = "simpleError")
+  expect_error(.Call(zu_dec_arith_c, 1L, p, p[1]), class = "simpleError")
+  expect_error(.Call(zu_dec_arith_c, 0L, p, p), class = "simpleError")
+  expect_error(.Call(zu_dec_arith_c, 4L, p, p), class = "simpleError")
+  expect_identical(.Call(zu_api_version_c, -1L), FALSE)
+  expect_identical(.Call(zu_api_version_c, NA_integer_), FALSE)
+})

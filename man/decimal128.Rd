@@ -16,7 +16,9 @@ decimal_precision(x)
 decimal_scale(x)
 }
 \arguments{
-\item{x}{A vector to convert.}
+\item{x}{For \code{decimal128()}, a vector to convert; for \code{is_decimal128()},
+any object; for \code{decimal_precision()} and \code{decimal_scale()}, a
+\code{decimal128} vector.}
 
 \item{precision}{The number of digits, 1 to 38.}
 
@@ -45,8 +47,7 @@ and blank strings are \code{NA}.
 \item A double is rounded to the scale, half away from zero, as DuckDB's
 cast does: \code{decimal128(2.675, 5, 2)} is \code{2.68}.
 \item A \code{decimal128} of another type is rescaled, rounding half away from
-zero. With neither \code{precision} nor \code{scale} given it is returned as it
-is.
+zero. Without \code{precision} or \code{scale} it keeps its own: \code{decimal128(x, 20)} changes only the precision. With neither it is returned as it is.
 }
 
 A value that does not fit \code{precision} digits becomes \code{NA} with a warning
@@ -55,19 +56,34 @@ of class \code{zuint_cast_warning}. Names are kept.
 Arithmetic follows DuckDB's types: \code{+} and \code{-} keep the larger scale
 and grow the precision by one, \code{*} adds precisions and scales, and
 \code{precision} stops at 38. As in DuckDB, a product of two operands of at
-most 18 digits stops at 18 unless its scale is 18 or more. A result that does not fit is \code{NA} with a
-\code{zuint_overflow_warning}. An integer operand counts as
-\code{DECIMAL(10, 0)}, \code{int64} as \code{DECIMAL(19, 0)}, \code{uint64} as
-\code{DECIMAL(20, 0)} and the 128-bit types as \code{DECIMAL(38, 0)}; a whole
-double is an integer operand, and any other double follows
-\code{options(zuint.double)}. Comparison is exact across scales. \code{/}, \code{\%\%},
-\code{\%/\%}, \code{^} and the \code{Math} functions other than \code{abs()} compute in double,
-as does \code{mean()}; \code{sum()} is a \code{DECIMAL(38, scale)}.
+most 18 digits stops at 18 unless its scale is 18 or more. A result that
+does not fit is \code{NA} with a \code{zuint_overflow_warning}. An integer operand
+counts as \code{DECIMAL(10, 0)}, \code{int64} as \code{DECIMAL(19, 0)}, \code{uint64} as
+\code{DECIMAL(20, 0)} and the 128-bit types as \code{DECIMAL(38, 0)}. A whole
+double is an integer operand, typed as DuckDB types an integer literal;
+any other double follows \code{options(zuint.double)}.
 
-\code{c()} and vctrs combine vectors in DuckDB's common type: the largest
-scale and the most integer digits, and the scale cut when both do not
-fit 38 digits. A value the common type cannot hold exactly is \code{NA} with
-a \code{zuint_cast_warning}.
+Comparison is exact across scales, and with every integer and whole
+double, even one too large for 38 digits. \code{/}, \code{\%\%}, \code{\%/\%} and \code{^}
+compute in double, as do \code{mean()}, \code{median()}, \code{prod()} and the \code{Math}
+functions other than those below; \code{!}, \code{&} and \code{|} give logicals.
+
+These keep a decimal type, DuckDB's:
+\itemize{
+\item \code{abs()}, \code{cummax()} and \code{cummin()} keep the type, and \code{sum()} and
+\code{cumsum()} are \code{DECIMAL(38, scale)}.
+\item \code{round(x, digits)} rounds half away from zero to \code{DECIMAL(precision, digits)}, and is \code{x} when \code{digits} is the scale or more. A negative
+\code{digits} gives scale 0, with one more digit at scale 0.
+\item \code{floor()}, \code{ceiling()} and \code{trunc()} are \code{DECIMAL(precision, 0)}.
+}
+
+\code{c()}, vctrs and \code{x[i] <- value} combine values in DuckDB's common type
+(for \verb{[<-}, \code{x}'s type): the largest scale and the most integer digits,
+and the scale cut when both do not fit 38 digits. A value the type
+cannot hold exactly is \code{NA} with a \code{zuint_cast_warning}; only
+\code{decimal128()} rounds. \code{sum()}, \code{min()} and the other \code{Summary}
+functions dispatch on their first argument, as R's group generics do, so
+write \code{sum(x, 1L)}, not \code{sum(1L, x)}.
 }
 \examples{
 price <- decimal128(c("19.99", "5.00", NA), 10, 2)

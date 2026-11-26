@@ -35,10 +35,8 @@ zu_register_vctrs <- function(...) {
   reg("vec_proxy_equal", dec, dec_vec_proxy_pieces)
   reg("vec_proxy_compare", dec, dec_vec_proxy_pieces)
   reg("vec_proxy_order", dec, dec_vec_proxy_pieces)
-  reg("vec_ptype_abbr", dec, function(x, ...) "dec")
-  reg("vec_ptype_full", dec, function(x, ...) {
-    dec_type_label(dec_p(x), dec_s(x))
-  })
+  reg("vec_ptype_abbr", dec, dec_vec_ptype_abbr)
+  reg("vec_ptype_full", dec, dec_vec_ptype_full)
   reg("vec_cast", paste0("double.", dec), dec_vec_cast_base)
   reg("vec_cast", paste0("integer.", dec), dec_vec_cast_base)
   for (cl2 in c(dec, zu_classes_all, others)) {
@@ -65,12 +63,7 @@ zu_register_pillar <- function(...) {
     dec_pillar_shaft,
     envir = ns
   )
-  registerS3method(
-    "type_sum",
-    "zu_decimal128",
-    function(x) sprintf("dec(%d,%d)", dec_p(x), dec_s(x)),
-    envir = ns
-  )
+  registerS3method("type_sum", "zu_decimal128", dec_type_sum, envir = ns)
 }
 
 # The proxy is the payload beside a flag that is TRUE for every real row.
@@ -126,10 +119,7 @@ zu_vec_ptype2 <- function(x, y, ..., x_arg = "", y_arg = "") {
 # cast error, as vctrs casts are.
 zu_vec_cast <- function(x, to, ..., x_arg = "", to_arg = "") {
   code <- zu_code(to)
-  out <- withCallingHandlers(
-    zu_cast(x, code),
-    zuint_cast_warning = function(w) invokeRestart("muffleWarning")
-  )
+  out <- zu_quiet_cast(zu_cast(x, code))
   lossy <- zu_is_na(out) & !is.na(x)
   if (any(lossy)) {
     return(vctrs::maybe_lossy_cast(
@@ -154,7 +144,7 @@ zu_vec_cast_base <- function(x, to, ..., x_arg = "", to_arg = "") {
   out <- res[[1L]]
   if (res[[2L]] > 0) {
     # a rounded double casts back to a different value; a lost integer is NA
-    back <- suppressWarnings(zu_cast(out, zu_code(x)))
+    back <- zu_quiet_cast(zu_cast(out, zu_code(x)))
     lossy <- !zu_is_na(x) & (is.na(out) | !(back == x) %in% TRUE)
     return(vctrs::maybe_lossy_cast(
       out,
@@ -169,6 +159,12 @@ zu_vec_cast_base <- function(x, to, ..., x_arg = "", to_arg = "") {
 }
 
 # ---- decimal128 ---------------------------------------------------------------
+
+dec_vec_ptype_abbr <- function(x, ...) "dec"
+
+dec_vec_ptype_full <- function(x, ...) dec_type_label(dec_p(x), dec_s(x))
+
+dec_type_sum <- function(x) sprintf("dec(%d,%d)", dec_p(x), dec_s(x))
 
 # The payload is int128's, so its proxy is too; the type comes back from `to`.
 dec_vec_restore <- function(x, to, ...) {
@@ -186,23 +182,26 @@ dec_vec_proxy_pieces <- function(x, ...) {
   structure(cols, row.names = c(NA, -length(x)), class = "data.frame")
 }
 
-# DuckDB's common type; a double takes the decimal's, as it takes a zuint
-# type's, and is checked when cast.
+# DuckDB's common type. A double counts as INTEGER, as DuckDB types an
+# integer literal and c() a double of int32 values: vctrs types prototypes,
+# not values, so a larger double is then a lossy cast, not a wider type.
 dec_vec_ptype2 <- function(x, y, ..., x_arg = "", y_arg = "") {
   sides <- list(x, y)
-  sides <- sides[!vapply(sides, function(v) is.double(v) && !is.object(v), NA)]
-  ops <- lapply(sides, function(v) dec_operand(v[0L], NULL))
-  type <- dec_common(ops, !vapply(sides, is_decimal128, NA))
+  ops <- lapply(sides, function(v) {
+    if (zu_is_bare_double(v)) {
+      list(p = 10L, s = 0L)
+    } else {
+      dec_operand(v[0L], NULL)
+    }
+  })
+  type <- dec_common(ops, !vapply(sides, is_decimal128, logical(1)))
   dec_new(complex(), type[[1L]], type[[2L]])
 }
 
 # x as the type of `to`. A cast that rounds is lossy, like one that loses a
 # value: vctrs casts must be exact.
 dec_vec_cast <- function(x, to, ..., x_arg = "", to_arg = "") {
-  out <- withCallingHandlers(
-    dec_cast(x, dec_p(to), dec_s(to), NULL),
-    zuint_cast_warning = function(w) invokeRestart("muffleWarning")
-  )
+  out <- zu_quiet_cast(dec_cast(x, dec_p(to), dec_s(to), NULL))
   lost <- dec_is_na(out) & !is.na(x)
   changed <- if (is_decimal128(x)) {
     !(out == x) %in% TRUE
@@ -227,10 +226,7 @@ dec_vec_cast <- function(x, to, ..., x_arg = "", to_arg = "") {
 
 # A decimal to a zuint integer type, to integer or to double.
 dec_vec_cast_zuint <- function(x, to, ..., x_arg = "", to_arg = "") {
-  out <- withCallingHandlers(
-    dec_to_zuint(x, zu_code(to), NULL),
-    zuint_cast_warning = function(w) invokeRestart("muffleWarning")
-  )
+  out <- zu_quiet_cast(dec_to_zuint(x, zu_code(to), NULL))
   lossy <- zu_is_na(out) & !dec_is_na(x)
   if (any(lossy)) {
     return(vctrs::maybe_lossy_cast(
@@ -248,10 +244,10 @@ dec_vec_cast_zuint <- function(x, to, ..., x_arg = "", to_arg = "") {
 dec_vec_cast_base <- function(x, to, ..., x_arg = "", to_arg = "") {
   if (is.double(to)) {
     out <- dec_as_double(x)
-    back <- suppressWarnings(dec_cast(out, dec_p(x), dec_s(x), NULL))
+    back <- zu_quiet_cast(dec_cast(out, dec_p(x), dec_s(x), NULL))
     lossy <- !dec_is_na(x) & !(back == x) %in% TRUE
   } else {
-    out <- suppressWarnings(dec_as_integer(x))
+    out <- zu_quiet_cast(dec_as_integer(x))
     lossy <- !dec_is_na(x) & is.na(out)
   }
   if (any(lossy)) {
@@ -294,13 +290,16 @@ zu_pillar_shaft <- function(x, ...) {
 #' [zu_common_type()]) and is `NA` where `test` is. `zu_vapply()` calls
 #' `FUN` on each element of `X` and requires each result to have the length
 #' of `FUN.VALUE`, a zuint prototype such as `int64(0)`; the results take its
-#' type.
+#' type. Both take [decimal128()] vectors too: `zu_ifelse()` combines `yes`
+#' and `no` as [c()] does, and `zu_vapply()` converts each result to the
+#' type of `FUN.VALUE` as `x[i] <- value` does, exactly or `NA`.
 #'
 #' @param test A logical vector.
 #' @param yes,no Values for `TRUE` and `FALSE`, recycled to `test`.
 #' @param X A vector or list.
 #' @param FUN A function.
-#' @param FUN.VALUE A zuint vector of the length each result must have.
+#' @param FUN.VALUE A zuint or `decimal128` vector of the length each result
+#'   must have.
 #' @param ... More arguments to `FUN`.
 #' @return A zuint vector.
 #' @examples
@@ -310,6 +309,9 @@ zu_pillar_shaft <- function(x, ...) {
 #' @export
 zu_ifelse <- function(test, yes, no) {
   call <- sys.call()
+  if (is_decimal128(yes) || is_decimal128(no)) {
+    return(dec_ifelse(test, yes, no, call))
+  }
   kinds <- c(zu_kind(yes), zu_kind(no))
   zu_check_operands(kinds, list(yes, no), call)
   code <- zu_common_code(kinds, call)
@@ -339,6 +341,9 @@ zu_ifelse <- function(test, yes, no) {
 #' @export
 zu_vapply <- function(X, FUN, FUN.VALUE, ...) {
   call <- sys.call()
+  if (is_decimal128(FUN.VALUE)) {
+    return(dec_vapply(X, FUN, FUN.VALUE, ..., call = call))
+  }
   code <- zu_code(FUN.VALUE)
   if (is.na(code)) {
     zu_abort("`FUN.VALUE` must be a zuint vector.", "type", call = call)
@@ -368,3 +373,49 @@ zu_vapply <- function(X, FUN, FUN.VALUE, ...) {
 
 # A zero-length payload of a type's storage.
 zu_alloc_empty <- function(code) if (code <= 2L) double() else complex()
+
+# zu_ifelse() with a decimal: yes and no in their common type, as c() takes
+# them.
+dec_ifelse <- function(test, yes, no, call) {
+  both <- dec_c(unname(yes), unname(no))
+  if (!is_decimal128(both)) {
+    # a double that is not whole, under options(zuint.double = "allow")
+    return(ifelse(test, dec_dbl_quiet(yes), dec_dbl_quiet(no)))
+  }
+  nm <- names(test)
+  test <- as.logical(test)
+  n <- length(test)
+  ny <- length(yes)
+  out <- rep(both[seq_len(ny)], length.out = n)
+  no <- rep(both[ny + seq_along(no)], length.out = n)
+  f <- !is.na(test) & !test
+  out[f] <- no[f]
+  out[is.na(test)] <- NA
+  names(out) <- nm
+  out
+}
+
+dec_vapply <- function(X, FUN, FUN.VALUE, ..., call) {
+  FUN <- match.fun(FUN)
+  k <- length(FUN.VALUE)
+  res <- lapply(X, function(el) {
+    r <- FUN(el, ...)
+    if (length(r) != k) {
+      zu_abort(
+        sprintf("Each result must have length %d.", k),
+        "type",
+        call = call
+      )
+    }
+    zu_bare(dec_assign_value(r, FUN.VALUE, call))
+  })
+  out <- dec_new(
+    if (length(res)) unlist(lapply(res, unname)) else complex(),
+    dec_p(FUN.VALUE),
+    dec_s(FUN.VALUE)
+  )
+  if (k == 1L) {
+    names(out) <- names(X)
+  }
+  out
+}

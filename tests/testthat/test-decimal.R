@@ -4,6 +4,7 @@
 # ---- construction -------------------------------------------------------------
 
 test_that("decimal128() reads text as the core does, and NA quietly", {
+  withr::local_seed(6)
   for (k in c(1L, 8L, 20L, 40L)) {
     type <- fx_types()[k, ]
     p <- type$p
@@ -102,7 +103,10 @@ test_that("decimal128() casts integers, doubles and decimals as DuckDB does", {
     )
     expect_identical(as.character(x), duck, label = paste(label, "decimal"))
   }
-  expect_warning(decimal128(NaN, 5, 2), class = "zuint_cast_warning")
+  # NaN is NA quietly, as int128(NaN) is; Inf does not convert
+  expect_no_warning(x <- decimal128(c(NaN, 1), 5, 2))
+  expect_identical(is.na(x), is.na(int128(c(NaN, 1))))
+  expect_warning(decimal128(Inf, 5, 2), class = "zuint_cast_warning")
   expect_warning(decimal128(int64(1000), 4, 2), class = "zuint_cast_warning")
   x <- decimal128("1.5", 5, 2)
   expect_identical(decimal128(x), x)
@@ -260,7 +264,8 @@ test_that("a whole double is an integer operand; any other follows zuint.double"
   expect_identical(dec_typeof(a + 2^40), "DECIMAL(22,2)")
   expect_identical(a * 2, a * 2L)
   expect_error(a * 1.5, class = "zuint_double_error")
-  expect_error(a == 0.1, class = "zuint_double_error")
+  # comparison is exact with any double instead (design 5)
+  expect_identical(a == 1.25, c(TRUE, FALSE))
   expect_error(c(a, 0.5), class = "zuint_double_error")
   withr::local_options(zuint.double = "allow")
   expect_warning(r <- a * 1.5, class = "zuint_double_warning")
@@ -281,6 +286,13 @@ test_that("comparison is exact across scales", {
     ca <- ca[seq_len(n)]
     cb <- cb[seq_len(n)]
     # every fifth pair is equal across the scales, where that fits
+    for (i in seq(1L, n, by = 5L)) {
+      lo <- if (sa <= sb) ca[[i]] else cb[[i]]
+      same <- as.character(gmp::as.bigz(lo) * gmp::as.bigz(10)^abs(sb - sa))
+      if (nchar(sub("^-", "", same)) <= 38L) {
+        if (sa <= sb) cb[[i]] <- same else ca[[i]] <- same
+      }
+    }
     a <- decimal128(fx_format(ca, 38L, sa), 38L, sa)
     b <- decimal128(fx_format(cb, 38L, sb), 38L, sb)
     s <- max(sa, sb)
@@ -288,7 +300,9 @@ test_that("comparison is exact across scales", {
     y <- gmp::as.bigz(cb) * gmp::as.bigz(10)^(s - sb)
     want <- as.integer(x > y) - as.integer(x < y)
     label <- sprintf("scales %d and %d", sa, sb)
+    expect_true(any(want == 0), label = label)
     expect_identical(a < b, want < 0, label = label)
+    expect_identical(a <= b, want <= 0, label = label)
     expect_identical(a == b, want == 0, label = label)
     expect_identical(a >= b, want >= 0, label = label)
   }
@@ -299,7 +313,7 @@ test_that("comparison is exact across scales", {
   expect_identical(a != 2, c(TRUE, NA))
 })
 
-test_that("/, %%, %/%, ^ and Math are computed in double; abs and - keep the type", {
+test_that("/, %%, %/%, ^ and most of Math are computed in double; abs and - keep the type", {
   a <- decimal128(c(x = "7.50", y = "-0.05", z = NA), 5, 2)
   b <- decimal128("2.0", 3, 1)
   for (op in c("/", "%%", "%/%", "^")) {
@@ -310,7 +324,11 @@ test_that("/, %%, %/%, ^ and Math are computed in double; abs and - keep the typ
     )
   }
   expect_identical(exp(a), stats::setNames(exp(as.double(a)), names(a)))
-  expect_identical(floor(a), stats::setNames(floor(as.double(a)), names(a)))
+  expect_identical(
+    signif(a, 1),
+    stats::setNames(signif(as.double(a), 1), names(a))
+  )
+  expect_identical(cumprod(a), stats::setNames(cumprod(as.double(a)), names(a)))
   expect_identical(abs(a), decimal128(c(x = "7.50", y = "0.05", z = NA), 5, 2))
   expect_identical(-a, decimal128(c(x = "-7.50", y = "0.05", z = NA), 5, 2))
   expect_identical(+a, a)
@@ -467,6 +485,7 @@ test_that("format, print and str show every digit of the scale", {
     unclass(summary(x)),
     c(
       "Min." = "-0.05",
+      Median = "1.5",
       Mean = "411.983333333333",
       "Max." = "1234.50",
       "NA's" = "1"
@@ -601,4 +620,438 @@ test_that("decimal128 columns work in data frames and tibbles", {
   out <- capture.output(print(tb))
   expect_true(any(grepl("<dec(5,2)>", out, fixed = TRUE)))
   expect_true(any(grepl("-3.50", out, fixed = TRUE)))
+})
+
+# ---- the review of 625e4a4 ------------------------------------------------------
+
+test_that("match(), %in%, table() and zu_match() find equal values across scales (#108, #126)", {
+  withr::local_seed(108)
+  # == is the oracle; it is checked against gmp above
+  for (k in 1:10) {
+    sa <- sample(0:6, 1L)
+    sb <- sample(0:6, 1L)
+    whole <- sample(-30:30, 40L, TRUE)
+    frac <- sample(0:9, 40L, TRUE)
+    texts <- sprintf("%d.%d", whole, frac)
+    texts[c(3L, 17L)] <- c("0", "-0.00")
+    x <- decimal128(texts, 20L, max(sa, 1L))
+    tab <- decimal128(texts[sample(40L, 25L)], 20L, max(sb, 1L))
+    want <- vapply(
+      seq_along(x),
+      function(i) match(TRUE, (x[i] == tab) %in% TRUE),
+      integer(1)
+    )
+    label <- sprintf("scales %d and %d", max(sa, 1L), max(sb, 1L))
+    expect_identical(match(x, tab), want, label = label)
+    expect_identical(x %in% tab, !is.na(want), label = label)
+    expect_identical(zu_match(x, tab), want, label = label)
+    expect_identical(x %zin% tab, !is.na(want), label = label)
+  }
+  expect_identical(decimal128("2.0", 3, 1) %in% 1:3, TRUE)
+  expect_identical(match(decimal128("2.0", 3, 1), int64(c(1, 2))), 2L)
+  expect_identical(match(decimal128(".50", 2, 2), decimal128("0.5", 2, 1)), 1L)
+  expect_identical(zu_match(1L, decimal128(c("2.00", "1.00"), 5, 2)), 2L)
+  expect_identical(zu_match(decimal128(c("1.50", NA), 5, 2), 1.5), c(1L, NA))
+  t2 <- table(c(decimal128("1.0", 5, 1), decimal128(c("1.00", "2.50"), 5, 2)))
+  expect_identical(as.vector(t2), c(2L, 1L))
+  # a value beyond 38 digits matches nothing, quietly (#58)
+  expect_no_warning(
+    r <- zu_match(
+      uint128(paste0("2", strrep("0", 38))),
+      decimal128(c("1", NA), 5, 0)
+    )
+  )
+  expect_identical(r, NA_integer_)
+})
+
+test_that("x[i] <- value is exact and follows zuint.double, as c() does (#109)", {
+  x <- decimal128(c("1.25", "2.50"), 10, 2)
+  y <- x
+  expect_warning(
+    y[1] <- decimal128("1.255", 10, 3),
+    class = "zuint_cast_warning"
+  )
+  expect_identical(as.character(y), c(NA, "2.50"))
+  y <- x
+  y[[2]] <- decimal128("7.5", 3, 1)
+  expect_identical(as.character(y), c("1.25", "7.50"))
+  expect_error(y[1] <- 1.255, class = "zuint_double_error")
+  expect_error(y[[1]] <- 1.255, class = "zuint_double_error")
+  y[1] <- 3
+  expect_identical(as.character(y), c("3.00", "7.50"))
+  # text rounds, as decimal128() and c() read it
+  y[2] <- "7.777"
+  expect_identical(as.character(y), c("3.00", "7.78"))
+  expect_identical(c(x, "7.777")[3], decimal128("7.78", 10, 2))
+  # past the end: the type's NA in the padding, the value at the end
+  y <- x
+  y[4] <- 1L
+  expect_identical(as.character(y), c("1.25", "2.50", NA, "1.00"))
+  # a value the type can't hold is NA with a warning, never wrapped
+  y <- x
+  expect_warning(y[1] <- int64("100000000000"), class = "zuint_cast_warning")
+  expect_true(is.na(y[1]))
+  # the same value by every route: c(), [<- and vec_assign() agree
+  v <- decimal128("1.555", 10, 3)
+  expect_warning(r <- c(decimal128("0", 10, 2), v), NA)
+  expect_identical(decimal_scale(r), 3L)
+  skip_if_not_installed("vctrs")
+  expect_error(vctrs::vec_assign(x, 1L, v), class = "vctrs_error_cast_lossy")
+  withr::local_options(zuint.double = "allow")
+  y <- x
+  expect_warning(y[1] <- 1.375, class = "zuint_double_warning")
+  expect_identical(as.character(y), c("1.38", "2.50"))
+})
+
+test_that("blank and \"NA\" text is missing, not lost (#110)", {
+  d <- decimal128("1.25", 10, 2)
+  blank <- c("NA", "", " ", " NA ", "\t\v\f\r\n", NA)
+  expect_no_warning(r <- c(d, blank))
+  expect_identical(as.character(r), c("1.25", rep(NA, length(blank))))
+  expect_no_warning(r <- decimal128(blank, 5, 2))
+  expect_true(all(is.na(r)))
+  y <- d
+  expect_no_warning(y[2] <- "NA")
+  expect_identical(is.na(y), c(FALSE, TRUE))
+  # text that is not a number still warns
+  expect_warning(c(d, "1.2.3"), class = "zuint_cast_warning")
+})
+
+test_that("a warning counts each result an operand lost after recycling (#111)", {
+  big <- decimal128(strrep("9", 38), 38, 0)
+  expect_snapshot(r <- big + decimal128(rep("0.1", 5), 10, 1))
+  expect_identical(sum(is.na(r)), 5L)
+})
+
+test_that("NaN is NA quietly, as for the integer types (#112)", {
+  expect_no_warning(r <- decimal128(c(NaN, 2), 5, 2))
+  expect_identical(as.character(r), c(NA, "2.00"))
+  expect_no_warning(r <- decimal128("1.5", 5, 2) + NaN)
+  expect_true(is.na(r))
+})
+
+test_that("comparison with a double is exact, whatever the double (#113)", {
+  d <- decimal128(c("1.50", "-2.25", NA, "0.00", "0.10", "0.30"), 5, 2)
+  expect_identical(d == 1.5, c(TRUE, FALSE, NA, FALSE, FALSE, FALSE))
+  expect_identical(d < 1.75, c(TRUE, TRUE, NA, TRUE, TRUE, TRUE))
+  expect_identical(d <= -2.25, c(FALSE, TRUE, NA, FALSE, FALSE, FALSE))
+  expect_identical(1.5 == d, d == 1.5)
+  expect_identical(d < Inf, c(TRUE, TRUE, NA, TRUE, TRUE, TRUE))
+  expect_identical(d > -Inf, d < Inf)
+  expect_identical(d < 1e300, d < Inf)
+  expect_identical(d == NaN, rep(NA, 6))
+  # 0.1 as a double is 0.1000000000000000055..., and 0.1 + 0.2 is
+  # 0.3000000000000000444...: no decimal of scale 2 equals either
+  expect_identical(d[5] == 0.1, FALSE)
+  expect_identical(d[5] < 0.1, TRUE)
+  expect_identical(d[6] < 0.1 + 0.2, TRUE)
+  expect_identical(d[6] > 0.3, TRUE) # 0.29999999999999998889...
+  # every double that is a decimal of the scale compares equal
+  skip_if_not_installed("gmp")
+  withr::local_seed(113)
+  for (s in c(0L, 1L, 5L, 20L, 38L)) {
+    p <- 38L
+    k <- sample(-2^20:2^20, 50L)
+    v <- c(k / 2^sample(0:min(s, 20L), 50L, TRUE), 2^60, -2^62, 1e37)
+    if (s > 0L) {
+      v <- v[abs(v) < 10^(p - s)]
+    }
+    # each double's exact value, as a fraction, against the decimal's
+    x <- decimal128(v, p, s)
+    exact <- gmp::as.bigq(v)
+    dec <- gmp::as.bigq(
+      gmp::as.bigz(as.character(dec_view(x))),
+      gmp::as.bigz(10)^s
+    )
+    want <- as.integer(dec > exact) - as.integer(dec < exact)
+    label <- sprintf("scale %d", s)
+    expect_identical(x == v, want == 0L, label = label)
+    expect_identical(x < v, want < 0L, label = label)
+    expect_identical(x >= v, want >= 0L, label = label)
+    expect_identical(v > x, want < 0L, label = label)
+  }
+})
+
+test_that("an integer or whole double beyond 38 digits compares by its sign (#113)", {
+  d <- decimal128(c("1.25", NA, "-99"), 5, 2)
+  huge <- uint128(paste0("2", strrep("0", 38)))
+  expect_no_warning(r <- d < huge)
+  expect_identical(r, c(TRUE, NA, TRUE))
+  expect_identical(int128(paste0("-1", strrep("0", 38))) < d, c(TRUE, NA, TRUE))
+  expect_identical(d == 1e30, c(FALSE, NA, FALSE))
+  expect_identical(d < 1e38, c(TRUE, NA, TRUE))
+  expect_identical(decimal128(strrep("9", 38), 38, 0) < 1e38, TRUE)
+  expect_identical(d > -1e300, c(TRUE, NA, TRUE))
+})
+
+test_that("format() and summary() keep \".\" under OutDec (#114)", {
+  x <- decimal128(c("-1234567.891234", "2.5", NA), 20, 6)
+  y <- int64(c(1234567, 2, NA))
+  plain <- list(format(x, big.mark = " "), format(x), summary(x), summary(y))
+  withr::local_options(OutDec = ",", scipen = -5, digits = 3)
+  expect_identical(format(x, big.mark = " ")[[1L]], "-1 234 567.891234")
+  expect_identical(
+    list(format(x, big.mark = " "), format(x), summary(x), summary(y)),
+    plain
+  )
+  expect_false(any(grepl(",", summary(x), fixed = TRUE)))
+})
+
+test_that("bit64 can't compute an integer64 with a decimal128 (#115)", {
+  skip_if_not_installed("bit64")
+  # bit64 registers its methods when its namespace loads
+  requireNamespace("bit64", quietly = TRUE)
+  zu_register_bit64()
+  d <- decimal128("1.5", 2, 1)
+  expect_error(bit64::as.integer64(d), class = "zuint_incompatible_error")
+  expect_identical(as.character(d * bit64::as.integer64(2)), "3.0")
+  expect_identical(
+    as_integer64(decimal128("7.00", 5, 2)),
+    bit64::as.integer64(7)
+  )
+})
+
+test_that("decimal128(x, precision) keeps x's scale, and the other way round (#124)", {
+  d <- decimal128(c("1.25", "-2.50"), 5, 2)
+  expect_identical(decimal128(d, 20), decimal128(c("1.25", "-2.50"), 20, 2))
+  expect_identical(decimal128(d, scale = 1), decimal128(c("1.3", "-2.5"), 5, 1))
+  # the scale stays, so one digit holds neither value
+  expect_warning(r <- decimal128(d, 1), class = "zuint_cast_warning")
+  expect_identical(dec_typeof(r), "DECIMAL(1,1)")
+})
+
+test_that("c() keeps its own arguments out of the data, and names in the double fallback (#128)", {
+  d <- decimal128(c(a = "1.50", b = "-2.25"), 5, 2)
+  expect_identical(c(d, use.names = FALSE), unname(d))
+  expect_identical(c(d, d[1], recursive = TRUE), c(d, d[1]))
+  withr::local_options(zuint.double = "allow")
+  expect_warning(r <- c(x = d[[1]], y = 0.5), class = "zuint_double_warning")
+  expect_identical(r, c(x = 1.5, y = 0.5))
+})
+
+test_that("vctrs types a double as c() types an int32 one (#129)", {
+  skip_if_not_installed("vctrs")
+  d <- decimal128(c("1.50", NA), 5, 2)
+  expect_identical(vctrs::vec_c(d, 3), c(d, 3))
+  expect_identical(vctrs::vec_ptype2(d, 1.5), vctrs::vec_ptype2(d, 1L))
+  # vctrs types prototypes: a double past int32 is a lossy cast
+  expect_error(vctrs::vec_c(d, 2^40), class = "vctrs_error_cast_lossy")
+})
+
+test_that("zu_ifelse() and zu_vapply() take decimals (#126)", {
+  d <- decimal128(c("1.0", "2.5", "-3.0"), 10, 1)
+  e <- decimal128(c("7.00", "8.25", "9.00"), 10, 2)
+  test <- c(TRUE, FALSE, NA)
+  r <- zu_ifelse(test, d, e)
+  both <- c(d, e)
+  expect_identical(r, c(both[1L], both[5L], decimal128(NA, 11, 2)))
+  expect_identical(
+    zu_ifelse(c(a = TRUE, b = FALSE), d[1], 3L),
+    c(a = d[1], b = 3L)[1:2] |> stats::setNames(c("a", "b"))
+  )
+  r <- zu_vapply(1:3, function(i) d[i] * 2L, decimal128(0, 12, 1))
+  expect_identical(r, decimal128(c("2.0", "5.0", "-6.0"), 12, 1))
+  expect_warning(
+    zu_vapply(1L, function(i) decimal128("1.25", 5, 2), decimal128(0, 5, 1)),
+    class = "zuint_cast_warning"
+  )
+})
+
+test_that("round(), floor(), ceiling() and trunc() give DuckDB's type and value (#127)", {
+  con <- local_duckdb_plain()
+  types <- list(
+    c(2L, 0L),
+    c(5L, 0L),
+    c(3L, 1L),
+    c(5L, 2L),
+    c(10L, 2L),
+    c(18L, 3L),
+    c(19L, 3L),
+    c(38L, 0L),
+    c(38L, 2L),
+    c(38L, 38L)
+  )
+  for (type in types) {
+    p <- type[[1L]]
+    s <- type[[2L]]
+    coefs <- c(fx_coefs(20L, p, seed = p + s), "5", "-5", "25", "-35", "0")
+    # ties at every digit the rounding can cut
+    ties <- paste0(c("", "-"), "5", strrep("0", 0:(p - 1L)))
+    coefs <- unique(c(coefs, ties[nchar(sub("-", "", ties)) <= p]))
+    texts <- fx_format(coefs, p, s)
+    x <- decimal128(texts, p, s)
+    df <- data.frame(x = texts)
+    cases <- c(
+      lapply(c(-p - 1L, -p, -2L, -1L, 0L, 1L, 2L, s, s + 1L), function(d) {
+        list(
+          r = function(x) round(x, d),
+          sql = sprintf("round(%%s, %d)", d),
+          d = d
+        )
+      }),
+      list(
+        list(r = floor, sql = "floor(%s)", d = NA),
+        list(r = ceiling, sql = "ceil(%s)", d = NA),
+        list(r = trunc, sql = "trunc(%s)", d = NA)
+      )
+    )
+    for (case in cases) {
+      label <- sprintf("%s on DECIMAL(%d, %d)", case$sql, p, s)
+      want_type <- duck_typeof(con, sprintf(case$sql, dec_sql("'0'", p, s)))
+      duck <- duck_df(
+        con,
+        df,
+        sprintf("TRY(%s)::VARCHAR", sprintf(case$sql, dec_sql("x", p, s)))
+      )
+      r <- withCallingHandlers(
+        case$r(x),
+        zuint_overflow_warning = function(w) invokeRestart("muffleWarning")
+      )
+      expect_identical(dec_typeof(r), want_type, label = label)
+      # TRY() is NULL where DuckDB overflows (rounding 38 nines up): NA here
+      expect_identical(as.character(r), duck, label = label)
+    }
+  }
+  # names stay; NA stays
+  a <- decimal128(c(u = "1.25", v = NA), 5, 2)
+  expect_identical(round(a, 1), decimal128(c(u = "1.3", v = NA), 5, 1))
+  expect_identical(floor(a), decimal128(c(u = "1", v = NA), 5, 0))
+})
+
+test_that("cumsum() is DuckDB's running sum; cummax() and cummin() keep the type (#127)", {
+  con <- local_duckdb_plain()
+  for (type in list(c(5L, 2L), c(18L, 9L), c(38L, 0L), c(38L, 30L))) {
+    p <- type[[1L]]
+    s <- type[[2L]]
+    coefs <- fx_coefs(30L, p, seed = 7L * p)
+    coefs <- coefs[abs(as.numeric(coefs)) < 1e36 | p < 38L]
+    texts <- fx_format(coefs, p, s)
+    x <- decimal128(texts, p, s)
+    label <- sprintf("DECIMAL(%d, %d)", p, s)
+    df <- data.frame(x = texts)
+    win <- function(f) {
+      duck_df(
+        con,
+        df,
+        sprintf(
+          "%s(%s) OVER (ORDER BY i ROWS UNBOUNDED PRECEDING)::VARCHAR",
+          f,
+          dec_sql("x", p, s)
+        )
+      )
+    }
+    expect_identical(as.character(cumsum(x)), win("sum"), label = label)
+    expect_identical(dec_typeof(cumsum(x)), sprintf("DECIMAL(38,%d)", s))
+    expect_identical(as.character(cummax(x)), win("max"), label = label)
+    expect_identical(as.character(cummin(x)), win("min"), label = label)
+    expect_identical(dec_typeof(cummax(x)), dec_typeof(x))
+  }
+  # NA propagates, as base cumsum() does; past 38 digits NA from there on
+  x <- decimal128(c("1.5", NA, "2.0"), 5, 1)
+  expect_identical(is.na(cumsum(x)), is.na(cumsum(as.double(x))))
+  top <- decimal128(c(strrep("9", 38), "1", "-5"), 38, 0)
+  expect_warning(r <- cumsum(top), class = "zuint_overflow_warning")
+  expect_identical(as.character(r), c(strrep("9", 38), NA, NA))
+})
+
+# ---- mutants and limits the review found unchecked (#118, #121) ----------------
+
+test_that("the product scale stops at 38, and DuckDB's 18-digit cap at scale 18 (#121)", {
+  con <- local_duckdb_plain()
+  for (pair in list(
+    c(38, 19, 38, 18),
+    c(38, 19, 38, 19),
+    c(38, 20, 38, 19),
+    c(9, 8, 9, 9),
+    c(9, 9, 9, 9),
+    c(10, 9, 9, 9),
+    c(18, 9, 18, 8),
+    c(19, 9, 18, 8),
+    c(18, 9, 18, 9),
+    c(18, 9, 18, 10)
+  )) {
+    pa <- pair[[1L]]
+    sa <- pair[[2L]]
+    pb <- pair[[3L]]
+    sb <- pair[[4L]]
+    label <- sprintf("DECIMAL(%d, %d) * DECIMAL(%d, %d)", pa, sa, pb, sb)
+    want <- duck_typeof(
+      con,
+      sprintf("%s * %s", dec_sql("'0'", pa, sa), dec_sql("'0'", pb, sb))
+    )
+    a <- decimal128("0", pa, sa)
+    b <- decimal128("0", pb, sb)
+    if (want == "ERROR") {
+      expect_error(a * b, class = "zuint_incompatible_error", label = label)
+    } else {
+      expect_identical(dec_typeof(a * b), want, label = label)
+    }
+  }
+})
+
+test_that("a whole double is INTEGER, BIGINT or HUGEINT at DuckDB's thresholds (#121)", {
+  con <- local_duckdb_plain()
+  a <- decimal128("1.5", 5, 2)
+  lits <- c(
+    "2147483647",
+    "2147483648",
+    "-2147483648",
+    "-2147483649",
+    "9223372036854774784",
+    "9223372036854775808",
+    "-9223372036854775808"
+  )
+  for (lit in lits) {
+    want <- duck_typeof(con, sprintf("%s + %s", dec_sql("'0'", 5, 2), lit))
+    expect_identical(dec_typeof(a + as.numeric(lit)), want, label = lit)
+  }
+})
+
+test_that("sum() fits DECIMAL(38, s) exactly, beyond int64 and within int128 (#118, #121)", {
+  nines <- decimal128(c(strrep("9", 37), strrep("9", 37)), 38, 0)
+  expect_identical(as.character(sum(nines)), paste0("1", strrep("9", 36), "8"))
+  # 6e37 twice is 1.2e38: past 38 digits, inside int128
+  six <- decimal128(rep(paste0("6", strrep("0", 37)), 2), 38, 0)
+  expect_warning(r <- sum(six), class = "zuint_overflow_warning")
+  expect_true(is.na(r))
+  edge <- decimal128(
+    c(paste0("5", strrep("0", 37)), paste0("4", strrep("9", 37))),
+    38,
+    0
+  )
+  expect_identical(as.character(sum(edge)), strrep("9", 38))
+  expect_warning(
+    sum(c(edge, decimal128("1", 38, 0))),
+    class = "zuint_overflow_warning"
+  )
+})
+
+test_that("the vctrs casts to integer and double refuse a lossy decimal (#118)", {
+  skip_if_not_installed("vctrs")
+  expect_error(
+    vctrs::vec_cast(decimal128("1.5", 5, 1), integer()),
+    class = "vctrs_error_cast_lossy"
+  )
+  expect_identical(vctrs::vec_cast(decimal128("2.0", 5, 1), integer()), 2L)
+  expect_error(
+    vctrs::vec_cast(decimal128(strrep("9", 38), 38, 0), double()),
+    class = "vctrs_error_cast_lossy"
+  )
+  expect_identical(vctrs::vec_cast(decimal128("0.5", 5, 1), double()), 0.5)
+})
+
+test_that("range(finite =), median(na.rm =), anyDuplicated(fromLast =) and all.equal() (#118)", {
+  x <- decimal128(c("1.5", NA, "-2.0", "1.5"), 5, 1)
+  expect_identical(range(x, finite = TRUE), decimal128(c("-2.0", "1.5"), 5, 1))
+  expect_identical(range(x, na.rm = TRUE), range(x, finite = TRUE))
+  expect_true(all(is.na(range(x))))
+  expect_identical(median(x, na.rm = TRUE), 1.5)
+  expect_identical(median(x), NA_real_)
+  expect_identical(anyDuplicated(x), 4L)
+  expect_identical(anyDuplicated(x, fromLast = TRUE), 1L)
+  y <- x
+  y[1] <- decimal128("1.4", 5, 1)
+  expect_identical(all.equal(x, y), "1 of 4 values differ")
+  expect_true(all.equal(x, x))
+  expect_match(all.equal(x, decimal128(x, 6, 1)), "Types differ")
 })

@@ -29,7 +29,8 @@ on long vectors.
 }
 \details{
 Both arguments take their common type first (see \code{\link[=zu_common_type]{zu_common_type()}}); \code{NA}
-matches \code{NA}.
+matches \code{NA}. A \code{\link[=decimal128]{decimal128()}} matches by value, whatever the scales:
+\code{1.0} matches \code{1.00} and the integer \code{1}.
 }
 \examples{
 zu_match(uint64(c("18446744073709551614", "7")), uint64(c(7, 1)))

@@ -1,29 +1,40 @@
 # Ordering, set operations and summaries (design 7).
 
-zu_summary_group <- function(..., na.rm = FALSE) {
-  call <- sys.call()
-  args <- list(...)
-  # range()'s `finite` is an argument, not data (#56); for integers it
-  # drops NA, as base R does
+# The Summary group's arguments: range()'s `finite` is an argument, not
+# data (#56), and for integers it drops NA, as base R does.
+zu_summary_args <- function(args, generic, na.rm) {
   finite <- FALSE
-  if (.Generic == "range" && "finite" %in% names(args)) {
+  if (generic == "range" && "finite" %in% names(args)) {
     finite <- isTRUE(args[["finite"]])
     args[names(args) == "finite"] <- NULL
     na.rm <- na.rm || finite
   }
+  list(args = args, na.rm = na.rm, finite = finite)
+}
+
+# The combined values were doubles, under options(zuint.double = "allow")
+# (#60): the answer is base R's on those doubles.
+zu_summary_double <- function(x, generic, na.rm, finite) {
+  if (generic == "range") {
+    return(range(x, na.rm = na.rm, finite = finite))
+  }
+  get(generic, baseenv())(x, na.rm = na.rm)
+}
+
+zu_summary_group <- function(..., na.rm = FALSE) {
+  call <- sys.call()
+  a <- zu_summary_args(list(...), .Generic, na.rm)
+  args <- a$args
+  na.rm <- a$na.rm
   x <- if (length(args) == 1L) args[[1L]] else do.call(zu_c, args)
   if (is_decimal128(x)) {
     # min(int64(1), <decimal128>): the decimal's method on the combination
     return(get(.Generic, baseenv())(x, na.rm = na.rm))
   }
   code <- zu_code(x)
-  if (is.na(code) && is.double(x) && !is.object(x)) {
+  if (is.na(code) && zu_is_bare_double(x)) {
     # zu_c() fell back to double under options(zuint.double = "allow")
-    # (#60): the answer is base R's on those doubles
-    if (.Generic == "range") {
-      return(range(x, na.rm = na.rm, finite = finite))
-    }
-    return(get(.Generic, baseenv())(x, na.rm = na.rm))
+    return(zu_summary_double(x, .Generic, na.rm, a$finite))
   }
   if (is.na(code)) {
     x <- zu_cast(
@@ -128,9 +139,12 @@ zu_duplicated <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
   .Call(zu_duplicated_c, x, zu_code(x), isTRUE(fromLast))
 }
 
+# Names go, as base unique() drops them.
 zu_unique <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
   if (isTRUE(fromLast) || !is.null(names(x))) {
-    return(x[!zu_duplicated(x, fromLast = fromLast)])
+    out <- x[!zu_duplicated(x, fromLast = fromLast)]
+    names(out) <- NULL
+    return(out)
   }
   zu_new(.Call(zu_unique_c, x, zu_code(x)), zu_code(x))
 }
@@ -152,7 +166,8 @@ zu_mtfrm <- function(x) zu_as_character(x)
 #' on long vectors.
 #'
 #' Both arguments take their common type first (see [zu_common_type()]); `NA`
-#' matches `NA`.
+#' matches `NA`. A [decimal128()] matches by value, whatever the scales:
+#' `1.0` matches `1.00` and the integer `1`.
 #'
 #' @param x Values to look up: a zuint vector, or an integer vector when
 #'   `table` is one.
@@ -166,6 +181,9 @@ zu_mtfrm <- function(x) zu_as_character(x)
 #' @export
 zu_match <- function(x, table, nomatch = NA_integer_) {
   call <- sys.call()
+  if (is_decimal128(x) || is_decimal128(table)) {
+    return(dec_match(x, table, as.integer(nomatch), call))
+  }
   kinds <- c(zu_kind(x), zu_kind(table))
   zu_check_operands(kinds, list(x, table), call)
   code <- zu_common_code(kinds, call)
@@ -173,12 +191,7 @@ zu_match <- function(x, table, nomatch = NA_integer_) {
   # A value the common type can't hold matches nothing, quietly: a lookup
   # that finds nothing loses nothing (#58). Cast to NA, it must not match
   # the table's NA, nor may an NA match a table value lost the same way.
-  quiet <- function(v) {
-    withCallingHandlers(
-      zu_cast(v, code, call = call),
-      zuint_cast_warning = function(w) invokeRestart("muffleWarning")
-    )
-  }
+  quiet <- function(v) zu_quiet_cast(zu_cast(v, code, call = call))
   cx <- quiet(x)
   ct <- quiet(table)
   res <- .Call(zu_match_c, cx, ct, code, nomatch)

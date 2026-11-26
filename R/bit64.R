@@ -120,14 +120,33 @@ zu_matrix_unsupported <- function(...) {
 # bit64's as.integer64() for the wider types, registered when bit64 loads.
 # bit64 calls it when an integer64 is on the left of one of them, then
 # computes in int64: exact, or NA with a warning, never truncated.
+# A decimal refuses: bit64 would compute `integer64 * decimal` on the
+# integers, making every fraction NA, and keep the decimal's attributes.
 zu_register_bit64 <- function(...) {
   ns <- asNamespace("bit64")
-  for (cl in c("zu_uint64", "zu_int128", "zu_uint128", "zu_decimal128")) {
+  for (cl in c("zu_uint64", "zu_int128", "zu_uint128")) {
     registerS3method("as.integer64", cl, zu_as_integer64_method, envir = ns)
   }
+  registerS3method(
+    "as.integer64",
+    "zu_decimal128",
+    dec_as_integer64_method,
+    envir = ns
+  )
 }
 
 zu_as_integer64_method <- function(x, ...) as_integer64(x)
+
+dec_as_integer64_method <- function(x, ...) {
+  zu_abort(
+    paste(
+      "bit64 can't compute with a decimal128.",
+      "Put the decimal128 first in the operation, or convert it with as_integer64() or int64()."
+    ),
+    "incompatible",
+    call = sys.call(-1L)
+  )
+}
 
 #' Convert to bit64's integer64
 #'

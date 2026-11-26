@@ -71,3 +71,12 @@ zu_warn_lost <- function(n, type, call = NULL) {
     )
   }
 }
+
+# expr with its zuint_cast_warning muffled: for callers that count the lost
+# values themselves, or for which a lost value is an answer.
+zu_quiet_cast <- function(expr) {
+  withCallingHandlers(
+    expr,
+    zuint_cast_warning = function(w) invokeRestart("muffleWarning")
+  )
+}
