@@ -6,9 +6,10 @@
 #   make -C tools/fuzz driver CC="$MULL_CC" CFLAGS=
 CC ?= cc
 CFLAGS ?= -g -O1 -fno-omit-frame-pointer -fsanitize=address,undefined
-R_INCLUDE := $(shell R RHOME)/include
+# R CMD config, not R RHOME: Debian's R keeps R.h in /usr/share/R/include.
+R_CPPFLAGS := $(shell R CMD config --cppflags)
 ZUFAST_INCLUDE ?= $(shell Rscript -e 'cat(system.file("include", package = "zufast"))')
-CPPFLAGS += -I../../src -I$(R_INCLUDE) -I$(ZUFAST_INCLUDE)
+CPPFLAGS += -I../../src $(R_CPPFLAGS) -I$(ZUFAST_INCLUDE)
 OBJS := harness.o driver.o zu_parse.o zu_metadata.o zu_fixed.o
 
 driver: $(OBJS)

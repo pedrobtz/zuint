@@ -6,10 +6,13 @@
 # `gh workflow run alloc-failure.yaml --ref <branch>`.
 #
 # expect-pattern: an injected failure must surface as zuint's own
-# "zuint: out of memory" error, or as R's or bash's allocation error, matched
-# by its wording. target-pattern counts the failures that reached zuint's C;
-# min-target-hits stays 0 until the first sweep has shown the count, then
-# goes a little under it so a sweep that stops reaching zuint goes red.
+# "zuint: out of memory" error (from the Arrow kernels, a classed
+# zuint_arrow_error whose message zu_arrow_try() strips to "out of memory"),
+# or as R's or bash's allocation error, matched by its wording.
+# target-pattern counts the failures that reached zuint's C. The first full
+# sweep on main (2026-11-26, run 45877736225) had 22, all in the Arrow
+# export; min-target-hits sits a little under, so a sweep that stops
+# reaching zuint goes red.
 on:
   workflow_dispatch:
 
@@ -25,8 +28,8 @@ jobs:
       run: R_ENABLE_JIT=0 Rscript tools/alloc-exercise.R
       baseline-run: R_ENABLE_JIT=0 Rscript -e 'suppressPackageStartupMessages(library(zuint))'
       max-allocations: 12000
-      expect-pattern: "zuint: out of memory|cannot allocate (vector|memory block|[0-9]+ bytes)|[Cc]ould not allocate|memory exhausted|out of virtual memory|cannot open file '[^']*\\.rdb': Cannot allocate memory"
-      target-pattern: "alloc-exercise: .*zuint: out of memory"
-      min-target-hits: 0
+      expect-pattern: "zuint: out of memory|zuint_[a-z]+_error/zuint_error/error/condition: out of memory|cannot allocate (vector|memory block|[0-9]+ bytes)|[Cc]ould not allocate|memory exhausted|out of virtual memory|cannot open file '[^']*\\.rdb': Cannot allocate memory"
+      target-pattern: "alloc-exercise: (zuint_[a-z]+_error/zuint_error/error/condition: |.*zuint: )out of memory"
+      min-target-hits: 18
       ignore-crash-pattern: "^ 1: (grepl?|sub|gsub|regexpr|gregexpr|strsplit|gzfile)\\("
       timeout-minutes: 150
