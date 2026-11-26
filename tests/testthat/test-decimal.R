@@ -662,6 +662,9 @@ test_that("match(), %in%, table() and zu_match() find equal values across scales
     )
   )
   expect_identical(r, NA_integer_)
+  # nor does a table value lost that way match x's NA: the real NA does
+  big <- uint128(c(paste0("2", strrep("0", 38)), NA))
+  expect_identical(zu_match(decimal128(NA, 5, 0), big), 2L)
 })
 
 test_that("x[i] <- value is exact and follows zuint.double, as c() does (#109)", {
