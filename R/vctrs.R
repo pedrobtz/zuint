@@ -29,6 +29,28 @@ zu_register_vctrs <- function(...) {
       reg("vec_ptype2", paste0(cl2, ".", cl), zu_vec_ptype2)
     }
   }
+  dec <- "zu_decimal128"
+  reg("vec_proxy", dec, zu_vec_proxy)
+  reg("vec_restore", dec, dec_vec_restore)
+  reg("vec_proxy_equal", dec, dec_vec_proxy_pieces)
+  reg("vec_proxy_compare", dec, dec_vec_proxy_pieces)
+  reg("vec_proxy_order", dec, dec_vec_proxy_pieces)
+  reg("vec_ptype_abbr", dec, function(x, ...) "dec")
+  reg("vec_ptype_full", dec, function(x, ...) {
+    dec_type_label(dec_p(x), dec_s(x))
+  })
+  reg("vec_cast", paste0("double.", dec), dec_vec_cast_base)
+  reg("vec_cast", paste0("integer.", dec), dec_vec_cast_base)
+  for (cl2 in c(dec, zu_classes_all, others)) {
+    reg("vec_ptype2", paste0(dec, ".", cl2), dec_vec_ptype2)
+    reg("vec_cast", paste0(dec, ".", cl2), dec_vec_cast)
+    if (cl2 != dec) {
+      reg("vec_ptype2", paste0(cl2, ".", dec), dec_vec_ptype2)
+    }
+  }
+  for (cl in zu_classes_all) {
+    reg("vec_cast", paste0(cl, ".", dec), dec_vec_cast_zuint)
+  }
 }
 
 zu_register_pillar <- function(...) {
@@ -37,6 +59,18 @@ zu_register_pillar <- function(...) {
     registerS3method("pillar_shaft", cl, zu_pillar_shaft, envir = ns)
     registerS3method("type_sum", cl, zu_vec_ptype_abbr, envir = ns)
   }
+  registerS3method(
+    "pillar_shaft",
+    "zu_decimal128",
+    dec_pillar_shaft,
+    envir = ns
+  )
+  registerS3method(
+    "type_sum",
+    "zu_decimal128",
+    function(x) sprintf("dec(%d,%d)", dec_p(x), dec_s(x)),
+    envir = ns
+  )
 }
 
 # The proxy is the payload beside a flag that is TRUE for every real row.
@@ -132,6 +166,113 @@ zu_vec_cast_base <- function(x, to, ..., x_arg = "", to_arg = "") {
     ))
   }
   out
+}
+
+# ---- decimal128 ---------------------------------------------------------------
+
+# The payload is int128's, so its proxy is too; the type comes back from `to`.
+dec_vec_restore <- function(x, to, ...) {
+  if (!is.data.frame(x)) {
+    return(dec_new(zu_unclass(x), dec_p(to), dec_s(to)))
+  }
+  dec_new(zu_fill_na(x$bits, 3L, is.na(x$real)), dec_p(to), dec_s(to))
+}
+
+# One scale per vector, and vctrs casts both sides to the common type before
+# it compares, so the coefficients' order is the values'.
+dec_vec_proxy_pieces <- function(x, ...) {
+  cols <- .Call(zu_pieces_c, x, 3L)
+  names(cols) <- paste0("w", seq_along(cols))
+  structure(cols, row.names = c(NA, -length(x)), class = "data.frame")
+}
+
+# DuckDB's common type; a double takes the decimal's, as it takes a zuint
+# type's, and is checked when cast.
+dec_vec_ptype2 <- function(x, y, ..., x_arg = "", y_arg = "") {
+  sides <- list(x, y)
+  sides <- sides[!vapply(sides, function(v) is.double(v) && !is.object(v), NA)]
+  ops <- lapply(sides, function(v) dec_operand(v[0L], NULL))
+  type <- dec_common(ops, !vapply(sides, is_decimal128, NA))
+  dec_new(complex(), type[[1L]], type[[2L]])
+}
+
+# x as the type of `to`. A cast that rounds is lossy, like one that loses a
+# value: vctrs casts must be exact.
+dec_vec_cast <- function(x, to, ..., x_arg = "", to_arg = "") {
+  out <- withCallingHandlers(
+    dec_cast(x, dec_p(to), dec_s(to), NULL),
+    zuint_cast_warning = function(w) invokeRestart("muffleWarning")
+  )
+  lost <- dec_is_na(out) & !is.na(x)
+  changed <- if (is_decimal128(x)) {
+    !(out == x) %in% TRUE
+  } else if (is.double(x)) {
+    !(dec_as_double(out) == x) %in% TRUE
+  } else {
+    FALSE
+  }
+  lossy <- lost | (!dec_is_na(out) & changed)
+  if (any(lossy)) {
+    return(vctrs::maybe_lossy_cast(
+      out,
+      x,
+      to,
+      lossy = lossy,
+      x_arg = x_arg,
+      to_arg = to_arg
+    ))
+  }
+  out
+}
+
+# A decimal to a zuint integer type, to integer or to double.
+dec_vec_cast_zuint <- function(x, to, ..., x_arg = "", to_arg = "") {
+  out <- withCallingHandlers(
+    dec_to_zuint(x, zu_code(to), NULL),
+    zuint_cast_warning = function(w) invokeRestart("muffleWarning")
+  )
+  lossy <- zu_is_na(out) & !dec_is_na(x)
+  if (any(lossy)) {
+    return(vctrs::maybe_lossy_cast(
+      out,
+      x,
+      to,
+      lossy = lossy,
+      x_arg = x_arg,
+      to_arg = to_arg
+    ))
+  }
+  out
+}
+
+dec_vec_cast_base <- function(x, to, ..., x_arg = "", to_arg = "") {
+  if (is.double(to)) {
+    out <- dec_as_double(x)
+    back <- suppressWarnings(dec_cast(out, dec_p(x), dec_s(x), NULL))
+    lossy <- !dec_is_na(x) & !(back == x) %in% TRUE
+  } else {
+    out <- suppressWarnings(dec_as_integer(x))
+    lossy <- !dec_is_na(x) & is.na(out)
+  }
+  if (any(lossy)) {
+    return(vctrs::maybe_lossy_cast(
+      out,
+      x,
+      to,
+      lossy = lossy,
+      x_arg = x_arg,
+      to_arg = to_arg
+    ))
+  }
+  out
+}
+
+dec_pillar_shaft <- function(x, ...) {
+  out <- dec_as_character(x)
+  pillar::new_pillar_shaft_simple(
+    ifelse(is.na(out), pillar::style_na("NA"), out),
+    align = "right"
+  )
 }
 
 zu_pillar_shaft <- function(x, ...) {

@@ -209,6 +209,9 @@ zu_set_length <- function(x, value) {
 zu_c <- function(...) {
   args <- list(...)
   call <- sys.call()
+  if (any(vapply(args, is_decimal128, logical(1)))) {
+    return(dec_c(...))
+  }
   kinds <- vapply(args, zu_kind, integer(1))
   if (anyNA(kinds)) {
     zu_abort(

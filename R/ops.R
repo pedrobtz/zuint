@@ -19,6 +19,10 @@ zu_compare_ops <- c(
 zu_ops <- function(e1, e2) {
   op <- .Generic
   call <- sys.call()
+  # an int64 + decimal128 call can dispatch here: DuckDB's decimal rules
+  if (is_decimal128(e1) || (!missing(e2) && is_decimal128(e2))) {
+    return(dec_binary(op, e1, e2, call))
+  }
   if (missing(e2)) {
     return(switch(
       op,

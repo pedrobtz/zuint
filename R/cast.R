@@ -50,6 +50,9 @@ zu_convert <- function(x, kind, code) {
 # x as zuint type `code`, names kept. Lost values warn, reported against
 # `call`.
 zu_cast <- function(x, code, call = sys.call(-1L)) {
+  if (is_decimal128(x)) {
+    return(dec_to_zuint(x, code, call))
+  }
   kind <- zu_kind(x)
   if (is.na(kind)) {
     zu_abort(
