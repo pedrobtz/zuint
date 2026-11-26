@@ -43,6 +43,13 @@ test_that("int64 summaries and set operations behave the same with bit64 attache
   expect_bit64_parity("summaries")
 })
 
+test_that("decimal128 behaves the same with bit64 attached and absent", {
+  res <- expect_bit64_parity("decimal")
+  # and the attached run is not vacuous: int64 operands took DECIMAL(19, 0)
+  expect_identical(res$attached$value$add[[1L]], "9223372036854775794.66")
+  expect_true(length(res$attached$value) > 20)
+})
+
 test_that("every base generic bit64 has an integer64 method for has a zu_int64 method", {
   skip_if_not_installed("bit64")
   ns <- asNamespace("bit64")

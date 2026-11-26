@@ -160,6 +160,47 @@ list(
   raw = suppressWarnings(as.raw(x[c(1, 3)])), seq = zu_storage(seq(int64(1), int64(5))),
   all_equal = all.equal(x, x), date = as.Date(int64(1))
 )
+',
+  decimal = '
+x <- decimal128(c(a = "-12.34", b = "0.05", c = NA, d = "9999999.99"), 9, 2)
+y <- x
+y[6] <- "1.5"
+y[["b"]] <- 7L
+z <- x
+length(z) <- 6
+i <- int64(c("9223372036854775807", "-2", "0", "3"))
+list(
+  chr = as.character(x),
+  storage = zu_storage(int128(decimal128(x, 20, 0))),
+  subset = as.character(x[c(2, 9, NA)]),
+  assign = as.character(y),
+  len = as.character(z),
+  c = as.character(c(x, 1L, "2.5", NA)),
+  c_int64 = as.character(c(i, x)),
+  rep = as.character(rep(x, 2)),
+  is_na = is.na(x),
+  dbl = as.double(x),
+  int = suppressWarnings(as.integer(x)),
+  to_int64 = zu_storage(suppressWarnings(int64(x))),
+  add = as.character(suppressWarnings(x + i)),
+  add_left = as.character(suppressWarnings(i + x)),
+  mul = as.character(x * 3L),
+  cmp = list(x < i, i == x, x > 0L),
+  div = x / i,
+  sum = as.character(sum(x, na.rm = TRUE)),
+  minmax = as.character(c(min(x, na.rm = TRUE), max(i, x, na.rm = TRUE))),
+  mean = mean(x, na.rm = TRUE),
+  sort = as.character(sort(x)),
+  unique = as.character(unique(c(x, x))),
+  match = match(x, rev(x)),
+  format = format(x),
+  print = capture.output(print(x)),
+  str = capture.output(str(x)),
+  summary = summary(x),
+  df = capture.output(print(data.frame(v = x))),
+  predicates = list(is.numeric(x), is.nan(x), is.finite(x)),
+  all_equal = all.equal(x, x)
+)
 '
 )
 

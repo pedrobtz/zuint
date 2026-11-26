@@ -3,13 +3,18 @@
 
 zu_all_types <- c("int64", "uint64", "int128", "uint128")
 
+# The types the vector protocol tests run for: the four, and decimal128 at
+# scale 0, whose values then read as the integers' do.
+zu_vector_types <- c(zu_all_types, "decimal128")
+
 zu_ctor <- function(type) {
   switch(
     type,
     int64 = int64,
     uint64 = uint64,
     int128 = int128,
-    uint128 = uint128
+    uint128 = uint128,
+    decimal128 = function(x = integer()) decimal128(x, 38L, 0L)
   )
 }
 

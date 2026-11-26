@@ -1,5 +1,5 @@
 test_that("[ keeps the class and pads out-of-range positions with the type's NA", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(c(a = 1, b = 2, c = 3))
     expect_identical(x[2:3], zu_ctor(type)(c(b = 2, c = 3)), label = type)
     expect_identical(x[-1], x[2:3], label = type)
@@ -17,7 +17,7 @@ test_that("[ keeps the class and pads out-of-range positions with the type's NA"
 })
 
 test_that("[[ extracts one element without its name", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(c(a = 1, b = 2))
     expect_identical(x[[2]], zu_ctor(type)(2), label = type)
     expect_identical(x[["a"]], zu_ctor(type)(1), label = type)
@@ -26,7 +26,7 @@ test_that("[[ extracts one element without its name", {
 })
 
 test_that("[<- casts the value to the vector's type", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(1:4)
     x[2] <- 20L
     x[3:4] <- c("30", "40")
@@ -47,7 +47,7 @@ test_that("[<- casts the value to the vector's type", {
 })
 
 test_that("[<- beyond the end pads with the type's NA", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(1)
     x[4] <- 4
     expect_identical(as.character(x), c("1", NA, NA, "4"), label = type)
@@ -73,7 +73,7 @@ test_that("[[<- casts the value", {
 })
 
 test_that("length<- truncates or pads with NA", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(1:3)
     length(x) <- 5
     expect_identical(as.character(x), c("1", "2", "3", NA, NA), label = type)
@@ -94,7 +94,7 @@ test_that("c() converts every argument to the common type", {
 })
 
 test_that("rep and rev keep the type and names", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(c(a = 1, b = NA))
     expect_identical(
       rep(x, 2),
@@ -109,7 +109,7 @@ test_that("rep and rev keep the type and names", {
 })
 
 test_that("is.na, is.na<- and anyNA see only the type's NA", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(c(a = 0, b = NA, c = 1))
     expect_identical(is.na(x), c(a = FALSE, b = TRUE, c = FALSE), label = type)
     expect_true(anyNA(x), label = type)
@@ -124,7 +124,7 @@ test_that("is.na, is.na<- and anyNA see only the type's NA", {
 })
 
 test_that("as.double is exact up to 2^53 and warns when it rounds", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(c(0, 1, 2^53, NA))
     expect_no_warning(d <- as.double(x))
     expect_identical(d, c(0, 1, 2^53, NA), label = type)
@@ -158,7 +158,7 @@ test_that("as.double is exact up to 2^53 and warns when it rounds", {
 })
 
 test_that("as.integer is exact within the integer range, NA with a warning outside", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(c(0, 2147483647, NA))
     expect_no_warning(i <- as.integer(x))
     expect_identical(i, c(0L, 2147483647L, NA), label = type)
@@ -185,7 +185,7 @@ test_that("as.list gives one element per value", {
 })
 
 test_that("zuint vectors work as data frame columns", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(c(1, NA, 3))
     df <- data.frame(id = 1:3, v = x)
     expect_identical(df$v, x, label = type)
@@ -222,14 +222,14 @@ test_that("multi-dimensional indexing is a type error", {
 })
 
 test_that("each class claims mixed Ops calls", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(1)
     expect_true(chooseOpsMethod(x, 1, NULL, NULL, NULL, FALSE), label = type)
   }
 })
 
 test_that("is.nan, is.finite and is.infinite read values, not raw bits", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     x <- zu_ctor(type)(c(a = "1", b = NA, c = "0"))
     expect_identical(
       is.nan(x),
@@ -314,7 +314,7 @@ test_that("a zuint vector used as an index is read as a number", {
 })
 
 test_that("rep() of an empty vector pads with the type's NA (#55)", {
-  for (type in zu_all_types) {
+  for (type in zu_vector_types) {
     e <- zu_ctor(type)()
     expect_identical(rep(e, length.out = 3), zu_na(type, 3), label = type)
     expect_identical(rep(e, times = 0), e, label = type)
