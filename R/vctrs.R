@@ -294,6 +294,11 @@ zu_pillar_shaft <- function(x, ...) {
 #' and `no` as [c()] does, and `zu_vapply()` converts each result to the
 #' type of `FUN.VALUE` as `x[i] <- value` does, exactly or `NA`.
 #'
+#' The same goes for [sum()], [min()], [max()], [range()] and the other
+#' `Summary` functions, which R dispatches on their first argument only:
+#' `sum(int128(5), 1L)` is exact, while `sum(1L, int128(5))` reads the raw
+#' bits. Put the zuint vector first.
+#'
 #' @param test A logical vector.
 #' @param yes,no Values for `TRUE` and `FALSE`, recycled to `test`.
 #' @param X A vector or list.
