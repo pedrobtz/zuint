@@ -181,6 +181,20 @@
   2.0.1 does it, with two of DuckDB’s bugs fixed), and checked 128-bit
   arithmetic. `zuint.h` includes no R header, and every member is safe
   on any thread ([\#103](https://github.com/pedrobtz/zuint/issues/103)).
+- [`decimal128()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+  holds DuckDB’s `DECIMAL(p, s)` exactly, with
+  [`is_decimal128()`](https://pedrobtz.github.io/zuint/reference/decimal128.md),
+  [`decimal_precision()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+  and
+  [`decimal_scale()`](https://pedrobtz.github.io/zuint/reference/decimal128.md).
+  `+`, `-`, `*`, [`c()`](https://rdrr.io/r/base/c.html) and vctrs give
+  DuckDB’s result types; comparison is exact across scales; `/`,
+  [`mean()`](https://rdrr.io/r/base/mean.html) and the `Math` functions
+  give doubles; and sorting, hashing,
+  [`sum()`](https://rdrr.io/r/base/sum.html),
+  [`min()`](https://rdrr.io/r/base/Extremes.html) and
+  [`max()`](https://rdrr.io/r/base/Extremes.html) work on the
+  coefficients ([\#104](https://github.com/pedrobtz/zuint/issues/104)).
 - With vctrs, dplyr and tibble: zuint columns combine by the promotion
   order, cast exactly, arrange, group, summarise, bind and print.
   data.table keys on `int64` natively.

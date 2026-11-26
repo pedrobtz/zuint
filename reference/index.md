@@ -4,6 +4,11 @@
 
 - [`as_integer64()`](https://pedrobtz.github.io/zuint/reference/as_integer64.md)
   : Convert to bit64's integer64
+- [`decimal128()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+  [`is_decimal128()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+  [`decimal_precision()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+  [`decimal_scale()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+  : Fixed-point decimal vectors
 - [`format_hex()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
   [`format_bin()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
   : Hexadecimal and binary text

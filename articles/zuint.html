@@ -151,13 +151,35 @@ error:</p>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 </div>
 <div class="section level2">
+<h2 id="fixed-point-decimals">Fixed-point decimals<a class="anchor" aria-label="anchor" href="#fixed-point-decimals"></a>
+</h2>
+<p><code><a href="../reference/decimal128.html">decimal128()</a></code> holds DuckDB’s
+<code>DECIMAL(precision, scale)</code>: up to 38 digits,
+<code>scale</code> of them after the point, kept exactly. Arithmetic
+gives DuckDB’s types, so a product’s scale is the sum of the operands’
+scales, and comparison is exact across scales:</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">price</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/decimal128.html">decimal128</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"19.99"</span>, <span class="st">"5.00"</span><span class="op">)</span>, <span class="fl">10</span>, <span class="fl">2</span><span class="op">)</span></span>
+<span><span class="va">qty</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">3L</span>, <span class="fl">12L</span><span class="op">)</span></span>
+<span><span class="va">price</span> <span class="op">*</span> <span class="va">qty</span></span>
+<span><span class="co">#&gt; &lt;decimal128(18, 2)[2]&gt;</span></span>
+<span><span class="co">#&gt; [1] 59.97 60.00</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">price</span> <span class="op">*</span> <span class="va">qty</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;decimal128(38, 2)[1]&gt;</span></span>
+<span><span class="co">#&gt; [1] 119.97</span></span>
+<span><span class="va">price</span> <span class="op">==</span> <span class="fu"><a href="../reference/decimal128.html">decimal128</a></span><span class="op">(</span><span class="st">"5"</span>, <span class="fl">3</span>, <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] FALSE  TRUE</span></span></code></pre></div>
+<p><code>/</code> and functions such as <code><a href="https://rdrr.io/r/base/Log.html" class="external-link">log()</a></code> give doubles,
+as DuckDB’s do.</p>
+</div>
+<div class="section level2">
 <h2 id="overflow-policies">Overflow policies<a class="anchor" aria-label="anchor" href="#overflow-policies"></a>
 </h2>
 <p>The operators give <code>NA</code> with a warning when a result is
 out of range, as R’s integers do. The <code>checked_*()</code> functions
 make it an error, and the <code>wrapping_*()</code> functions compute
 modulo 2<sup>64</sup> or 2<sup>128</sup>:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">big</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/zuint-types.html">int64</a></span><span class="op">(</span><span class="st">"9223372036854775807"</span><span class="op">)</span></span>
 <span><span class="va">big</span> <span class="op">+</span> <span class="fl">1L</span></span>
 <span><span class="co">#&gt; Warning in Ops.zu_int64(big, 1L): 1 result is out of range. NA produced.</span></span>
@@ -171,7 +193,7 @@ modulo 2<sup>64</sup> or 2<sup>128</sup>:</p>
 <p><code><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum()</a></code> keeps the type and is exact, or <code>NA</code>
 with a warning; <code><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean()</a></code> and <code><a href="https://rdrr.io/r/stats/median.html" class="external-link">median()</a></code> are
 doubles computed from the exact values:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/zuint-types.html">int128</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"170141183460469231731687303715884105727"</span>, <span class="st">"1"</span>, <span class="st">"-1"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;int128[1]&gt;</span></span>
@@ -189,7 +211,7 @@ zuarrow is loaded its readers and writers handle zuint columns exactly
 <p>From DuckDB, turn on <code>arrow_lossless_conversion</code>, so that
 <code>HUGEINT</code> and <code>UHUGEINT</code> arrive as themselves
 rather than as decimals, and read the result through zuarrow:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/pedrobtz/zuarrow" class="external-link">zuarrow</a></span><span class="op">)</span></span>
 <span><span class="va">con</span> <span class="op">&lt;-</span> <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbConnect.html" class="external-link">dbConnect</a></span><span class="op">(</span><span class="fu">duckdb</span><span class="fu">::</span><span class="fu"><a href="https://r.duckdb.org/reference/duckdb.html" class="external-link">duckdb</a></span><span class="op">(</span>shared_home <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbExecute.html" class="external-link">dbExecute</a></span><span class="op">(</span><span class="va">con</span>, <span class="st">"SET arrow_lossless_conversion = true"</span><span class="op">)</span></span>
@@ -204,7 +226,7 @@ rather than as decimals, and read the result through zuarrow:</p>
 <span><span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbDisconnect.html" class="external-link">dbDisconnect</a></span><span class="op">(</span><span class="va">con</span>, shutdown <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>The same columns are written with their types, so an Arrow IPC file,
 and anything that reads one, gets them back exactly:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".arrow"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://pedrobtz.github.io/zuarrow/reference/arrow_write.html" class="external-link">arrow_write</a></span><span class="op">(</span><span class="va">df</span>, <span class="va">f</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu"><a href="https://pedrobtz.github.io/zuarrow/reference/arrow_read.html" class="external-link">arrow_read</a></span><span class="op">(</span><span class="va">f</span><span class="op">)</span>, <span class="va">df</span><span class="op">)</span></span>
@@ -235,7 +257,7 @@ the zuint vector first.</li>
 </ul>
 <p><code><a href="../reference/zu_ifelse.html">zu_ifelse()</a></code> and <code><a href="../reference/zu_ifelse.html">zu_vapply()</a></code> keep the
 type:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/zuint-types.html">int64</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"-9223372036854775807"</span>, <span class="st">"5"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/zu_ifelse.html">zu_ifelse</a></span><span class="op">(</span><span class="va">x</span> <span class="op">&gt;</span> <span class="fl">0L</span>, <span class="va">x</span>, <span class="fu"><a href="../reference/zuint-types.html">int64</a></span><span class="op">(</span><span class="fl">0</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;int64[2]&gt;</span></span>

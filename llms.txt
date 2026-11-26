@@ -37,6 +37,7 @@ type intact.
 | Arrow `uint64`, DuckDB `UBIGINT` | a double, rounded beyond 2⁵³ | `uint64` |
 | DuckDB `HUGEINT` | a double | `int128` |
 | DuckDB `UHUGEINT` | a double | `uint128` |
+| DuckDB `DECIMAL(p, s)` | a double, rounded beyond 15 digits | `decimal128` (not yet through zuarrow) |
 
 ## Installation
 
@@ -203,6 +204,11 @@ against [gmp](https://CRAN.R-project.org/package=gmp).
 
 - [`as_integer64()`](https://pedrobtz.github.io/zuint/reference/as_integer64.md)
   : Convert to bit64's integer64
+- [`decimal128()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+  [`is_decimal128()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+  [`decimal_precision()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+  [`decimal_scale()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+  : Fixed-point decimal vectors
 - [`format_hex()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
   [`format_bin()`](https://pedrobtz.github.io/zuint/reference/format_hex.md)
   : Hexadecimal and binary text

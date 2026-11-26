@@ -73,6 +73,31 @@ int64("9007199254740993") > 2^53
 #> [1] TRUE
 ```
 
+## Fixed-point decimals
+
+[`decimal128()`](https://pedrobtz.github.io/zuint/reference/decimal128.md)
+holds DuckDB’s `DECIMAL(precision, scale)`: up to 38 digits, `scale` of
+them after the point, kept exactly. Arithmetic gives DuckDB’s types, so
+a product’s scale is the sum of the operands’ scales, and comparison is
+exact across scales:
+
+``` r
+
+price <- decimal128(c("19.99", "5.00"), 10, 2)
+qty <- c(3L, 12L)
+price * qty
+#> <decimal128(18, 2)[2]>
+#> [1] 59.97 60.00
+sum(price * qty)
+#> <decimal128(38, 2)[1]>
+#> [1] 119.97
+price == decimal128("5", 3, 0)
+#> [1] FALSE  TRUE
+```
+
+`/` and functions such as [`log()`](https://rdrr.io/r/base/Log.html)
+give doubles, as DuckDB’s do.
+
 ## Overflow policies
 
 The operators give `NA` with a warning when a result is out of range, as

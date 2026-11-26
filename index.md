@@ -37,6 +37,7 @@ type intact.
 | Arrow `uint64`, DuckDB `UBIGINT` | a double, rounded beyond 2⁵³ | `uint64` |
 | DuckDB `HUGEINT` | a double | `int128` |
 | DuckDB `UHUGEINT` | a double | `uint128` |
+| DuckDB `DECIMAL(p, s)` | a double, rounded beyond 15 digits | `decimal128` (not yet through zuarrow) |
 
 ## Installation
 
