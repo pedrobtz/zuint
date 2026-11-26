@@ -49,10 +49,12 @@ jobs:
     uses: pedrobtz/r-actions/.github/workflows/gctorture.yml@v1
     with:
       profile: auto
-      # Step 20 takes about 140 minutes since the fixed-point tests (31 minutes
-      # of it); the default 120 cancelled it (2026-11-26). Step stays at 20:
-      # it caught the unprotected pair in zu_fixed_r.c that rchk missed.
-      timeout-minutes: 180
+      # Step 20 took about 140 minutes with the fixed-point tests; the review
+      # tests of #143 put test-decimal.R alone at 84 minutes, and 180 cancelled
+      # the run in test-fixed.R (2026-11-26). 330 stays under GitHub's 360-minute
+      # job limit. Step stays at 20: it caught the unprotected pair in
+      # zu_fixed_r.c that rchk missed.
+      timeout-minutes: 330
 
   rchk:
     uses: pedrobtz/r-actions/.github/workflows/rchk.yml@v1
