@@ -218,6 +218,47 @@ fixed-point is a small layer on top.
 
   Overflow, invalid input and a result that does not fit are each a
   status. No function calls R.
+
+  DuckDB's behaviour, settled 2026-11-25 (Stage 9.1) from its source at
+  commit d54cbbe3df (2.0.0) and checked against its casts:
+  - **Text.** Surrounding whitespace (space, `\t`, `\n`, `\v`, `\f`,
+    `\r`), a `+` or `-`, `_` between two digits, `1.` and `.5`, and an
+    exponent (`e` or `E`, a sign, an `int16`, and a point DuckDB lets end
+    it: `1e2.`). No hex, binary, `NaN` or `inf`. Digits past the scale
+    round half away from zero, and `-0.001` at scale 2 is `0.00`. Which
+    texts are accepted is decided by a port of DuckDB's own state machine
+    (`inst/COPYRIGHTS`), because its exponent handling refuses values
+    that fit: `12345e-2` as DECIMAL(5,2) is refused, as DuckDB does
+    ([duckdb#29189](https://github.com/duckdb/duckdb/issues/29189)). The
+    value is then computed exactly. zuint differs from DuckDB 2.0.0 in
+    two places, both DuckDB bugs:
+    - it reads `1.234e4` as DECIMAL(4,0) 12340, a value wider than its
+      type; zuint refuses it. Fixed on DuckDB's main by
+      [duckdb#26961](https://github.com/duckdb/duckdb/pull/26961), not
+      yet released;
+    - below precision 19 it keeps only 4, 9 or 18 digits, leading zeros
+      after the point included, so `0.0000000001234e10` as DECIMAL(5,2)
+      is 0.00; zuint gives 1.23
+      ([duckdb#29395](https://github.com/duckdb/duckdb/issues/29395)).
+
+    A refused text is `ZUINT_ERR_INVALID` when it is outside the grammar
+    and `ZUINT_ERR_OVERFLOW` when it is inside it.
+  - **Text out.** `1.50`, `-0.05`, and no integer part when p == s:
+    `.50`, `-.05`.
+  - **To double.** c / 10^s correctly rounded, ties to even, at every
+    precision and scale. DuckDB 2.0.0 added the two 64-bit words as
+    doubles at scale 0 with p > 18, one unit in the last place off for
+    some values; 2.0.1 rounds correctly, and zuint follows 2.0.1
+    (2026-11-26: CI's 2.0.1 disagreed with the 2.0.0 formula). The
+    function keeps the precision argument, which it validates.
+  - **From double.** `round(x * 1e<s>)` in double arithmetic, half away
+    from zero, refused at or beyond the double `1e<p>`; so 2.675 is 2.68
+    and 1.005 is 1.00 at scale 2. NaN and infinity are invalid.
+  - **Rescale.** Half away from zero, then the new precision is checked.
+  - **Compare** is exact across scales. DuckDB casts both sides to a
+    common type first and can fail with a conversion error
+    ([duckdb#29396](https://github.com/duckdb/duckdb/issues/29396)), so
+    it is not the oracle there.
 - **An R-free C table, `zuint_api_v1`,** in a header that includes no R
   header, with the operations above and the integer ones the engine may
   use. The `R_GetCCallable` resolver lives in a second header, as

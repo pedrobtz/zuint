@@ -1,0 +1,76 @@
+# The fixed-point core's C tests, with no R (design 2.2, Stage 9.1):
+# tools/fixed/fixed over the table of inst/include/zuint.h.
+#
+#   - the General Decimal Arithmetic cases that apply to fixed point,
+#     fetched from CPython at a pinned tag and checked by SHA-256;
+#   - random cases against Python's decimal (tools/fixed/diff.py): 200,000
+#     in the quick profile, 5,000,000 in the full one;
+#   - threads through the table against one thread, under ThreadSanitizer;
+#   - all of it again with zufast's portable fallback (ZUF_NO_INT128).
+#
+# Under ASan and UBSan throughout. One job, so one runner. zufast's headers
+# come from a clone until zufast 0.1.1 is on CRAN.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+
+name: fixed.yaml
+
+permissions: read-all
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  # ci.md: a documentation-only pull request skips the job below.
+  changes:
+    # Labels are decided here, without a runner (ci.md, Labels).
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'full-ci')
+      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
+        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
+        || contains(github.event.pull_request.labels.*.name, 'skip-ci:fixed'))
+    uses: pedrobtz/r-actions/.github/workflows/changes.yml@v1
+    with:
+      name: fixed
+
+  fixed:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.result != 'skipped' && needs.changes.outputs.docs-only != 'true' }}
+    runs-on: ubuntu-latest
+    name: fixed-point C tests
+    timeout-minutes: 30
+    env:
+      ZUFAST_INCLUDE: /tmp/zufast/inst/include
+      CASES: ${{ needs.changes.outputs.profile == 'full' && '5000000' || '200000' }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: git clone --depth 1 https://github.com/pedrobtz/zufast /tmp/zufast
+      - run: tools/fixed/fetch-dectest /tmp/dectest
+
+      - name: ASan and UBSan
+        run: |
+          make -C tools/fixed
+          tools/fixed/fixed dectest /tmp/dectest/*.decTest
+          python3 tools/fixed/diff.py "$CASES" 20261125 | tools/fixed/fixed diff
+          tools/fixed/fixed threads 8
+
+      - name: The portable fallback (ZUF_NO_INT128)
+        run: |
+          make -C tools/fixed clean
+          make -C tools/fixed CPPFLAGS=-DZUF_NO_INT128
+          tools/fixed/fixed dectest /tmp/dectest/*.decTest
+          python3 tools/fixed/diff.py "$CASES" 20261126 | tools/fixed/fixed diff
+          tools/fixed/fixed threads 8
+
+      - name: ThreadSanitizer
+        run: |
+          # TSan cannot map its shadow memory under the runner's default
+          # ASLR entropy
+          sudo sysctl vm.mmap_rnd_bits=28
+          make -C tools/fixed clean
+          make -C tools/fixed SAN=thread
+          tools/fixed/fixed threads 8

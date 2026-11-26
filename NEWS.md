@@ -79,6 +79,12 @@
   reaches the top of the unsigned ranges (#59).
 * The Arrow import refuses a schema whose format is not the array's own
   (`zuint_arrow_error`), which would have read past the data (#61).
+* A C table for other packages, `zuint_api_v1` in `inst/include/zuint.h`,
+  resolved through `zuint-r.h`: DuckDB's fixed-point `DECIMAL(p, s)` on a
+  128-bit coefficient (parse, format, rescale, compare, and conversion to
+  and from double, each as DuckDB 2.0.1 does it, with two of DuckDB's bugs
+  fixed), and checked 128-bit arithmetic. `zuint.h` includes no R header,
+  and every member is safe on any thread (#103).
 * With vctrs, dplyr and tibble: zuint columns combine by the promotion order,
   cast exactly, arrange, group, summarise, bind and print. data.table keys
   on `int64` natively.

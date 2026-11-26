@@ -53,3 +53,5 @@ po/*~
 tools/fuzz/driver
 tools/fuzz/*.o
 tests/testthat/_problems/
+tools/fixed/fixed
+tools/fixed/fixed.dSYM/

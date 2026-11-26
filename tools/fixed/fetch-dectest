@@ -1,0 +1,29 @@
+#!/bin/sh
+# Fetches the General Decimal Arithmetic test files `fixed dectest` runs,
+# from CPython at a pinned tag, and checks each against its SHA-256. They
+# are never committed: they are IBM's, shipped by CPython, and only CI and
+# a local run read them.
+#
+#   tools/fixed/fetch-dectest DIR
+set -eu
+
+dir=${1:?usage: fetch-dectest DIR}
+tag=v3.13.1
+base=https://raw.githubusercontent.com/python/cpython/$tag/Lib/test/decimaltestdata
+mkdir -p "$dir"
+
+while read -r sum name; do
+  curl -sfL --retry 3 -o "$dir/$name" "$base/$name"
+  got=$( (sha256sum "$dir/$name" 2>/dev/null || shasum -a 256 "$dir/$name") | cut -d' ' -f1)
+  if [ "$got" != "$sum" ]; then
+    echo "fetch-dectest: $name has SHA-256 $got, expected $sum" >&2
+    exit 1
+  fi
+  echo "ok $name"
+done <<EOF
+c807ff5789d9236766419d5da5e6e2b07229a255f3bb5746169d3e1b00ddfc6a add.decTest
+2515e665e0c81f2555f9b19e72cff8e9344e7f2ba25a77d9b87a5c9f58bf0510 subtract.decTest
+c7fe6fd25c1984823d905ce7a72eb1f5a8e80c79ec324b1c51cf6bb26ee59caf multiply.decTest
+72b4a13b865a333dcf9b94a3c88d25800227d5b0afecef97980b685f9d850495 compare.decTest
+ea5946871cb24c521b7947e587a3dceef06f1a26c773a3b442dff87d99d291dc quantize.decTest
+EOF

@@ -34,7 +34,8 @@ static size_t put(unsigned char *buf, size_t n, size_t cap, const char *s)
 static size_t gen_text(unsigned char *buf, size_t cap)
 {
     static const char *pre[] = {"", "", " ", "\t", "+", "-", "0x", "0X", "0b", "-0x", "+0b", "N", "NA"};
-    static const char *piece[] = {"0", "1", "7", "9", "a", "F", "f", "g", "_", "__", " ", "x", "b", ".", "e"};
+    static const char *piece[] = {"0", "1", "7", "9", "a", "F", "f", "g", "_", "__", " ", "x", "b",
+                                  ".", "e", "E", "e-", "e+", "5", "-", "+", "\v"};
     size_t n = 0;
     n = put(buf, n, cap, pre[next() % (sizeof pre / sizeof pre[0])]);
     size_t len = next() % 48;

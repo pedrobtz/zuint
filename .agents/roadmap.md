@@ -48,7 +48,7 @@ pedrobtz/zufast`; `src/zuint.c` is an empty stub; `R/zuint-package.R` holds
 | 7 | [vctrs, pillar and benchmarks](#stage-7--vctrs-pillar-and-benchmarks) | quick | [#9](https://github.com/pedrobtz/zuint/issues/9) | [#22](https://github.com/pedrobtz/zuint/pull/22) | 2026-10-16 |
 | 8 | [Full CI](#stage-8--full-ci) | full | [#10](https://github.com/pedrobtz/zuint/issues/10) | [#23](https://github.com/pedrobtz/zuint/pull/23) | 2026-10-16 |
 | 9 | [Arrow bridge handover](#stage-9--arrow-bridge-handover) | full — compiled code removed and a new Suggests guard | [#52](https://github.com/pedrobtz/zuint/issues/52) | [#89](https://github.com/pedrobtz/zuint/pull/89) | 2026-11-25 |
-| 9.1 | [Fixed-point core and the C table](#stage-91--fixed-point-core-and-the-c-table) | full — new compiled code, a public C ABI and a thread contract | [#103](https://github.com/pedrobtz/zuint/issues/103) | | |
+| 9.1 | [Fixed-point core and the C table](#stage-91--fixed-point-core-and-the-c-table) | full — new compiled code, a public C ABI and a thread contract | [#103](https://github.com/pedrobtz/zuint/issues/103) | [#106](https://github.com/pedrobtz/zuint/pull/106) | 2026-11-25 |
 | 9.2 | [The decimal128 vector class](#stage-92--the-decimal128-vector-class) | quick | [#104](https://github.com/pedrobtz/zuint/issues/104) | | |
 | 10 | [v0.1.0 readiness](#stage-10--v010-readiness) | full | [#11](https://github.com/pedrobtz/zuint/issues/11) | | |
 | 11 | [Review](#stage-11--review) | full | [#53](https://github.com/pedrobtz/zuint/issues/53) | | |
@@ -675,6 +675,18 @@ without R, behind a versioned table another package can resolve.
 
 **Design.** §2.2, §10.
 
+**Deviation (2026-11-25).** "Agree with DuckDB 2.0.0" holds except in the
+two places DuckDB is wrong (design §2.2: a value wider than its type, and
+digits dropped below precision 19), where zuint gives the exact answer and
+the tests require each difference to be one of the two. Comparison across
+scales has gmp and Python as oracles, not DuckDB, which can fail with a
+conversion error there.
+
+**Deviation (2026-11-26).** The oracle is DuckDB 2.0.1, not 2.0.0: CI
+installed 2.0.1, whose cast to double at scale 0 past 18 digits is
+correctly rounded where 2.0.0's was one unit in the last place off for
+some values. zuint now rounds correctly at every scale (design §2.2).
+
 ## Stage 9.2 — The decimal128 vector class
 
 **Issue.** [#104](https://github.com/pedrobtz/zuint/issues/104), sub-issue
@@ -703,13 +715,13 @@ a digit or its type.
 
 **Exit criteria.**
 - For every (p, s) pair the tests generate, the result type and value of
-  each operator and cast match DuckDB 2.0.0.
+  each operator and cast match DuckDB 2.0.1.
 - The vector protocol tests that run for the integer types run for
   `decimal128`, with and without bit64 attached.
 - `R CMD check` 0/0/0 on the quick profile.
 
 **Tests.**
-- Operator result types and values: DuckDB 2.0.0, compared as text.
+- Operator result types and values: DuckDB 2.0.1, compared as text.
 - Construction from text, integers and doubles: the Stage 9.1 core and
   DuckDB's casts.
 - `c()` and `vec_ptype2()` of different scales: DuckDB's common type.
