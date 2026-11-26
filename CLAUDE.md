@@ -352,7 +352,8 @@ The shared workflows this package calls:
   that builds it from source.
 - `native-checks.yml`: `sanitizers.yml`, `valgrind.yml` (with
   `tools/valgrind.supp` for arrow's worker threads), `lto.yml`,
-  `gctorture.yml`, `rchk.yml`, `analyzers.yml`, `cran-special.yml` and
+  `gctorture.yml` (step 20 with a 180-minute timeout: the full suite
+  takes about 140), `rchk.yml`, `analyzers.yml`, `cran-special.yml` and
   `vendor.yml`. Until zufast 0.1.1 is on CRAN, `rchk.yml` installs it
   through `github-packages`, because the rchk image ignores `Remotes:`.
 - `coverage.yaml`: `coverage.yml`, pinned to a commit, with its badge on
