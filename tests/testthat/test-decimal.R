@@ -365,7 +365,7 @@ test_that("c() takes DuckDB's common type", {
         )
       )
       expect_identical(paste0(dec_typeof(r), "[]"), type)
-      duck <- DBI::dbGetQuery(
+      duck <- duck_query(
         con,
         sprintf(
           "SELECT unnest([%s, %s])::VARCHAR AS r",
@@ -530,7 +530,7 @@ test_that("sum is DECIMAL(38, s); min, max and range keep the type; mean is Duck
     texts <- fx_format(coefs, p, s)
     x <- decimal128(texts, p, s)
     label <- sprintf("DECIMAL(%d, %d)", p, s)
-    duck <- DBI::dbGetQuery(
+    duck <- duck_query(
       con,
       sprintf(
         "SELECT sum(v)::VARCHAR AS s, min(v)::VARCHAR AS lo, max(v)::VARCHAR AS hi, avg(v) AS m, typeof(sum(v)) AS t FROM (SELECT CAST(x AS DECIMAL(%d, %d)) AS v FROM (SELECT unnest([%s]) AS x))",
@@ -614,10 +614,7 @@ test_that("decimal128 columns work in data frames and tibbles", {
   df <- data.frame(x = x)
   expect_identical(df$x, x)
   expect_identical(df[2:3, "x"], x[2:3])
-  skip_if_not_installed("tibble")
-  skip_if_not_installed("pillar")
-  tb <- tibble::tibble(x = x)
-  out <- capture.output(print(tb))
+  out <- capture.output(print(pillar_tbl(data.frame(x = x))))
   expect_true(any(grepl("<dec(5,2)>", out, fixed = TRUE)))
   expect_true(any(grepl("-3.50", out, fixed = TRUE)))
 })
