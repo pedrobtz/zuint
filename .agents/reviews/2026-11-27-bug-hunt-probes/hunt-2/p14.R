@@ -1,0 +1,17 @@
+source("pre.R")
+d <- data.frame(id = int64(c(1, 2)), u = uint128(c(5, 6)), n = c(1.5, 2.5))
+e <- d; e[5, "id"] <- 7L; print(e); print(is.na(e$id)); print(is.na(e$u)); print(is.na(e$n))
+e <- d; e[4, ] <- list(int64(9), uint128(9), 9); print(e); print(is.na(e$id))
+e <- d; e[4, "n"] <- 1; print(e); print(sapply(e, function(col) sum(is.na(col))))
+e <- d; e$id[2] <- NA; print(is.na(e$id))
+e <- d[c(1, NA, 3), ]; print(e); print(sapply(e, function(col) sum(is.na(col))))
+e <- merge(d, data.frame(id = int64(c(2, 3)), z = 1:2), all = TRUE); print(e); print(sapply(e, function(col) sum(is.na(col))))
+e <- rbind(d, data.frame(id = NA, u = NA, n = NA)); print(e); print(sapply(e, function(col) sum(is.na(col))))
+x <- int64(c(1, 2)); 
+trace_calls <- character()
+ns <- asNamespace("zuint")
+print(body(`[<-.data.frame`)[[length(body(`[<-.data.frame`)) - 6]])
+# which base path pads?
+f <- function() { xj <- int64(c(1, 2)); xj[5] <- 7L; xj }; print(is.na(f()))
+g <- function() { x <- list(id = int64(c(1, 2))); x[[1]][5] <- 7L; x[[1]] }; print(is.na(g()))
+h <- function() { x <- list(id = int64(c(1, 2))); jj <- 1L; iseq <- 5L; vjj <- 7L; x[[jj]][iseq] <- vjj; x[[jj]] }; print(is.na(h()))

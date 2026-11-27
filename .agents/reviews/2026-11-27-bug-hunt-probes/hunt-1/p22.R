@@ -1,0 +1,5 @@
+source("pre.R")
+x <- decimal128(c("1.25","-1.25"), 5, 2)
+P(min(1L, x)); P(sum(1L, x)); P(prod(2L, x)); P(range(0L, x)); P(any(TRUE, x)); P(as.character(Conj(x))); P(Arg(x)); P(class(Re(x))); P(unclass(Re(x)))
+P(is.unsorted(decimal128(c("-1","1"),5,0))); P(is.unsorted(int128(c(-1,1)))); P(is.unsorted(int64(c(-1,1)))); P(is.unsorted(uint64(c(1,2))))
+P(round(decimal128("1.2345",5,4), 2.5)); P(round(1.2345, 2.5)); P(round(decimal128("1.2345",5,4), 2.7)); P(round(int64(12345), -1.5)); P(round(12345, -1.5)); P(round(decimal128("12345",5,0), -1.7)); P(round(12345, -1.7))

@@ -1,0 +1,15 @@
+source("helper.R")
+con <- DBI::dbConnect(duckdb::duckdb(shared_home = FALSE)); invisible(DBI::dbExecute(con, "SET arrow_lossless_conversion = true"))
+tryl <- function(label, l) { cat("--", label, "\n"); df <- data.frame(k = seq_along(l)); df$l <- l
+  raw <- try_(zuarrow::arrow_write(df, NULL, format = "stream"))
+  if (!is.null(raw)) print(duck_view(con, arrow::read_ipc_stream(raw, as_data_frame = FALSE), "l")) }
+tryl("uint128 list, no empties", list(uint128(c("340282366920938463463374607431768211454", NA)), uint128("7")))
+tryl("int128 list", list(int128(c("-5", NA)), int128("7")))
+tryl("int128 list with empty", list(int128(c("-5", NA)), int128(character())))
+tryl("uint64 list", list(uint64(c("18446744073709551614", NA)), uint64("7"), uint64(character())))
+tryl("int64 list w NULL", list(int64(c("-5", NA)), NULL, int64(7)))
+tryl("mixed int64/uint64 list", list(int64(-5), uint64("18446744073709551614")))
+tryl("mixed int64/integer list", list(int64("9007199254740993"), 5L))
+tryl("mixed int64/double list", list(int64("9007199254740993"), 5.5))
+tryl("mixed int128/int64 list", list(int128("-170141183460469231731687303715884105727"), int64(5)))
+print(body(zuarrow:::zar_c_from_r) |> deparse() |> head(3))

@@ -1,0 +1,11 @@
+source("pre.R"); invisible(loadNamespace("bit64"))   # loaded, not attached
+b <- bit64::as.integer64(c(-2, 3))
+show("integer64 * uint64(5)   want -10 15", b * uint64(5))
+show("integer64 / uint64(5)   want -0.4 0.6", b / uint64(5))
+show("integer64 ^ uint64(2)   want 4 9", b ^ uint64(2))
+show("integer64 + uint64(5)   (ok)", b + uint64(5))
+show("uint64(5) * integer64   (ok, zuint method)", uint64(5) * b)
+show("integer64 * int128(5)   (ok)", b * int128(5))
+show("integer64 * uint64 max-1", b * uint64("18446744073709551614"))
+show("integer64 %/% uint64(5)", b %/% uint64(5)); show("integer64 %% uint64(5)", b %% uint64(5)); show("integer64 - uint64(5)", b - uint64(5))
+show("bit64:::is.double? ", bit64::is.double(uint64(5)))
