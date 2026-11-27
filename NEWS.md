@@ -110,6 +110,8 @@
   as `int128`, and DuckDB's own metadata with the keys in another order or
   written with escapes no longer reads as raw bytes. A decimal under any
   other `arrow.opaque` type no longer reads as `int128` (#154).
+* `to = int64()` and `to = uint64()` read 8-, 16- and 32-bit integer
+  columns exactly: `-2147483648` had been lost as R's `NA_integer_` (#155).
 * The Arrow decimal format `d:P,S` is read in the specification's form
   only: a precision or scale past `INT_MAX` no longer wraps into range, and
   signs and spaces are refused (#156).

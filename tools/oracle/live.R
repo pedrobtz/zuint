@@ -173,6 +173,32 @@ opaque_bytes <- function(json, storage) {
   readBin(path, "raw", file.size(path))
 }
 
+# nanoarrow's IPC stream of one column `x` of a small integer type ("c",
+# "C", "s", "S", "i" or "I") holding `values`, doubles that are exact.
+int_bytes <- function(format, values) {
+  type <- switch(
+    format,
+    c = nanoarrow::na_int8(),
+    C = nanoarrow::na_uint8(),
+    s = nanoarrow::na_int16(),
+    S = nanoarrow::na_uint16(),
+    i = nanoarrow::na_int32(),
+    I = nanoarrow::na_uint32()
+  )
+  a <- nanoarrow::as_nanoarrow_array(
+    data.frame(x = values),
+    schema = nanoarrow::na_struct(list(x = type))
+  )
+  back <- nanoarrow::convert_array(a, data.frame(x = double()))$x
+  if (!identical(back, values)) {
+    stop("nanoarrow did not write the values exactly")
+  }
+  path <- tempfile(fileext = ".arrows")
+  on.exit(unlink(path))
+  nanoarrow::write_nanoarrow(a, path)
+  readBin(path, "raw", file.size(path))
+}
+
 # DuckDB's answer to `expr` over column `x` of an IPC stream, read through
 # arrow as a Table, or "ERROR" when arrow or DuckDB refuses the stream (an
 # arrow.opaque extension whose JSON Arrow cannot read).

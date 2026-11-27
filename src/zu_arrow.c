@@ -260,6 +260,59 @@ SEXP zu_from_arrow_c(SEXP array, SEXP schema)
     return zu_import(zu_array_arg(array), t);
 }
 
+/* The byte width of a small integer format (int8 to uint32), negative for
+   the signed ones, or 0 for any other schema. */
+static int zu_small_width(const struct ArrowSchema *s)
+{
+    const char *f = s->format;
+    if (f == NULL || s->dictionary != NULL || s->n_children != 0 || f[0] == '\0' || f[1] != '\0') return 0;
+    switch (f[0]) {
+    case 'c': return -1;
+    case 'C': return 1;
+    case 's': return -2;
+    case 'S': return 2;
+    case 'i': return -4;
+    case 'I': return 4;
+    default: return 0;
+    }
+}
+
+/* list(int64 payload, 0, 1L) for an array of a small integer format, read
+   exactly, so that a zuint prototype casts the values themselves rather
+   than R integers, whose NA is INT32_MIN (#155); NULL for any other
+   format. */
+SEXP zu_from_arrow_small_c(SEXP array, SEXP schema)
+{
+    int w = zu_small_width(zu_schema_arg(schema));
+    if (w == 0) return R_NilValue;
+    zu_check_own_schema(array, schema);
+    const struct ArrowArray *a = zu_array_arg(array);
+    R_xlen_t n = (R_xlen_t)a->length;
+    SEXP out = PROTECT(zu_alloc(ZU_INT64, n));
+    const unsigned char *data = (const unsigned char *)a->buffers[1];
+    size_t width = (size_t)(w < 0 ? -w : w);
+    for (R_xlen_t i = 0; i < n; i++) {
+        int64_t j = a->offset + (int64_t)i, v = 0;
+        if (!zu_valid(a, j)) { zu_set64(REAL(out), i, zu_na64(ZU_INT64)); continue; }
+        const unsigned char *p = data + width * (size_t)j;
+        switch (w) {
+        case -1: { int8_t x; memcpy(&x, p, 1); v = x; break; }
+        case 1: { uint8_t x; memcpy(&x, p, 1); v = x; break; }
+        case -2: { int16_t x; memcpy(&x, p, 2); v = x; break; }
+        case 2: { uint16_t x; memcpy(&x, p, 2); v = x; break; }
+        case -4: { int32_t x; memcpy(&x, p, 4); v = x; break; }
+        default: { uint32_t x; memcpy(&x, p, 4); v = x; break; }
+        }
+        zu_set64(REAL(out), i, (uint64_t)v);
+    }
+    SEXP res = PROTECT(Rf_allocVector(VECSXP, 3));
+    SET_VECTOR_ELT(res, 0, out);
+    SET_VECTOR_ELT(res, 1, Rf_ScalarReal(0));
+    SET_VECTOR_ELT(res, 2, Rf_ScalarInteger(ZU_INT64));
+    UNPROTECT(2);
+    return res;
+}
+
 
 /* ---- export ------------------------------------------------------------- */
 

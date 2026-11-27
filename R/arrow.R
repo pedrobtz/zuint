@@ -19,7 +19,9 @@
 #' `"uhugeint"`. Other `arrow.opaque` types, which DuckDB uses for types
 #' Arrow has no form for, keep zuarrow's own conversion, as does metadata
 #' that is not valid JSON.
-
+#'
+#' With `to = int64()` or `to = uint64()`, 8-, 16- and 32-bit integer
+#' columns are read exactly and cast to the prototype.
 #'
 #' A `decimal128(p, 0)` column is a decimal, not an integer, so zuint does
 #' not register for it. Asking for `int128` with `to = int128()` in
@@ -86,6 +88,14 @@ zu_arrow_to <- function(target) {
     call <- sys.call()
     code <- zu_arrow_try(zu_arrow_type(schema), call)
     if (is.na(code)) {
+      if (!is.na(target)) {
+        # a small integer column under a zuint prototype: read exactly in
+        # C, since an R integer would make INT32_MIN NA (#155)
+        res <- zu_arrow_try(.Call(zu_from_arrow_small_c, array, schema), call)
+        if (!is.null(res)) {
+          return(zu_cast(zu_new(res[[1L]], 1L), target, call = call))
+        }
+      }
       # zuarrow's own conversion: an arrow.opaque type that is not hugeint
       # or uhugeint, or a column zuint does not read, such as a double
       # under `to = int64()`, which is then cast as the caller asked

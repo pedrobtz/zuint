@@ -27,6 +27,9 @@ the top level: \code{vendor_name} \code{"DuckDB"} and \code{type_name} \code{"hu
 Arrow has no form for, keep zuarrow's own conversion, as does metadata
 that is not valid JSON.
 
+With \code{to = int64()} or \code{to = uint64()}, 8-, 16- and 32-bit integer
+columns are read exactly and cast to the prototype.
+
 A \code{decimal128(p, 0)} column is a decimal, not an integer, so zuint does
 not register for it. Asking for \code{int128} with \code{to = int128()} in
 \code{zuarrow::arrow_to_r()} reads one with \code{p} up to 38 as the 128 bits it

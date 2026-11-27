@@ -472,6 +472,45 @@ test_that("DuckDB's extension is read when DuckDB reads it, from its JSON (#154)
   }
 })
 
+test_that("a small integer column reads exactly into a zuint prototype (#155)", {
+  skip_without_zuarrow()
+  skip_if_not_installed("gmp")
+  two <- gmp::as.bigz(2)
+  formats <- list(
+    c = c(-(two^7), two^7 - 1),
+    C = c(gmp::as.bigz(0), two^8 - 1),
+    s = c(-(two^15), two^15 - 1),
+    S = c(gmp::as.bigz(0), two^16 - 1),
+    i = c(-(two^31), two^31 - 1),
+    I = c(gmp::as.bigz(0), two^32 - 1)
+  )
+  for (f in names(formats)) {
+    ends <- formats[[f]]
+    v <- c(as.character(ends), as.character(ends + c(1, -1)), "0", NA)
+    bytes <- arrow_bytes("int_bytes", format = f, values = as.numeric(v))
+    expect_identical(
+      zuarrow::arrow_read(bytes, to = list(x = int64()))$x,
+      int64(v),
+      label = f
+    )
+    if (ends[[1L]] < 0) {
+      # a negative value has no uint64: zuint's cast warns, as for int64
+      expect_warning(
+        u <- zuarrow::arrow_read(bytes, to = list(x = uint64()))$x,
+        class = "zuint_cast_warning"
+      )
+      v[which(gmp::as.bigz(v) < 0)] <- NA
+      expect_identical(u, uint64(v), label = f)
+    } else {
+      expect_identical(
+        zuarrow::arrow_read(bytes, to = list(x = uint64()))$x,
+        uint64(v),
+        label = f
+      )
+    }
+  }
+})
+
 test_that("the extension's JSON must be valid JSON throughout (#154)", {
   i32 <- function(v) {
     writeBin(as.integer(v), raw(), size = 4, endian = .Platform$endian)

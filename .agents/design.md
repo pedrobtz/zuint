@@ -688,8 +688,12 @@ names a zuint prototype for a column of another format, zuarrow calls that
 class's handler, which reads the column, through zuarrow's built-in
 conversion if zuint does not read the format itself, and casts it to the
 prototype's type under zuint's rules. The `arrow.opaque` handler serves
-two classes, so it casts nothing. Every handler error about the schema or the array is a
-`zuint_arrow_error` (#166).
+two classes, so it casts nothing. Under an `int64()` or `uint64()`
+prototype, zuint reads the small integer formats (`c`, `C`, `s`, `S`, `i`,
+`I`) itself, exactly, before the cast (decided 2026-11-27, #155): through
+zuarrow they became R integers first, whose `NA` is INT32_MIN. Every
+handler error about the schema or the array is a `zuint_arrow_error`
+(#166).
 
 ### 9.2 Per-partner mapping
 
