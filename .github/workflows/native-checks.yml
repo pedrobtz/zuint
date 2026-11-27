@@ -24,22 +24,14 @@ jobs:
     uses: pedrobtz/r-actions/.github/workflows/sanitizers.yml@v1
     with:
       asan: true
-      # R-devel has no binaries for the engine Suggests (arrow, duckdb), and
-      # building them from source takes half an hour; pull requests use
-      # R-release, the full profile CRAN's R-devel.
+      # R-devel has no binaries, so its dependencies build from source; pull
+      # requests use R-release, the full profile CRAN's R-devel.
       r-version: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'release' || 'devel' }}
-      # On R-devel: duckdb from r-universe when it has a binary, and 90
-      # minutes, not 60, for a cold cache that builds it under the
-      # sanitizer (PR #89's first full run timed out).
-      pre-install: Rscript tools/ci-binaries.R
-      timeout-minutes: 90
       profile: auto
 
   valgrind:
     uses: pedrobtz/r-actions/.github/workflows/valgrind.yml@v1
     with:
-      # arrow's worker threads, loaded by the engine tests; see the file
-      suppressions: tools/valgrind.supp
       profile: auto
 
   lto:

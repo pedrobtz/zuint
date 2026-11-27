@@ -1,32 +1,6 @@
 # The decimal128 class (Stage 9.2) against DuckDB 2.0.1, whose casts,
-# operators and typeof() are the oracle, and gmp for exact values.
-
-# expr over a data frame registered as a table, one row per row of df, in
-# order.
-duck_df <- function(con, df, expr) {
-  df$i <- seq_len(nrow(df))
-  name <- paste0("dc_", paste(sample(letters, 12L, TRUE), collapse = ""))
-  duckdb::duckdb_register(con, name, df)
-  on.exit(duckdb::duckdb_unregister(con, name), add = TRUE)
-  sql <- sprintf("SELECT %s AS r FROM %s ORDER BY i", expr, name)
-  DBI::dbGetQuery(con, sql)$r
-}
-
-# DuckDB's type of an expression, as "DECIMAL(p,s)", or "ERROR" when it
-# refuses to bind the types.
-duck_typeof <- function(con, expr) {
-  tryCatch(
-    DBI::dbGetQuery(con, sprintf("SELECT typeof(%s) AS t", expr))$t,
-    error = function(e) {
-      # only DuckDB refusing the types (a scale past 38 is out of range); a
-      # broken query is the test's own bug (#136)
-      if (!grepl("^(Binder|Out of Range) Error", conditionMessage(e))) {
-        stop(e)
-      }
-      "ERROR"
-    }
-  )
-}
+# operators and typeof() are the oracle (replayed, helper-engines.R), and
+# gmp for exact values.
 
 dec_typeof <- function(x) {
   sprintf("DECIMAL(%d,%d)", decimal_precision(x), decimal_scale(x))

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Records tests/testthat/fixtures/engines.rds: runs the whole test suite
+# against the live engines (tools/oracle/live.R) and writes every answer
+# they gave. Needs duckdb (>= 2.0.1), DBI, nanoarrow, arrow and zuarrow.
+# Run from the package root, after any change that makes a test ask an
+# engine something new; commit the fixture with the change.
+#
+#   tools/oracle/record                 # into the committed fixture
+#   ZUINT_ORACLE_OUT=/tmp/e.rds tools/oracle/record   # elsewhere (CI)
+set -eu
+ZUINT_ORACLE_RECORD=true Rscript -e 'testthat::test_local(stop_on_failure = TRUE)'

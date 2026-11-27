@@ -328,8 +328,9 @@ every type in design §0 without any R package in between.
   second release does nothing, and a struct moved into nanoarrow is
   released once by its new owner. A collected array is checked to be
   released; a double release on collection is what ASan and valgrind catch.
-- `tools/valgrind.supp` suppresses two "possibly lost" blocks from the
-  arrow package's worker threads, which the engine tests load.
+- `tools/valgrind.supp` suppressed two "possibly lost" blocks from the
+  arrow package's worker threads, which the engine tests loaded; removed
+  on 2026-11-27, when the tests stopped loading arrow (tools/oracle/).
 - The vendor gate is `vendor.yml` from r-actions calling
   `tools/verify-vendor`; abi.h is a header of structs, so there is no
   vendored object for the `nm -u` guard beyond `zu_arrow.o`, which

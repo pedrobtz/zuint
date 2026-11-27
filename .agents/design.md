@@ -176,8 +176,8 @@ load or use zuint.
   constraint to `>= 0.1.1` and delete `Remotes:` in the same commit; CRAN
   rejects a `Remotes:` field, so this is a `Pre-flight` entry criterion.
 - **`Suggests` is the only place another package may appear.** Tests may use
-  anything there (testthat, withr, gmp as the oracle, and the engines for
-  the round-trip matrix), skipped when absent. Outside the tests, a Suggests
+  anything there (testthat, withr, gmp as the oracle), skipped when absent.
+  Outside the tests, a Suggests
   package appears only in lazily registered methods on its own generics
   (bit64, vctrs, pillar) and in the zuarrow registrations (§9), and the core
   never calls into one.
@@ -185,8 +185,18 @@ load or use zuint.
   zuarrow is a Suggests. When it loads, zuint registers `to` and `from`
   handlers with `zuarrow::arrow_register()`. The handlers are zuint's C
   kernels over the vendored `abi.h` structs (§9.1); every R-level Arrow and
-  engine function is zuarrow's. nanoarrow, arrow and duckdb remain test
-  oracles only.
+  engine function is zuarrow's.
+- **The engines are recorded oracles, not Suggests** (decided 2026-11-27).
+  DuckDB, DBI, arrow and nanoarrow answered the decimal types and the
+  round-trip matrix live; dplyr, tibble and data.table carried interop
+  tests. All seven were Suggests, so every check, CRAN's included,
+  installed them, and duckdb and arrow take half an hour to build from
+  source. The tests now replay the engines' answers from a committed
+  fixture, keyed by what each answer depends on, including the
+  fingerprint of what zuint writes; `tools/oracle/` records it and CI's
+  oracle job records it afresh and compares (§12). The dplyr tests became
+  the vctrs calls dplyr makes, and dplyr and data.table themselves run
+  only in that job.
 - **The family no longer relies on `decimal`** (2026-11-20, #88). It was
   to depend on zuint and hold the decimal bridge. `decimal` imports
   rlang, vctrs and withr and has no R-free C table, so zuint takes the
@@ -737,7 +747,9 @@ zu_storage(int128(1))        # raw CPLXSXP payload
   type in §0 and each path (DuckDB → R → DuckDB, Arrow → R → Arrow, Parquet → R
   → Parquet), check that the schema is identical and every value is identical.
   Values include 0, ±1, 2⁵³ ± 1, MIN, MAX, MIN+1, MAX−1, nulls, and random
-  fills. Skipped when duckdb/arrow are not installed; always run in CI.
+  fills. The engines' side is replayed from a recorded fixture (§2.1,
+  2026-11-27), so it runs everywhere; CI's oracle job checks the fixture
+  against the live engines.
 - **Oracle:** `gmp::as.bigz` (Suggests) for property-based tests of arithmetic,
   parsing and formatting at random widths, including edge values (0, ±1, 2⁵³ ±
   1, the NaN-pattern ranges, MIN/MAX, MIN+1, MAX−1).
@@ -745,8 +757,9 @@ zu_storage(int128(1))        # raw CPLXSXP payload
   the lattice.
 - **ALTREP tests:** materialise-then-write, duplicate, subset,
   serialize/unserialize in both modes, `unclass()` sanity.
-- **Interop tests:** round-trips with bit64, data.table `fread` output, arrow
-  and duckdb (skip if not installed).
+- **Interop tests:** round-trips with bit64 in the suite; data.table and
+  dplyr in CI's oracle job (`tools/oracle/test-interop.R`), and arrow and
+  duckdb through the recorded fixture.
 - **bit64 parity:** the int64 suite runs with bit64 attached and without it,
   and the two runs must agree (§4.1). The attached run also covers
   `zu_int64` ⊕ `integer64` dispatch through `chooseOpsMethod()`.

@@ -39,71 +39,39 @@ test_that("vctrs slices, compares and orders exactly, beyond 2^53 and NaN patter
   expect_identical(vctrs::vec_unique_count(int64(c(-1, -2, -1))), 2L)
 })
 
-test_that("dplyr arranges, groups, summarises and binds every type", {
-  skip_if_not_installed("dplyr")
-  skip_if_not_installed("tibble")
+# dplyr's verbs are these vctrs calls; dplyr itself runs in CI's oracle job
+# (tools/oracle/test-interop.R).
+test_that("vctrs orders, groups, binds and deduplicates data frames of every type", {
+  skip_if_not_installed("vctrs")
   for (type in zu_all_types) {
     big <- oracle_range(type)$max
     k <- zu_ctor(type)(c(as.character(big), "1", "0", "1"))
-    df <- tibble::tibble(k = k, g = c("a", "b", "a", "b"))
-    arranged <- dplyr::arrange(df, k)
+    df <- data.frame(k = k, g = c("a", "b", "a", "b"))
+    arranged <- vctrs::vec_slice(df, vctrs::vec_order(df["k"]))
     expect_identical(arranged$k, k[c(3, 2, 4, 1)], label = type)
-    s <- dplyr::summarise(
-      dplyr::group_by(df, g),
-      s = sum(k, na.rm = TRUE),
-      .groups = "drop"
+    groups <- vctrs::vec_split(df$k, df$g)
+    expect_identical(
+      sum(groups$val[[which(groups$key == "b")]], na.rm = TRUE),
+      zu_ctor(type)(2),
+      label = type
     )
-    expect_identical(s$s[[2]], zu_ctor(type)(2), label = type)
-    expect_identical(dplyr::bind_rows(df, df)$k, c(k, k), label = type)
-    expect_identical(nrow(dplyr::distinct(df, k)), 3L, label = type)
+    expect_identical(vctrs::vec_rbind(df, df)$k, c(k, k), label = type)
+    expect_identical(nrow(vctrs::vec_unique(df["k"])), 3L, label = type)
   }
   expect_error(
-    dplyr::bind_rows(
-      tibble::tibble(x = int128(1)),
-      tibble::tibble(x = uint128(1))
-    ),
+    vctrs::vec_rbind(data.frame(x = int128(1)), data.frame(x = uint128(1))),
     class = "vctrs_error_ptype2"
   )
 })
 
 test_that("tibbles print exact values with short type names", {
-  skip_if_not_installed("tibble")
-  skip_if_not_installed("pillar")
-  expect_snapshot(print(tibble::tibble(
+  df <- data.frame(
     i64 = int64(c("-9223372036854775807", NA)),
     u64 = uint64(c("18446744073709551614", "0")),
     i128 = int128(c("-1", "170141183460469231731687303715884105727")),
     u128 = uint128(c(NA, "340282366920938463463374607431768211454"))
-  )))
-})
-
-test_that("data.table keys on int64 natively", {
-  skip_if_not_installed("data.table")
-  skip_if_not_installed("bit64")
-  dt <- data.table::data.table(
-    k = int64(c("9007199254740993", "9007199254740992", "-1")),
-    v = 1:3
   )
-  data.table::setkey(dt, k)
-  expect_identical(dt$v, c(3L, 2L, 1L))
-  hit <- merge(
-    dt,
-    data.table::data.table(k = int64("9007199254740993")),
-    by = "k"
-  )
-  expect_identical(hit$v, 1L)
-  # the other types key through text, as documented
-  dt2 <- data.table::data.table(
-    k = as.character(uint64(c("18446744073709551614", "1"))),
-    v = 1:2
-  )
-  data.table::setkey(dt2, k)
-  hit2 <- merge(
-    dt2,
-    data.table::data.table(k = "18446744073709551614"),
-    by = "k"
-  )
-  expect_identical(hit2$v, 1L)
+  expect_snapshot(print(pillar_tbl(df)))
 })
 
 test_that("zu_ifelse and zu_vapply keep the type", {
@@ -150,27 +118,28 @@ test_that("slots vctrs creates are the type's NA, never R's NA bits", {
   )
 })
 
-test_that("dplyr padding, unmatched joins, lag and if_else give NA", {
-  skip_if_not_installed("dplyr")
-  skip_if_not_installed("tibble")
+test_that("vctrs padding, unmatched rows, lag and if_else give NA", {
+  skip_if_not_installed("vctrs")
+  skip_if_not(exists("vec_case_when", asNamespace("vctrs")))
   for (type in zu_all_types) {
     ctor <- zu_ctor(type)
-    padded <- dplyr::bind_rows(
-      tibble::tibble(x = ctor(1)),
-      tibble::tibble(y = 1)
-    )$x
+    padded <- vctrs::vec_rbind(data.frame(x = ctor(1)), data.frame(y = 1))$x
     expect_identical(padded, ctor(c(1, NA)), label = type)
-    a <- tibble::tibble(k = 1:3, v = ctor(c(7, 8, 9)))
-    joined <- dplyr::left_join(tibble::tibble(k = c(1L, 4L)), a, by = "k")
-    expect_identical(joined$v, ctor(c(7, NA)), label = type)
-    expect_identical(dplyr::lag(ctor(1:3)), ctor(c(NA, 1, 2)), label = type)
+    # an unmatched join row is an NA index
+    v <- ctor(c(7, 8, 9))
+    joined <- vctrs::vec_slice(v, vctrs::vec_match(c(1L, 4L), 1:3))
+    expect_identical(joined, ctor(c(7, NA)), label = type)
+    # dplyr::lag()
+    x <- ctor(1:3)
+    lagged <- vctrs::vec_c(vctrs::vec_init(x, 1L), vctrs::vec_slice(x, 1:2))
+    expect_identical(lagged, ctor(c(NA, 1, 2)), label = type)
     expect_identical(
-      dplyr::if_else(c(TRUE, NA, FALSE), ctor(1), ctor(2)),
+      vctrs::vec_if_else(c(TRUE, NA, FALSE), ctor(1), ctor(2)),
       ctor(c(1, NA, 2)),
       label = type
     )
     expect_identical(
-      dplyr::case_when(c(TRUE, FALSE) ~ ctor(3)),
+      vctrs::vec_case_when(list(c(TRUE, FALSE)), list(ctor(3))),
       ctor(c(3, NA)),
       label = type
     )

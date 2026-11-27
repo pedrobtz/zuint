@@ -1,14 +1,6 @@
 # The fixed-point core (design 2.2) through its internal entry points, and
-# its two oracles: gmp for the exact value, and DuckDB 2.0.1's SQL casts.
-
-# A DuckDB connection with no zuarrow needed, closed when the test ends.
-local_duckdb_plain <- function(env = parent.frame()) {
-  testthat::skip_if_not_installed("DBI")
-  testthat::skip_if_not_installed("duckdb", minimum_version = "2.0.1")
-  con <- DBI::dbConnect(duckdb::duckdb(shared_home = FALSE))
-  withr::defer(DBI::dbDisconnect(con, shutdown = TRUE), envir = env)
-  con
-}
+# its two oracles: gmp for the exact value, and DuckDB 2.0.1's SQL casts
+# (replayed, helper-engines.R).
 
 # The status codes of zu_fixed.h.
 fx_ok <- 0L
@@ -120,17 +112,6 @@ fx_format_ref <- function(coef, p, s) {
 }
 
 # ---- DuckDB ------------------------------------------------------------------
-
-# One SQL expression over a column `x` of `values`, in their order, as text
-# (NA where DuckDB's TRY_CAST gives NULL).
-duck_eval <- function(con, values, expr) {
-  df <- data.frame(i = seq_along(values), x = values, stringsAsFactors = FALSE)
-  name <- paste0("fx_", paste(sample(letters, 12L, TRUE), collapse = ""))
-  duckdb::duckdb_register(con, name, df)
-  on.exit(duckdb::duckdb_unregister(con, name), add = TRUE)
-  sql <- sprintf("SELECT %s AS r FROM %s ORDER BY i", expr, name)
-  DBI::dbGetQuery(con, sql)$r
-}
 
 # DuckDB's DECIMAL text back to a coefficient.
 duck_coef <- function(text) {

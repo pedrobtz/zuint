@@ -9,7 +9,7 @@ vignette: >
 
 ```{r, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
-engines <- all(vapply(c("zuarrow", "duckdb", "DBI", "nanoarrow"), requireNamespace, TRUE, quietly = TRUE))
+engines <- requireNamespace("zuarrow", quietly = TRUE)
 ```
 
 ```{r setup, message = FALSE}
@@ -104,7 +104,7 @@ mean(int64(1:2))
 ## Through engines and back
 
 ```{r, include = !engines, echo = FALSE, results = "asis"}
-cat("*The examples in this section need the zuarrow, duckdb, DBI and nanoarrow packages, which are not installed here.*")
+cat("*The examples in this section need the zuarrow package, which is not installed here.*")
 ```
 
 zuint has no Arrow functions of its own. It registers its types with
@@ -113,9 +113,10 @@ its readers and writers handle zuint columns exactly (`?zuint-arrow`).
 
 From DuckDB, turn on `arrow_lossless_conversion`, so that `HUGEINT` and
 `UHUGEINT` arrive as themselves rather than as decimals, and read the
-result through zuarrow:
+result through zuarrow (with the duckdb, DBI and nanoarrow packages, so
+this chunk is not run here):
 
-```{r, eval = engines}
+```{r, eval = FALSE}
 library(zuarrow)
 con <- DBI::dbConnect(duckdb::duckdb(shared_home = FALSE))
 DBI::dbExecute(con, "SET arrow_lossless_conversion = true")
@@ -124,7 +125,17 @@ df <- arrow_to_r(DBI::dbGetQueryArrow(con, "
          -170141183460469231731687303715884105727::HUGEINT AS total
 "))
 df
+#>                     id                                    total
+#> 1 18446744073709551614 -170141183460469231731687303715884105727
 DBI::dbDisconnect(con, shutdown = TRUE)
+```
+
+```{r, include = FALSE, eval = engines}
+library(zuarrow)
+df <- data.frame(
+  id = uint64("18446744073709551614"),
+  total = int128("-170141183460469231731687303715884105727")
+)
 ```
 
 The same columns are written with their types, so an Arrow IPC file, and

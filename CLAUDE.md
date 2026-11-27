@@ -27,7 +27,8 @@ family are allowed only in `Suggests` (design §2.1): zufast (>= 0.1.1) is
 `LinkingTo` only, R (>= 4.3.0) is required for `chooseOpsMethod()`, stats
 (part of R) is imported for the `median()` generic, and bit64, zuarrow,
 vctrs, pillar and gmp are Suggests used in tests and lazily registered
-methods; arrow, duckdb, DBI and nanoarrow are test oracles only. It does not
+methods. DuckDB, arrow and nanoarrow are oracles but not Suggests: the tests
+replay their answers from a fixture (Testing). It does not
 fork bit64, do arithmetic on small integer types, offer arbitrary precision,
 or do matrix algebra. Fixed-point `DECIMAL(p, s)` on `int128`, with an
 R-free C table for zugodb, is in 0.1.0 as roadmap Stages 9.1 and 9.2
@@ -271,13 +272,21 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   `arrow::as_arrow_array()`, `infer_type()` and `as_data_type()` crash on
   it in arrow 24.0.0 and 25.0.1, with or without zuint: an unchecked cast in
   `ExtensionType__r6_class()`, reported as
-  [apache/arrow#53951](https://github.com/apache/arrow/issues/53951). So the
-  tests move tables between zuarrow and arrow as IPC streams
-  (`helper-arrow.R`), which never make that R object.
+  [apache/arrow#53951](https://github.com/apache/arrow/issues/53951). So
+  `tools/oracle/live.R` moves tables between zuarrow and arrow as IPC
+  streams, which never make that R object.
 - **Register an Arrow Table with DuckDB, not a record batch reader.** A
   registered reader is consumed by the first query and is empty after.
-- **Open DuckDB with `shared_home = FALSE` in tests** (#74), or it writes
-  under `~/.duckdb`.
+- **Open DuckDB with `shared_home = FALSE` when recording** (#74), or it
+  writes under `~/.duckdb`.
+- **The tests load no engine.** DuckDB's, arrow's and nanoarrow's answers
+  are replayed from `tests/testthat/fixtures/engines.rds`
+  (`helper-engines.R`, `tools/oracle/README.md`); only `tools/oracle/live.R`
+  calls them, and only when recording. A test that asks an engine
+  something new, or a change to what zuint writes (its fingerprint is in
+  the key), fails with "no recorded engine answer" until
+  `tools/oracle/record` is run and the fixture committed. Recording draws no
+  random numbers, so two recordings are identical.
 - **`xtfrm()` must return exact integer ranks.** Base `order()`, `rank()`
   and `sort()` on several keys go through it; a double proxy would tie
   values beyond 2^53. `match()`, `%in%` and `table()` go through `mtfrm()`,
@@ -353,12 +362,15 @@ Add each new one when a stage establishes it.
   every test.
 - **The round-trip matrix is `test-roundtrip.R`** (design §12): DuckDB,
   Arrow and Parquet paths for BIGINT, UBIGINT, HUGEINT and UHUGEINT, through
-  zuarrow, with the values of `matrix_values()` in `helper-arrow.R`. It
-  skips without zuarrow, duckdb, DBI, arrow and nanoarrow; CI installs them,
-  zuarrow from GitHub until it is on CRAN. Each Arrow test starts with
-  `skip_without_zuarrow()`.
+  zuarrow, with the values of `matrix_values()` in `helper-arrow.R`, the
+  engines' side replayed. It skips without zuarrow, installed from GitHub
+  until it is on CRAN. Each Arrow test starts with `skip_without_zuarrow()`.
+- **dplyr, tibble and data.table are not loaded by the tests either.** The
+  suite checks the vctrs calls dplyr makes, and pillar prints a `tbl`
+  without tibble (`helper-pillar.R`); dplyr and data.table themselves run
+  in CI's oracle job, from `tools/oracle/test-interop.R`.
 - **The suite runs in about 10 seconds locally** (2026-10-16), most of it
-  the bit64 processes and DuckDB.
+  the bit64 processes.
 
 ## Continuous integration
 
@@ -366,11 +378,8 @@ The shared workflows this package calls:
 
 - `R-CMD-check.yaml`: `r-cmd-check.yml` with `nosuggests` and `nold` on,
   and a second job, `no-int128`, that builds zufast's portable fallback (see
-  Commands). `tools/ci-binaries.R` installs duckdb from r-universe's R-devel
-  binaries when they exist, and the timeout is 90 minutes for a cold cache
-  that builds it from source.
-- `native-checks.yml`: `sanitizers.yml`, `valgrind.yml` (with
-  `tools/valgrind.supp` for arrow's worker threads), `lto.yml`,
+  Commands).
+- `native-checks.yml`: `sanitizers.yml`, `valgrind.yml`, `lto.yml`,
   `gctorture.yml` (step 20 with a 330-minute timeout: the full suite
   passed 180 on 2026-11-26, `test-decimal.R` alone taking 84), `rchk.yml`, `analyzers.yml`, `cran-special.yml` and
   `vendor.yml`. Until zufast 0.1.1 is on CRAN, `rchk.yml` installs it
@@ -384,6 +393,9 @@ The shared workflows this package calls:
 - `fuzz.yaml`: `fuzz.yml` over `tools/fuzz/harness.c`, which compares the
   text parser and the metadata reader with references written from their
   specs. 120 seconds on a pull request, half an hour on a dispatch.
+- `oracle.yaml`, the package's own, full profile only: records the
+  engines' answers afresh (`tools/oracle/record`), fails if any differs
+  from the committed fixture, and runs `tools/oracle/test-interop.R`.
 - `fixed.yaml`, the package's own: `tools/fixed/fixed` (Commands) under
   ASan and UBSan, with zufast's fallback, and under ThreadSanitizer,
   gated by `changes.yml`; 200,000 differential cases on the quick
@@ -403,10 +415,9 @@ Two deliberate deviations from the shared CI rules:
   repository went private, where Actions minutes are metered. Run the full
   set on demand instead: `gh workflow run R-CMD-check.yaml --ref main` and
   `gh workflow run native-checks.yml --ref main`.
-- **The quick profile runs UBSan on R-release and no container.** The
-  engine Suggests (arrow, duckdb) have no R-devel binaries, and building
-  them from source takes about half an hour. The full profile keeps CRAN's
-  R-devel flavours, and pays that cost when the dependency cache is cold.
+- **The quick profile runs UBSan on R-release and no container.** R-devel
+  has no binaries, so its dependencies build from source. The full profile
+  keeps CRAN's R-devel flavours.
 
 ## Vendored native code
 

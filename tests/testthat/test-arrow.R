@@ -50,13 +50,13 @@ test_that("the formats written are the ones DuckDB reads as its types", {
     c = int128(3),
     d = uint128(4)
   )
-  duckdb_register_df(con, "t", df)
-  types <- DBI::dbGetQuery(
+  got <- duck_receive(
     con,
-    "SELECT column_name, column_type FROM (DESCRIBE t)"
+    list(t = df),
+    list(types = "SELECT column_name, column_type FROM (DESCRIBE t)")
   )
   expect_identical(
-    types$column_type,
+    got$types$column_type,
     c("BIGINT", "UBIGINT", "HUGEINT", "UHUGEINT")
   )
 })
@@ -261,27 +261,23 @@ test_that("the metadata entry cap is 4096, straddled", {
 })
 
 test_that("decimal128 imports up to precision 38, straddled", {
-  skip_if_not_installed("nanoarrow")
-  s <- nanoarrow::na_decimal128(38L, 0L)
   type_of <- function(format) {
-    zu_arrow_type(nanoarrow::nanoarrow_schema_modify(s, list(format = format)))
+    t <- .Call(zu_arrow_format_type_c, format)
+    if (is.integer(t)) t else NA_integer_
   }
   for (f in c("d:37,0", "d:38,0", "d:37,0,128", "d:38,0,128")) {
     expect_identical(type_of(f), 3L, label = f)
   }
-  # nanoarrow refuses to build precision 39, so the format is edited
+  # no Arrow library builds precision 39, so only the format is given
   for (f in c("d:39,0", "d:39,0,128", "d:0,0", "d:38,0,256")) {
     expect_identical(type_of(f), NA_integer_, label = f)
   }
-  # the values at both precisions zuint reads
-  to <- zu_arrow_to(NA_integer_)
+  # the values at both precisions zuint reads, as nanoarrow wrote them
+  skip_without_zuarrow()
   for (p in c(37L, 38L)) {
-    a <- nanoarrow::as_nanoarrow_array(
-      c(1, -2, NA),
-      schema = nanoarrow::na_decimal128(p, 0L)
-    )
+    bytes <- arrow_bytes("decimal_bytes", values = c(1, -2, NA), p = p)
     expect_identical(
-      to(a, nanoarrow::infer_nanoarrow_schema(a), "error"),
+      zuarrow::arrow_read(bytes, to = list(x = int128()))$x,
       int128(c(1, -2, NA)),
       label = p
     )
