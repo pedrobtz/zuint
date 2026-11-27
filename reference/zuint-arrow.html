@@ -57,8 +57,13 @@ and <code><a href="https://pedrobtz.github.io/zuarrow/reference/arrow_array.html
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
 
-<table class="table table"><tr><td>Key</td><td>Arrow type</td><td>zuint type</td></tr><tr><td><code>l</code></td><td><code>int64</code></td><td><code>int64</code></td></tr><tr><td><code>L</code></td><td><code>uint64</code></td><td><code>uint64</code></td></tr><tr><td><code>arrow.opaque</code></td><td>DuckDB's <code>hugeint</code> extension (<code>w:16</code>)</td><td><code>int128</code></td></tr><tr><td><code>arrow.opaque</code></td><td>DuckDB's <code>uhugeint</code> extension (<code>w:16</code>)</td><td><code>uint128</code></td></tr></table><p>Other <code>arrow.opaque</code> types, which DuckDB uses for types Arrow has no
-form for, keep zuarrow's own conversion.</p>
+<table class="table table"><tr><td>Key</td><td>Arrow type</td><td>zuint type</td></tr><tr><td><code>l</code></td><td><code>int64</code></td><td><code>int64</code></td></tr><tr><td><code>L</code></td><td><code>uint64</code></td><td><code>uint64</code></td></tr><tr><td><code>arrow.opaque</code></td><td>DuckDB's <code>hugeint</code> extension (<code>w:16</code>)</td><td><code>int128</code></td></tr><tr><td><code>arrow.opaque</code></td><td>DuckDB's <code>uhugeint</code> extension (<code>w:16</code>)</td><td><code>uint128</code></td></tr></table><p>An <code>arrow.opaque</code> column is DuckDB's when its JSON metadata says so at
+the top level: <code>vendor_name</code> <code>"DuckDB"</code> and <code>type_name</code> <code>"hugeint"</code> or
+<code>"uhugeint"</code>. Other <code>arrow.opaque</code> types, which DuckDB uses for types
+Arrow has no form for, keep zuarrow's own conversion, as does metadata
+that is not valid JSON.</p>
+<p>With <code>to = int64()</code> or <code>to = uint64()</code>, 8-, 16- and 32-bit integer
+columns are read exactly and cast to the prototype.</p>
 <p>A <code>decimal128(p, 0)</code> column is a decimal, not an integer, so zuint does
 not register for it. Asking for <code>int128</code> with <code>to = int128()</code> in
 <code><a href="https://pedrobtz.github.io/zuarrow/reference/arrow_to_r.html" class="external-link">zuarrow::arrow_to_r()</a></code> reads one with <code>p</code> up to 38 as the 128 bits it

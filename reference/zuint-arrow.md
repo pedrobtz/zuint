@@ -22,8 +22,14 @@ lists the entries:
 | `arrow.opaque` | DuckDB's `hugeint` extension (`w:16`)  | `int128`   |
 | `arrow.opaque` | DuckDB's `uhugeint` extension (`w:16`) | `uint128`  |
 
-Other `arrow.opaque` types, which DuckDB uses for types Arrow has no
-form for, keep zuarrow's own conversion.
+An `arrow.opaque` column is DuckDB's when its JSON metadata says so at
+the top level: `vendor_name` `"DuckDB"` and `type_name` `"hugeint"` or
+`"uhugeint"`. Other `arrow.opaque` types, which DuckDB uses for types
+Arrow has no form for, keep zuarrow's own conversion, as does metadata
+that is not valid JSON.
+
+With `to = int64()` or `to = uint64()`, 8-, 16- and 32-bit integer
+columns are read exactly and cast to the prototype.
 
 A `decimal128(p, 0)` column is a decimal, not an integer, so zuint does
 not register for it. Asking for `int128` with `to = int128()` in

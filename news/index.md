@@ -220,3 +220,28 @@
   base R’s does.
 - A getting-started vignette, and benchmarks against bit64 in the
   README.
+- [`mean()`](https://rdrr.io/r/base/mean.html) and
+  [`median()`](https://rdrr.io/r/stats/median.html) of every type,
+  decimals included, are the exact mean rounded once to the nearest
+  double; they had rounded the sum first, so a mean could lie above
+  [`max()`](https://rdrr.io/r/base/Extremes.html)
+  ([\#148](https://github.com/pedrobtz/zuint/issues/148)).
+- DuckDB’s `arrow.opaque` extension is recognised by reading its JSON as
+  DuckDB does: the top-level `vendor_name` must be `"DuckDB"` and the
+  top-level `type_name` `"hugeint"` or `"uhugeint"`, escapes decoded.
+  Another vendor’s type, or a `type_name` nested deeper, no longer reads
+  as `int128`, and DuckDB’s own metadata with the keys in another order
+  or written with escapes no longer reads as raw bytes. A decimal under
+  any other `arrow.opaque` type no longer reads as `int128`
+  ([\#154](https://github.com/pedrobtz/zuint/issues/154)).
+- `to = int64()` and `to = uint64()` read 8-, 16- and 32-bit integer
+  columns exactly: `-2147483648` had been lost as R’s `NA_integer_`
+  ([\#155](https://github.com/pedrobtz/zuint/issues/155)).
+- The Arrow decimal format `d:P,S` is read in the specification’s form
+  only: a precision or scale past `INT_MAX` no longer wraps into range,
+  and signs and spaces are refused
+  ([\#156](https://github.com/pedrobtz/zuint/issues/156)).
+- Errors about an Arrow schema are `zuint_arrow_error`, and a schema
+  with more than 4096 metadata entries is one too, where a DuckDB
+  `HUGEINT` column had silently read as raw bytes
+  ([\#166](https://github.com/pedrobtz/zuint/issues/166)).

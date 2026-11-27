@@ -83,6 +83,13 @@
 <li>
 <code><a href="../reference/zu_ifelse.html">zu_ifelse()</a></code> and <code><a href="../reference/zu_ifelse.html">zu_vapply()</a></code> keep the type where <code><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse()</a></code> and <code><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply()</a></code> would read raw bits. <code><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique()</a></code> drops names, as base R’s does.</li>
 <li>A getting-started vignette, and benchmarks against bit64 in the README.</li>
+<li>
+<code><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean()</a></code> and <code><a href="https://rdrr.io/r/stats/median.html" class="external-link">median()</a></code> of every type, decimals included, are the exact mean rounded once to the nearest double; they had rounded the sum first, so a mean could lie above <code><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max()</a></code> (<a href="https://github.com/pedrobtz/zuint/issues/148" class="external-link">#148</a>).</li>
+<li>DuckDB’s <code>arrow.opaque</code> extension is recognised by reading its JSON as DuckDB does: the top-level <code>vendor_name</code> must be <code>"DuckDB"</code> and the top-level <code>type_name</code> <code>"hugeint"</code> or <code>"uhugeint"</code>, escapes decoded. Another vendor’s type, or a <code>type_name</code> nested deeper, no longer reads as <code>int128</code>, and DuckDB’s own metadata with the keys in another order or written with escapes no longer reads as raw bytes. A decimal under any other <code>arrow.opaque</code> type no longer reads as <code>int128</code> (<a href="https://github.com/pedrobtz/zuint/issues/154" class="external-link">#154</a>).</li>
+<li>
+<code>to = int64()</code> and <code>to = uint64()</code> read 8-, 16- and 32-bit integer columns exactly: <code>-2147483648</code> had been lost as R’s <code>NA_integer_</code> (<a href="https://github.com/pedrobtz/zuint/issues/155" class="external-link">#155</a>).</li>
+<li>The Arrow decimal format <code>d:P,S</code> is read in the specification’s form only: a precision or scale past <code>INT_MAX</code> no longer wraps into range, and signs and spaces are refused (<a href="https://github.com/pedrobtz/zuint/issues/156" class="external-link">#156</a>).</li>
+<li>Errors about an Arrow schema are <code>zuint_arrow_error</code>, and a schema with more than 4096 metadata entries is one too, where a DuckDB <code>HUGEINT</code> column had silently read as raw bytes (<a href="https://github.com/pedrobtz/zuint/issues/166" class="external-link">#166</a>).</li>
 </ul></div>
   </main></div>
 
