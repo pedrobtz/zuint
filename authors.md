@@ -7,6 +7,10 @@
 - **The Apache Software Foundation**. Copyright holder.  
   Arrow C Data Interface header in src/vendor/arrow/abi.h
 
+- **Stichting DuckDB Foundation**. Copyright holder.  
+  DuckDB's VARCHAR to DECIMAL state machine, ported in src/zu_fixed.c
+  (dk\_\*)
+
 ## Citation
 
 Source:
