@@ -212,3 +212,50 @@ oracle_collisions <- function(type) {
 # n NAs of `type`: what an exact assertion on an NA result compares with, so
 # that a result that lost its class or came back as another type fails.
 zu_na <- function(type, n = 1L) zu_ctor(type)(rep(NA, n))
+
+# The double nearest the rational q (a bigq of length 1), ties to even:
+# the correctly rounded value. as.double() of a bigq lands within a few
+# ulps, and the neighbours are compared with q exactly from there.
+oracle_nearest_double <- function(q) {
+  if (q == 0) {
+    return(0)
+  }
+  ulp <- function(d) {
+    e <- floor(log2(abs(d)))
+    if (2^e > abs(d)) {
+      e <- e - 1
+    }
+    if (2^(e + 1) <= abs(d)) {
+      e <- e + 1
+    }
+    2^(e - 52)
+  }
+  # the next double away from zero, and toward it
+  away <- function(d) d + sign(d) * ulp(d)
+  toward <- function(d) {
+    u <- ulp(d)
+    d - sign(d) * if (abs(d) == 2^(log2(u) + 52)) u / 2 else u
+  }
+  dist <- function(d) abs(q - gmp::as.bigq(d))
+  odd <- function(d) (abs(d) / ulp(d)) %% 2 == 1
+  d <- as.double(q)
+  repeat {
+    here <- dist(d)
+    a <- away(d)
+    t <- toward(d)
+    if (dist(a) < here || (dist(a) == here && odd(d))) {
+      d <- a
+    } else if (dist(t) < here || (dist(t) == here && odd(d))) {
+      d <- t
+    } else {
+      return(d)
+    }
+  }
+}
+
+# The exact mean of decimal strings, divided by 10^scale, correctly rounded.
+oracle_mean <- function(v, scale = 0L) {
+  b <- gmp::as.bigz(v)
+  q <- gmp::as.bigq(sum(b), length(b) * gmp::as.bigz(10)^scale)
+  oracle_nearest_double(q)
+}

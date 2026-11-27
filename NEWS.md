@@ -100,3 +100,6 @@
 * `zu_ifelse()` and `zu_vapply()` keep the type where `ifelse()` and
   `vapply()` would read raw bits. `unique()` drops names, as base R's does.
 * A getting-started vignette, and benchmarks against bit64 in the README.
+* `mean()` and `median()` of every type, decimals included, are the exact
+  mean rounded once to the nearest double; they had rounded the sum first,
+  so a mean could lie above `max()` (#148).

@@ -372,7 +372,8 @@ fixed-point is a small layer on top.
     `sum()` (as `DECIMAL(38, s)`), `min()`, `max()` and `range()` reuse
     the `int128` code on the coefficients, which share one scale within
     a vector; `mean()` is within an ulp or two of DuckDB's `avg()`,
-    whose last bit depends on the platform's `long double`. The
+    whose last bit depends on the platform's `long double`: it is the
+    exact sum ÷ (n · 10^s), rounded once (2026-11-27, #148). The
     accessors are `decimal_precision()` and `decimal_scale()`, since
     base `scale()` is already a generic. `match()`, `%in%` and `table()`
     compare values, not text at the vector's scale: `mtfrm()` writes a
@@ -571,7 +572,7 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
 | --- | --- |
 | `sum` | type stable (decided 2026-10-15): the result has the input's type, and overflow gives NA plus a warning, as base R's `sum()` on integers does. int64 and uint64 accumulate in 128 bits so the overflow check is exact; `sum(int128(x))` is the wide sum |
 | `cumsum`, `cumprod` | same type as input; overflow gives NA from that point on |
-| `mean` | exact sum ÷ n, returned as double; `mean_exact()` returns the quotient and remainder |
+| `mean` | exact sum ÷ n, returned as double; `mean_exact()` returns the quotient and remainder. The double is the exact quotient rounded once, to nearest with ties to even (decided 2026-11-27, #148): the 128-bit (or wider) sum is divided in integers and its quotient and remainder rounded together, never a double sum divided by n. `median()` is the mean of the middle pair, the same way |
 | `min`, `max`, `range` | exact; `na.rm` supported |
 | `sort`, `order`, `rank`, `xtfrm` | LSD radix sort on the unsigned-key transform (sign bit flipped for signed types); stable. `xtfrm` returns integer ranks (ties `"min"`, NA kept), never a double proxy, so base `order()` on several keys stays exact |
 | `unique`, `duplicated`, `match`, `%in%`, `table` | open-addressing hash on the exact bits, never through double |

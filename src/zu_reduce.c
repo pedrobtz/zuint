@@ -7,13 +7,14 @@
  * passes beyond the range and comes back is still exact. The result is NA
  * with an overflow when it does not fit the type. prod() is exact the same
  * way; a zero anywhere makes it zero. The cumulative functions are NA from
- * the first NA, or the first overflow, onwards. mean() is a double computed
- * from the exact sum.
+ * the first NA, or the first overflow, onwards. mean() is the exact sum
+ * divided by the count, rounded once to the nearest double.
  *
  * With na_rm FALSE, an NA makes the result NA (cumulative: from there on).
  */
 #include "zu_ops.h"
 #include <limits.h>
+#include <math.h>
 
 static SEXP zu_pair_r(SEXP value, R_xlen_t n)
 {
@@ -228,13 +229,56 @@ SEXP zu_cum_c(SEXP x, SEXP type_, SEXP what_)
     return out;
 }
 
-/* The mean as a double. The 64-bit types sum exactly in 128 bits; the
-   128-bit types keep sum = q * n + r with |r| < n, so nothing overflows. */
-SEXP zu_mean_c(SEXP x, SEXP type_, SEXP na_rm_)
+/* The double nearest (Q + R / m) / D, ties to even, for R < m < 2^63 and
+   1 <= D < 2^127: the one rounding of an exact quotient (design 7). The
+   bits are produced by long division until there are 64 of them, the
+   rest folded into a sticky bit, then rounded to 53. The state (A, R)
+   stands for the fraction (A + R / m) / D still to come, with A < D. */
+static double zu_round_quotient(zuf_u128 Q, uint64_t R, uint64_t m, zuf_u128 D)
+{
+    zuf_u128 M, A;
+    zuf_u128_divmod(Q, D, &M, &A);
+    if (zuf_int_u128_is_zero(M) && zuf_int_u128_is_zero(A) && R == 0) return 0;
+    int k = 0;   /* M = floor(value * 2^k) */
+    while (zuf_int_u128_bit_width(M) < 64) {
+        uint64_t r2 = R << 1;   /* R < m < 2^63: no overflow */
+        unsigned c = R >= m - R;   /* 2R >= m */
+        if (c) r2 -= m;
+        R = r2;
+        zuf_u128 a2 = zuf_u128_add_wrap(zuf_int_u128_shl(A, 1), zuf_u128_from_u64(c));   /* < 2D <= 2^128 */
+        unsigned bit = zuf_u128_cmp(a2, D) >= 0;
+        if (bit) a2 = zuf_u128_sub_wrap(a2, D);
+        A = a2;
+        M = zuf_u128_add_wrap(zuf_int_u128_shl(M, 1), zuf_u128_from_u64(bit));
+        k++;
+    }
+    bool sticky = !zuf_int_u128_is_zero(A) || R != 0;
+    unsigned shift = zuf_int_u128_bit_width(M) - 53;   /* 11..75 */
+    uint64_t mant = zuf_u128_low(zuf_int_u128_shr(M, shift));
+    zuf_u128 rest = zuf_u128_sub_wrap(M, zuf_int_u128_shl(zuf_u128_from_u64(mant), shift));
+    int c = zuf_u128_cmp(rest, zuf_int_u128_shl(zuf_u128_from_u64(1), shift - 1));
+    if (c > 0 || (c == 0 && (sticky || (mant & 1)))) mant++;   /* up to 2^53, exact */
+    return ldexp((double)mant, (int)shift - k);
+}
+
+/* 10^s as 128 bits, s in 0..38. */
+static zuf_u128 zu_pow10_128(int s)
+{
+    if (s <= 19) return zuf_u128_from_u64(zuf_int_pow10_u64((unsigned)s));
+    return zuf_u128_mul_u64_u64(zuf_int_pow10_u64(19), zuf_int_pow10_u64((unsigned)(s - 19)));
+}
+
+/* The mean as a double: the exact sum / (n * 10^scale), rounded once (the
+   scale is a decimal's, 0 for the integer types). The 64-bit types sum
+   exactly in 128 bits; the 128-bit types keep sum = q * n + r with
+   |r| < n, so nothing overflows. */
+SEXP zu_mean_c(SEXP x, SEXP type_, SEXP na_rm_, SEXP scale_)
 {
     zu_type t = zu_type_arg(type_);
     zu_check_payload(x, t);
     bool na_rm = Rf_asLogical(na_rm_) == TRUE;
+    int scale = Rf_asInteger(scale_);
+    if (scale == NA_INTEGER || scale < 0 || scale > 38) Rf_error("zuint: the scale must be in 0..38");
     R_xlen_t n = XLENGTH(x), m = 0;
     for (R_xlen_t i = 0; i < n; i++) {
         if (zu_is_na(x, t, i)) {
@@ -244,7 +288,10 @@ SEXP zu_mean_c(SEXP x, SEXP type_, SEXP na_rm_)
         }
     }
     if (m == 0) return Rf_ScalarReal(R_NaN);
-    double mean;
+    /* the mean is (neg ? -1 : 1) * (Q + R / m) with 0 <= R < m */
+    bool neg;
+    zuf_u128 Q;
+    uint64_t R;
     if (!zu_type_is_128(t)) {
         zu_wide_sum s = {zuf_u128_make(0, 0), 0};
         for (R_xlen_t i = 0; i < n; i++)
@@ -252,11 +299,11 @@ SEXP zu_mean_c(SEXP x, SEXP type_, SEXP na_rm_)
         /* the 128-bit total, signed for int64 */
         zu_val v = zu_type_is_signed(t) && (zuf_u128_high(s.acc) & ZU_SIGN64)
             ? zu_val_make(true, zu_negate_bits(s.acc)) : zu_val_make(false, s.acc);
-        double d = zu_mag_to_double(v.mag);
-        mean = (v.neg ? -d : d) / (double)m;
+        neg = v.neg;
+        zuf_u128_divmod_u64(v.mag, (uint64_t)m, &Q, &R);
     } else {
-        /* q and r with the sign of the running total; r is folded into q
-           whenever |r| reaches m */
+        /* q and r, each with its own sign; r is folded into q whenever |r|
+           reaches m, so sum = q * m + r throughout */
         zu_val q = zu_val_make(false, zuf_u128_make(0, 0));
         int64_t r = 0;
         for (R_xlen_t i = 0; i < n; i++) {
@@ -286,8 +333,21 @@ SEXP zu_mean_c(SEXP x, SEXP type_, SEXP na_rm_)
                 q = zu_val_make(q.neg, q.mag);
             }
         }
-        double d = zu_mag_to_double(q.mag);
-        mean = (q.neg ? -d : d) + (double)r / (double)m;
+        /* to one sign: |q| + |r| / m, or |q| - |r| / m = (|q| - 1) + (m - |r|) / m */
+        uint64_t ar = r < 0 ? (uint64_t)(-r) : (uint64_t)r;
+        bool rneg = r < 0;
+        if (ar == 0) {
+            neg = q.neg; Q = q.mag; R = 0;
+        } else if (zuf_int_u128_is_zero(q.mag)) {
+            neg = rneg; Q = q.mag; R = ar;
+        } else if (rneg == q.neg) {
+            neg = q.neg; Q = q.mag; R = ar;
+        } else {
+            neg = q.neg;
+            Q = zuf_u128_sub_wrap(q.mag, zuf_u128_from_u64(1));
+            R = (uint64_t)m - ar;
+        }
     }
-    return Rf_ScalarReal(mean);
+    double d = zu_round_quotient(Q, R, (uint64_t)m, zu_pow10_128(scale));
+    return Rf_ScalarReal(neg && d != 0 ? -d : d);
 }

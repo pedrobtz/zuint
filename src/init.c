@@ -42,7 +42,7 @@ SEXP zu_sort_values_c(SEXP x, SEXP type, SEXP decreasing);
 SEXP zu_sum_c(SEXP x, SEXP type, SEXP na_rm);
 SEXP zu_prod_c(SEXP x, SEXP type, SEXP na_rm);
 SEXP zu_cum_c(SEXP x, SEXP type, SEXP what);
-SEXP zu_mean_c(SEXP x, SEXP type, SEXP na_rm);
+SEXP zu_mean_c(SEXP x, SEXP type, SEXP na_rm, SEXP scale);
 SEXP zu_dec_parse_c(SEXP x, SEXP p, SEXP s);
 SEXP zu_dec_format_c(SEXP x, SEXP p, SEXP s);
 SEXP zu_dec_rescale_c(SEXP x, SEXP s, SEXP p_to, SEXP s_to);
@@ -93,7 +93,7 @@ static const R_CallMethodDef call_methods[] = {
   {"zu_sum_c", (DL_FUNC) &zu_sum_c, 3},
   {"zu_prod_c", (DL_FUNC) &zu_prod_c, 3},
   {"zu_cum_c", (DL_FUNC) &zu_cum_c, 3},
-  {"zu_mean_c", (DL_FUNC) &zu_mean_c, 3},
+  {"zu_mean_c", (DL_FUNC) &zu_mean_c, 4},
   {"zu_dec_parse_c", (DL_FUNC) &zu_dec_parse_c, 3},
   {"zu_dec_format_c", (DL_FUNC) &zu_dec_format_c, 3},
   {"zu_dec_rescale_c", (DL_FUNC) &zu_dec_rescale_c, 4},
