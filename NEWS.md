@@ -103,3 +103,16 @@
 * `mean()` and `median()` of every type, decimals included, are the exact
   mean rounded once to the nearest double; they had rounded the sum first,
   so a mean could lie above `max()` (#148).
+* DuckDB's `arrow.opaque` extension is recognised by reading its JSON as
+  DuckDB does: the top-level `vendor_name` must be `"DuckDB"` and the
+  top-level `type_name` `"hugeint"` or `"uhugeint"`, escapes decoded.
+  Another vendor's type, or a `type_name` nested deeper, no longer reads
+  as `int128`, and DuckDB's own metadata with the keys in another order or
+  written with escapes no longer reads as raw bytes. A decimal under any
+  other `arrow.opaque` type no longer reads as `int128` (#154).
+* The Arrow decimal format `d:P,S` is read in the specification's form
+  only: a precision or scale past `INT_MAX` no longer wraps into range, and
+  signs and spaces are refused (#156).
+* Errors about an Arrow schema are `zuint_arrow_error`, and a schema with
+  more than 4096 metadata entries is one too, where a DuckDB `HUGEINT`
+  column had silently read as raw bytes (#166).

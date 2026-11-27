@@ -143,3 +143,48 @@ decimal_bytes <- function(values, p) {
   nanoarrow::write_nanoarrow(a, path)
   readBin(path, "raw", file.size(path))
 }
+
+# ---- extension metadata and small integers (test-arrow.R) ----------------------
+
+# nanoarrow's IPC stream of one column `x`: the arrow.opaque extension with
+# this JSON metadata over `storage`, "w:16" or "d:38,0", holding 1 and -2.
+opaque_bytes <- function(json, storage) {
+  st <- switch(
+    storage,
+    "w:16" = nanoarrow::na_fixed_size_binary(16L),
+    "d:38,0" = nanoarrow::na_decimal128(38L, 0L)
+  )
+  type <- nanoarrow::na_extension(st, "arrow.opaque", json)
+  data <- as.raw(c(1, rep(0, 15), 0xfe, rep(0xff, 15)))
+  col <- nanoarrow::nanoarrow_array_init(type)
+  col <- nanoarrow::nanoarrow_array_modify(
+    col,
+    list(length = 2, null_count = 0, buffers = list(NULL, data)),
+    validate = FALSE
+  )
+  batch <- nanoarrow::nanoarrow_array_modify(
+    nanoarrow::nanoarrow_array_init(nanoarrow::na_struct(list(x = type))),
+    list(length = 2, null_count = 0, children = list(x = col)),
+    validate = FALSE
+  )
+  path <- tempfile(fileext = ".arrows")
+  on.exit(unlink(path))
+  nanoarrow::write_nanoarrow(batch, path)
+  readBin(path, "raw", file.size(path))
+}
+
+# DuckDB's answer to `expr` over column `x` of an IPC stream, read through
+# arrow as a Table, or "ERROR" when arrow or DuckDB refuses the stream (an
+# arrow.opaque extension whose JSON Arrow cannot read).
+over_ipc <- function(db, bytes, expr) {
+  tryCatch(
+    {
+      tbl <- arrow::read_ipc_stream(bytes, as_data_frame = FALSE)
+      name <- table_name()
+      duckdb::duckdb_register_arrow(db, name, tbl)
+      on.exit(duckdb::duckdb_unregister_arrow(db, name), add = TRUE)
+      DBI::dbGetQuery(db, sprintf("SELECT %s AS r FROM %s", expr, name))$r
+    },
+    error = function(e) "ERROR"
+  )
+}

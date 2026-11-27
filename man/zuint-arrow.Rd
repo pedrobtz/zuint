@@ -21,8 +21,11 @@ and \code{zuarrow::arrow_array()} read and write zuint columns exactly.
 }
 
 
-Other \code{arrow.opaque} types, which DuckDB uses for types Arrow has no
-form for, keep zuarrow's own conversion.
+An \code{arrow.opaque} column is DuckDB's when its JSON metadata says so at
+the top level: \code{vendor_name} \code{"DuckDB"} and \code{type_name} \code{"hugeint"} or
+\code{"uhugeint"}. Other \code{arrow.opaque} types, which DuckDB uses for types
+Arrow has no form for, keep zuarrow's own conversion, as does metadata
+that is not valid JSON.
 
 A \code{decimal128(p, 0)} column is a decimal, not an integer, so zuint does
 not register for it. Asking for \code{int128} with \code{to = int128()} in

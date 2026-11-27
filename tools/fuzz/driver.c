@@ -5,6 +5,7 @@
  * status says whether every input agreed. tools/fuzz/Makefile builds it;
  * mutation.yaml runs it against each mutant.
  */
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -91,6 +92,80 @@ static size_t gen_cap(unsigned char *buf, size_t cap)
     return n;
 }
 
+/* JSON values from the grammar's own pieces; one in ten pieces is a near
+   miss (a bad escape or number, a stray comma), so most documents are
+   valid and the rest fail in one place. */
+static size_t gen_json_value(unsigned char *buf, size_t n, size_t cap, int depth)
+{
+    static const char *str[] = {"\"hugeint\"", "\"uhugeint\"", "\"DuckDB\"", "\"\"", "\"huge\\u0069nt\"",
+                                "\"Duck\\u0044B\"", "\"\\ud83d\\ude00\"", "\"\\\"type_name\\\"\"", "\"\xc3\xa9\"",
+                                "\"a\\nb\\t\\/\\\\\""};
+    static const char *bad[] = {"\"\\q\"", "01", "1.", "-", "\"\\ud800\"", "\"\\udc00x\"", "\"\xc3\"",
+                                "\"\xed\xa0\x80\"", "\"\x01\"", "tru", "\"\\u12\"", ",", "[1,]", "{\"a\"}", "\""};
+    static const char *num[] = {"0", "-1", "7", "-2.5e3", "1E+9", "0.125", "true", "false", "null"};
+    uint64_t r = next() % 100;
+    if (r < 8) return put(buf, n, cap, bad[next() % (sizeof bad / sizeof bad[0])]);
+    if (r < 40) return put(buf, n, cap, str[next() % (sizeof str / sizeof str[0])]);
+    if (r < 70 || depth > 3) return put(buf, n, cap, num[next() % (sizeof num / sizeof num[0])]);
+    bool obj = r < 85;
+    n = put(buf, n, cap, obj ? "{" : "[");
+    int k = (int)(next() % 4);
+    for (int i = 0; i < k; i++) {
+        if (i) n = put(buf, n, cap, next() % 2 ? "," : " , ");
+        if (obj) n = put(buf, n, cap, next() % 2 ? "\"type_name\":" : "\"x\" : ");
+        n = gen_json_value(buf, n, cap, depth + 1);
+    }
+    return put(buf, n, cap, obj ? "}" : "]");
+}
+
+/* A top-level object whose members are often DuckDB's two keys. */
+static size_t gen_json(unsigned char *buf, size_t cap)
+{
+    static const char *key[] = {"\"type_name\"", "\"vendor_name\"", "\"x\"", "\"type\\u005fname\"",
+                                "\"vendor_name \"", "\"Type_name\""};
+    static const char *ws[] = {"", "", " ", "\n", "\t", "\r", "\f"};
+    size_t n = put(buf, 0, cap, next() % 20 ? "{" : "[");
+    /* half the time DuckDB's two members, at random places among others */
+    bool duck = next() % 2;
+    int k = (int)(next() % 5) + (duck ? 2 : 0), at_t = duck ? (int)(next() % k) : -1, at_v = -1;
+    if (duck) do at_v = (int)(next() % k); while (at_v == at_t);
+    for (int i = 0; i < k; i++) {
+        if (i) n = put(buf, n, cap, ",");
+        n = put(buf, n, cap, ws[next() % 7]);
+        if (i == at_t || i == at_v) {
+            n = put(buf, n, cap, i == at_t ? "\"type_name\"" : "\"vendor_name\"");
+            n = put(buf, n, cap, ws[next() % 7]);
+            n = put(buf, n, cap, ":");
+            n = put(buf, n, cap, i == at_v ? "\"DuckDB\"" : next() % 2 ? "\"hugeint\"" : "\"uhugeint\"");
+            continue;
+        }
+        n = put(buf, n, cap, key[next() % 3 ? next() % 2 + 2 : next() % 6]);
+        n = put(buf, n, cap, ws[next() % 7]);
+        n = put(buf, n, cap, next() % 30 ? ":" : "");
+        n = put(buf, n, cap, ws[next() % 7]);
+        uint64_t r = next() % 10;
+        n = r < 3 ? put(buf, n, cap, next() % 2 ? "\"hugeint\"" : "\"uhugeint\"")
+          : r < 5 ? put(buf, n, cap, "\"DuckDB\"") : gen_json_value(buf, n, cap, 1);
+    }
+    n = put(buf, n, cap, ws[next() % 7]);
+    n = put(buf, n, cap, next() % 20 ? "}" : "");
+    if (next() % 10 == 0) n = put(buf, n, cap, next() % 2 ? " x" : " ");
+    if (n && next() % 20 == 0) n -= next() % n;   /* truncate */
+    return n;
+}
+
+/* Decimal format strings, near the spec's form. */
+static size_t gen_format(unsigned char *buf, size_t cap)
+{
+    static const char *piece[] = {"d:", "d", ":", ",", "0", "1", "5", "38", "39", "128", "256", "4294967296",
+                                  "99999999999999999999", "+", "-", " ", "x"};
+    static const char *head[] = {"d:", "d:", "d:", "d", "D:", "", "d;", "dd:"};
+    size_t n = put(buf, 0, cap, head[next() % 8]), len = next() % 8;
+    for (size_t i = 0; i < len; i++) n = put(buf, n, cap, piece[next() % (sizeof piece / sizeof piece[0])]);
+    if (n > 2 && next() % 5 == 0) n = 2 + next() % (n - 1);
+    return n;
+}
+
 int main(int argc, char **argv)
 {
     static unsigned char buf[65536];
@@ -105,7 +180,9 @@ int main(int argc, char **argv)
     long runs = env ? strtol(env, NULL, 10) : 200000;
     for (long i = 0; i < runs; i++) {
         size_t n = i % 1000 == 999 ? gen_cap(buf, sizeof buf)
-                 : i % 2 ? gen_metadata(buf, 4096) : gen_text(buf, 4096);
+                 : i % 4 == 1 ? gen_metadata(buf, 4096)
+                 : i % 4 == 2 ? gen_json(buf, 4096)
+                 : i % 4 == 3 ? gen_format(buf, 4096) : gen_text(buf, 4096);
         LLVMFuzzerTestOneInput(buf, n);
     }
     return 0;

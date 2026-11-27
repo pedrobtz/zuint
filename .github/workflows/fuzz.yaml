@@ -1,5 +1,5 @@
-# The text parser (src/zu_parse.c), the Arrow metadata reader
-# (src/zu_metadata.c) and the DECIMAL text parser with the rest of the
+# The text parser (src/zu_parse.c), the Arrow metadata, extension JSON and
+# decimal format readers (src/zu_metadata.c) and the DECIMAL text parser with the rest of the
 # fixed-point core (src/zu_fixed.c, design 2.2), each against a reference
 # written from its spec in tools/fuzz/harness.c (#93). R's headers only: embed-r is there for
 # `R CMD config --cppflags`, since zu_wide.h includes R.h; nothing calls R.

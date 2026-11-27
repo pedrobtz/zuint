@@ -7,10 +7,14 @@
  * Formats:
  *   int64    "l"
  *   uint64   "L"
- *   int128   "w:16" + arrow.opaque {"type_name":"hugeint"}  (DuckDB's lossless
- *            export); on import also "d:P,0" with P <= 38, when the caller
- *            asks for int128
- *   uint128  "w:16" + arrow.opaque {"type_name":"uhugeint"}
+ *   int128   "w:16" + arrow.opaque {"type_name":"hugeint","vendor_name":"DuckDB"}
+ *            (DuckDB's lossless export); on import also "d:P,0" with
+ *            P <= 38, when the caller asks for int128 and the column is not
+ *            an arrow.opaque type
+ *   uint128  "w:16" + arrow.opaque {"type_name":"uhugeint","vendor_name":"DuckDB"}
+ *
+ * The extension's JSON and the decimal format are read by zu_metadata.c,
+ * which the fuzz target builds without R.
  *
  * A 128-bit value is 16 bytes of native-endian two's complement, low word
  * first on little-endian machines. A decimal128 is read as those bits with
@@ -67,40 +71,26 @@ static void zu_write16(unsigned char *p, zuf_u128 v)
 
 /* ---- schema metadata ---------------------------------------------------- */
 
-static const char *zu_metadata_get(const char *md, const char *key, int32_t *len)
-{
-    return zu_metadata_get_bounded(md, NULL, key, len);
-}
+#define ZU_STR_(x) #x
+#define ZU_STR(x) ZU_STR_(x)
+#define ZU_TOO_MANY "the schema's metadata has more than " ZU_STR(ZU_METADATA_MAX_ENTRIES) " entries"
 
 /* For the tests: zu_metadata_get_bounded() on a raw vector, bounded by its
-   length. The value as a string, or NULL. */
+   length. The value as a string, or NULL; past the entry cap, an error. */
 SEXP zu_metadata_get_c(SEXP raw, SEXP key)
 {
-    if (TYPEOF(raw) != RAWSXP || !Rf_isString(key)) Rf_error("zuint: expected a raw vector and a key");
+    if (TYPEOF(raw) != RAWSXP || !Rf_isString(key) || XLENGTH(key) != 1 || STRING_ELT(key, 0) == NA_STRING)
+        Rf_error("zuint: expected a raw vector and a key");
     int32_t len = 0;
+    bool too_many;
     const char *md = (const char *)RAW(raw);
-    const char *v = zu_metadata_get_bounded(md, md + XLENGTH(raw), CHAR(STRING_ELT(key, 0)), &len);
+    const char *v = zu_metadata_get_bounded(md, md + XLENGTH(raw), CHAR(STRING_ELT(key, 0)), &len, &too_many);
+    if (too_many) Rf_error("zuint: %s", ZU_TOO_MANY);
     return v ? Rf_ScalarString(Rf_mkCharLenCE(v, len, CE_UTF8)) : R_NilValue;
 }
 
-/* The string value of "type_name" in the extension's JSON metadata. */
-static bool zu_json_type_name(const char *js, int32_t len, const char *want)
-{
-    const char *key = "\"type_name\"", *end = js + len;
-    size_t klen = strlen(key), wlen = strlen(want);
-    for (const char *p = js; p + klen <= end; p++) {
-        if (memcmp(p, key, klen) != 0) continue;
-        p += klen;
-        while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
-        if (p == end || *p++ != ':') return false;
-        while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) p++;
-        if (p == end || *p++ != '"') return false;
-        return (size_t)(end - p) > wlen && memcmp(p, want, wlen) == 0 && p[wlen] == '"';
-    }
-    return false;
-}
-
-/* The zuint type a schema maps to, or 0 with *why set. */
+/* The zuint type a schema maps to; or 0 with *why set, when it is not one
+   of zuint's types; or -1 with *why set, when the schema cannot be read. */
 static int zu_schema_type(const struct ArrowSchema *s, const char **why)
 {
     const char *f = s->format;
@@ -111,30 +101,37 @@ static int zu_schema_type(const struct ArrowSchema *s, const char **why)
     if (s->n_children != 0) { *why = "the array has children"; return 0; }
     if (strcmp(f, "l") == 0) return ZU_INT64;
     if (strcmp(f, "L") == 0) return ZU_UINT64;
-    if (strncmp(f, "d:", 2) == 0) {
-        /* "d:P,S" or "d:P,S,128" */
-        int p = 0, sc = -1, used = 0;
-        bool ok = sscanf(f + 2, "%d,%d%n", &p, &sc, &used) == 2;
-        const char *rest = f + 2 + used;
-        if (!ok || p < 1 || p > 38 || (*rest != '\0' && strcmp(rest, ",128") != 0)) {
+    bool fsb = strcmp(f, "w:16") == 0, dec = strncmp(f, "d:", 2) == 0;
+    if (!fsb && !dec) { *why = "the format is not one zuint imports"; return 0; }
+    int p = 0, sc = 0, bits = 0;
+    bool dec128 = dec && zu_decimal_format(f, &p, &sc, &bits) && bits == 128;
+    /* The extension first: an arrow.opaque type is DuckDB's hugeint or
+       uhugeint, or not zuint's, so a decimal under another opaque type is
+       never read as its bits (#154). DuckDB reads hugeint and uhugeint on
+       any 16-byte storage, a decimal128 too, as the 128 bits. Past the
+       metadata's entry cap the extension cannot be read, and reading the
+       storage instead would change the type (#166). */
+    int32_t nlen = 0, mlen = 0;
+    bool too_many;
+    const char *name = zu_metadata_get_bounded(s->metadata, NULL, "ARROW:extension:name", &nlen, &too_many);
+    if (too_many) { *why = ZU_TOO_MANY; return -1; }
+    if (name && nlen == 12 && memcmp(name, "arrow.opaque", 12) == 0) {
+        const char *md = zu_metadata_get_bounded(s->metadata, NULL, "ARROW:extension:metadata", &mlen, NULL);
+        int t = (fsb || dec128) && md ? zu_opaque_duckdb_type(md, (size_t)mlen) : ZU_OPAQUE_OTHER;
+        if (t == ZU_OPAQUE_HUGEINT) return ZU_INT128;
+        if (t == ZU_OPAQUE_UHUGEINT) return ZU_UINT128;
+        *why = "an arrow.opaque type maps to a zuint type only as DuckDB's hugeint or uhugeint";
+        return 0;
+    }
+    if (dec) {
+        if (!dec128 || p < 1 || p > 38) {
             *why = "only decimal128 with precision up to 38 maps to int128";
             return 0;
         }
         if (sc != 0) { *why = "a decimal with a non-zero scale is not an integer"; return 0; }
         return ZU_INT128;
     }
-    if (strcmp(f, "w:16") == 0) {
-        int32_t nlen = 0, mlen = 0;
-        const char *name = zu_metadata_get(s->metadata, "ARROW:extension:name", &nlen);
-        const char *md = zu_metadata_get(s->metadata, "ARROW:extension:metadata", &mlen);
-        if (name && nlen == 12 && memcmp(name, "arrow.opaque", 12) == 0 && md) {
-            if (zu_json_type_name(md, mlen, "hugeint")) return ZU_INT128;
-            if (zu_json_type_name(md, mlen, "uhugeint")) return ZU_UINT128;
-        }
-        *why = "fixed-size binary maps to a zuint type only as DuckDB's arrow.opaque hugeint or uhugeint";
-        return 0;
-    }
-    *why = "the format is not one zuint imports";
+    *why = "fixed-size binary maps to a zuint type only as DuckDB's arrow.opaque hugeint or uhugeint";
     return 0;
 }
 
@@ -164,21 +161,26 @@ SEXP zu_arrow_type_c(SEXP schema)
 {
     const char *why;
     int t = zu_schema_type(zu_schema_arg(schema), &why);
+    if (t < 0) Rf_error("zuint: %s", why);
     return t ? Rf_ScalarInteger(t) : Rf_ScalarString(Rf_mkChar(why));
 }
 
-/* For the tests: the type a schema with this format and no metadata maps
-   to, so a format no Arrow library will build (decimal128 precision 39)
-   can be classified. The schema lives on the stack for the call. */
-SEXP zu_arrow_format_type_c(SEXP format)
+/* For the tests: the type a schema with this format and metadata (a raw
+   vector of Arrow's binary metadata, or NULL) maps to, so a format no Arrow
+   library will build (decimal128 precision 39) can be classified. The
+   schema lives on the stack for the call. */
+SEXP zu_arrow_format_type_c(SEXP format, SEXP metadata)
 {
     if (!Rf_isString(format) || XLENGTH(format) != 1 || STRING_ELT(format, 0) == NA_STRING)
         Rf_error("zuint: `format` must be a string");
+    if (metadata != R_NilValue && TYPEOF(metadata) != RAWSXP) Rf_error("zuint: `metadata` must be raw or NULL");
     struct ArrowSchema s;
     memset(&s, 0, sizeof s);
     s.format = CHAR(STRING_ELT(format, 0));
+    if (metadata != R_NilValue) s.metadata = (const char *)RAW(metadata);
     const char *why;
     int t = zu_schema_type(&s, &why);
+    if (t < 0) Rf_error("zuint: %s", why);
     return t ? Rf_ScalarInteger(t) : Rf_ScalarString(Rf_mkChar(why));
 }
 
@@ -230,7 +232,7 @@ static zu_type zu_import_type(SEXP schema)
 {
     const char *why;
     int t = zu_schema_type(zu_schema_arg(schema), &why);
-    if (!t) Rf_error("zuint: cannot import this array: %s", why);
+    if (t <= 0) Rf_error("zuint: cannot import this array: %s", why);
     return (zu_type)t;
 }
 
@@ -240,7 +242,7 @@ static zu_type zu_import_type(SEXP schema)
    the column's own pair, though not always the struct the array's handle
    holds: an array handle in nanoarrow's r.h layout carries its own schema in
    its tag, and when it does, its format must be this schema's. */
-SEXP zu_from_arrow_c(SEXP array, SEXP schema)
+static void zu_check_own_schema(SEXP array, SEXP schema)
 {
     SEXP own = TYPEOF(array) == EXTPTRSXP ? R_ExternalPtrTag(array) : R_NilValue;
     if (TYPEOF(own) == EXTPTRSXP && R_ExternalPtrAddr(own) != NULL) {
@@ -249,6 +251,11 @@ SEXP zu_from_arrow_c(SEXP array, SEXP schema)
         if (o->release != NULL && (o->format == NULL || s->format == NULL || strcmp(o->format, s->format) != 0))
             Rf_error("zuint: the schema is not the array's own");
     }
+}
+
+SEXP zu_from_arrow_c(SEXP array, SEXP schema)
+{
+    zu_check_own_schema(array, schema);
     zu_type t = zu_import_type(schema);
     return zu_import(zu_array_arg(array), t);
 }
@@ -411,8 +418,9 @@ SEXP zu_arrow_schema_c(SEXP array)
 /* For the tests: make an exported array malformed, one field at a time,
    so the import's guards can be reached; nanoarrow refuses to build such
    arrays. 1: negative length; 2: negative offset; 3: three buffers; 4: no
-   data buffer. The buffers the array owns are left where the release
-   callback frees them: case 4 points `buffers` at a static pair instead. */
+   data buffer; 5: the schema in its tag released. The buffers the array
+   owns are left where the release callback frees them: case 4 points
+   `buffers` at a static pair instead. */
 static const void *zu_no_buffers[2] = {NULL, NULL};
 
 SEXP zu_arrow_corrupt_c(SEXP xp, SEXP what)
@@ -424,8 +432,35 @@ SEXP zu_arrow_corrupt_c(SEXP xp, SEXP what)
     case 2: a->offset = -1; break;
     case 3: a->n_buffers = 3; break;
     case 4: a->buffers = zu_no_buffers; break;
+    case 5: {
+        SEXP tag = R_ExternalPtrTag(xp);
+        struct ArrowSchema *s = TYPEOF(tag) == EXTPTRSXP ? (struct ArrowSchema *)R_ExternalPtrAddr(tag) : NULL;
+        if (s && s->release) s->release(s);
+        break;
+    }
     default: Rf_error("zuint: unknown corruption");
     }
+    return R_NilValue;
+}
+
+/* For the tests: replace the metadata of the schema an exported array
+   carries with a copy of `raw` (Arrow's binary metadata), so the import
+   can be given any extension metadata, which nanoarrow would otherwise
+   have to build. The schema's release callback frees the copy. */
+SEXP zu_arrow_metadata_c(SEXP xp, SEXP raw)
+{
+    struct ArrowArray *a = (struct ArrowArray *)R_ExternalPtrAddr(xp);
+    if (a == NULL || a->release != zu_release_array) Rf_error("zuint: not an array zuint exported");
+    if (TYPEOF(raw) != RAWSXP) Rf_error("zuint: `raw` must be a raw vector");
+    SEXP tag = R_ExternalPtrTag(xp);
+    struct ArrowSchema *s = (struct ArrowSchema *)R_ExternalPtrAddr(tag);
+    if (s == NULL || s->release != zu_release_schema) Rf_error("zuint: not a schema zuint exported");
+    char *md = malloc(XLENGTH(raw) > 0 ? (size_t)XLENGTH(raw) : 1);
+    if (md == NULL) Rf_error("zuint: out of memory");
+    if (XLENGTH(raw) > 0) memcpy(md, RAW(raw), (size_t)XLENGTH(raw));
+    free(s->private_data);
+    s->private_data = md;
+    s->metadata = md;
     return R_NilValue;
 }
 

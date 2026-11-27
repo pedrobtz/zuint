@@ -14,8 +14,12 @@
 #' | `arrow.opaque` | DuckDB's `hugeint` extension (`w:16`) | `int128` |
 #' | `arrow.opaque` | DuckDB's `uhugeint` extension (`w:16`) | `uint128` |
 #'
-#' Other `arrow.opaque` types, which DuckDB uses for types Arrow has no
-#' form for, keep zuarrow's own conversion.
+#' An `arrow.opaque` column is DuckDB's when its JSON metadata says so at
+#' the top level: `vendor_name` `"DuckDB"` and `type_name` `"hugeint"` or
+#' `"uhugeint"`. Other `arrow.opaque` types, which DuckDB uses for types
+#' Arrow has no form for, keep zuarrow's own conversion, as does metadata
+#' that is not valid JSON.
+
 #'
 #' A `decimal128(p, 0)` column is a decimal, not an integer, so zuint does
 #' not register for it. Asking for `int128` with `to = int128()` in
@@ -79,24 +83,26 @@ zu_register_zuarrow <- function(...) {
 zu_arrow_to <- function(target) {
   force(target)
   function(array, schema, lossy) {
-    code <- zu_arrow_type(schema)
+    call <- sys.call()
+    code <- zu_arrow_try(zu_arrow_type(schema), call)
     if (is.na(code)) {
       # zuarrow's own conversion: an arrow.opaque type that is not hugeint
-      # or uhugeint, or a column zuint does not read, such as int32 under
-      # `to = int64()`, which is then cast as the caller asked
+      # or uhugeint, or a column zuint does not read, such as a double
+      # under `to = int64()`, which is then cast as the caller asked
       x <- zuarrow::arrow_to_r(array, lossy = lossy)
       if (is.na(target)) {
         return(x)
       }
-      return(zu_cast(x, target, call = sys.call()))
+      return(zu_cast(x, target, call = call))
     }
-    res <- zu_arrow_try(.Call(zu_from_arrow_c, array, schema), sys.call())
+    res <- zu_arrow_try(.Call(zu_from_arrow_c, array, schema), call)
     if (res[[2L]] > 0) {
-      zu_arrow_lost(res[[2L]], code, zu_arrow_format(schema), lossy)
+      format <- zu_arrow_try(zu_arrow_format(schema), call)
+      zu_arrow_lost(res[[2L]], code, format, lossy)
     }
     x <- zu_new(res[[1L]], code)
     if (!is.na(target) && code != target) {
-      x <- zu_cast(x, target, call = sys.call())
+      x <- zu_cast(x, target, call = call)
     }
     x
   }

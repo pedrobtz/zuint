@@ -616,6 +616,28 @@ duckdb (which imports and exports Arrow streams), ADBC drivers and polars.
     `"uhugeint"` → uint128. DuckDB produces this with
     `SET arrow_lossless_conversion = true`, and re-imports it as HUGEINT /
     UHUGEINT. It is the only schema-exact form for 128-bit values.
+  - How the extension is recognised (decided 2026-11-27, #154): the
+    metadata must be one valid JSON object (RFC 8259, UTF-8, nesting at
+    most 1024 deep) whose own top-level `vendor_name` is the string
+    `"DuckDB"` and whose own `type_name` is `"hugeint"` or `"uhugeint"`,
+    values with their escapes decoded, keys as written, the first of a
+    repeated key counting; this is how DuckDB reads the stream through
+    arrow, recorded for 26 pairs of metadata string and storage. Arrow's
+    simdjson parser looks only at the keys it wants and so reads some
+    invalid documents (a bad escape or number elsewhere, a trailing
+    comma); zuint reads none of them, so such a column is zuarrow's to
+    convert. The extension is
+    checked before the format: on decimal128 storage DuckDB reads the two
+    types as their bits too, and so does zuint, but any other
+    `arrow.opaque` type on a decimal is not an integer and never imports
+    as int128, `to = int128()` or not. More than 4096 metadata entries
+    (`ZU_METADATA_MAX_ENTRIES`) is a `zuint_arrow_error` (#166): the
+    extension cannot be read, and reading the storage instead would change
+    the column's type.
+  - The decimal format is read by hand in the C Data Interface's form only
+    (2026-11-27, #156): `d:`, digits, a comma, digits, and an optional
+    comma and digits for the bit width, which must be 128. A sign, a space
+    or a missing part is not that form, and a number cannot wrap.
   - Nulls become the NA sentinel; that always needs a pass over the buffer.
 - **Zero-copy** is a v0.4 feature (§13). A plain REALSXP owns its memory, so
   v0.2 copies every buffer. From v0.4, an ALTREP payload wraps the engine
@@ -666,7 +688,8 @@ names a zuint prototype for a column of another format, zuarrow calls that
 class's handler, which reads the column, through zuarrow's built-in
 conversion if zuint does not read the format itself, and casts it to the
 prototype's type under zuint's rules. The `arrow.opaque` handler serves
-two classes, so it casts nothing.
+two classes, so it casts nothing. Every handler error about the schema or the array is a
+`zuint_arrow_error` (#166).
 
 ### 9.2 Per-partner mapping
 

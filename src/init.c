@@ -23,7 +23,7 @@ SEXP zu_bitop_c(SEXP op, SEXP x, SEXP y, SEXP type);
 SEXP zu_bitcount_c(SEXP x, SEXP type, SEXP what);
 SEXP zu_arrow_type_c(SEXP schema);
 SEXP zu_arrow_format_c(SEXP schema);
-SEXP zu_arrow_format_type_c(SEXP format);
+SEXP zu_arrow_format_type_c(SEXP format, SEXP metadata);
 SEXP zu_from_arrow_c(SEXP array, SEXP schema);
 SEXP zu_to_arrow_c(SEXP x, SEXP type);
 SEXP zu_arrow_schema_c(SEXP array);
@@ -32,6 +32,7 @@ SEXP zu_arrow_released_c(SEXP xp);
 SEXP zu_arrow_release_c(SEXP xp);
 SEXP zu_metadata_get_c(SEXP raw, SEXP key);
 SEXP zu_arrow_corrupt_c(SEXP xp, SEXP what);
+SEXP zu_arrow_metadata_c(SEXP xp, SEXP raw);
 SEXP zu_order_c(SEXP x, SEXP type, SEXP decreasing, SEXP na_last);
 SEXP zu_rank_c(SEXP x, SEXP type);
 SEXP zu_duplicated_c(SEXP x, SEXP type, SEXP from_last);
@@ -74,7 +75,7 @@ static const R_CallMethodDef call_methods[] = {
   {"zu_bitcount_c", (DL_FUNC) &zu_bitcount_c, 3},
   {"zu_arrow_type_c", (DL_FUNC) &zu_arrow_type_c, 1},
   {"zu_arrow_format_c", (DL_FUNC) &zu_arrow_format_c, 1},
-  {"zu_arrow_format_type_c", (DL_FUNC) &zu_arrow_format_type_c, 1},
+  {"zu_arrow_format_type_c", (DL_FUNC) &zu_arrow_format_type_c, 2},
   {"zu_from_arrow_c", (DL_FUNC) &zu_from_arrow_c, 2},
   {"zu_to_arrow_c", (DL_FUNC) &zu_to_arrow_c, 2},
   {"zu_arrow_schema_c", (DL_FUNC) &zu_arrow_schema_c, 1},
@@ -83,6 +84,7 @@ static const R_CallMethodDef call_methods[] = {
   {"zu_arrow_release_c", (DL_FUNC) &zu_arrow_release_c, 1},
   {"zu_metadata_get_c", (DL_FUNC) &zu_metadata_get_c, 2},
   {"zu_arrow_corrupt_c", (DL_FUNC) &zu_arrow_corrupt_c, 2},
+  {"zu_arrow_metadata_c", (DL_FUNC) &zu_arrow_metadata_c, 2},
   {"zu_order_c", (DL_FUNC) &zu_order_c, 4},
   {"zu_rank_c", (DL_FUNC) &zu_rank_c, 2},
   {"zu_duplicated_c", (DL_FUNC) &zu_duplicated_c, 3},
