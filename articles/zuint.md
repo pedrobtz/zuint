@@ -142,14 +142,14 @@ loaded its readers and writers handle zuint columns exactly
 
 From DuckDB, turn on `arrow_lossless_conversion`, so that `HUGEINT` and
 `UHUGEINT` arrive as themselves rather than as decimals, and read the
-result through zuarrow:
+result through zuarrow (with the duckdb, DBI and nanoarrow packages, so
+this chunk is not run here):
 
 ``` r
 
 library(zuarrow)
 con <- DBI::dbConnect(duckdb::duckdb(shared_home = FALSE))
 DBI::dbExecute(con, "SET arrow_lossless_conversion = true")
-#> [1] 0
 df <- arrow_to_r(DBI::dbGetQueryArrow(con, "
   SELECT 18446744073709551614::UBIGINT AS id,
          -170141183460469231731687303715884105727::HUGEINT AS total

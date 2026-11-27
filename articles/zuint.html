@@ -210,12 +210,12 @@ zuarrow is loaded its readers and writers handle zuint columns exactly
 (<code>?zuint-arrow</code>).</p>
 <p>From DuckDB, turn on <code>arrow_lossless_conversion</code>, so that
 <code>HUGEINT</code> and <code>UHUGEINT</code> arrive as themselves
-rather than as decimals, and read the result through zuarrow:</p>
+rather than as decimals, and read the result through zuarrow (with the
+duckdb, DBI and nanoarrow packages, so this chunk is not run here):</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/pedrobtz/zuarrow" class="external-link">zuarrow</a></span><span class="op">)</span></span>
 <span><span class="va">con</span> <span class="op">&lt;-</span> <span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbConnect.html" class="external-link">dbConnect</a></span><span class="op">(</span><span class="fu">duckdb</span><span class="fu">::</span><span class="fu"><a href="https://r.duckdb.org/reference/duckdb.html" class="external-link">duckdb</a></span><span class="op">(</span>shared_home <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbExecute.html" class="external-link">dbExecute</a></span><span class="op">(</span><span class="va">con</span>, <span class="st">"SET arrow_lossless_conversion = true"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 0</span></span>
 <span><span class="va">df</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://pedrobtz.github.io/zuarrow/reference/arrow_to_r.html" class="external-link">arrow_to_r</a></span><span class="op">(</span><span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbGetQueryArrow.html" class="external-link">dbGetQueryArrow</a></span><span class="op">(</span><span class="va">con</span>, <span class="st">"</span></span>
 <span><span class="st">  SELECT 18446744073709551614::UBIGINT AS id,</span></span>
 <span><span class="st">         -170141183460469231731687303715884105727::HUGEINT AS total</span></span>
