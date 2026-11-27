@@ -4,13 +4,15 @@ Version: 0.0.0.9000
 Authors@R: c(
     person("Pedro", "Baltazar", , "pedrobtz@gmail.com", role = c("aut", "cre", "cph")),
     person("The Apache Software Foundation", role = "cph",
-           comment = "Arrow C Data Interface header in src/vendor/arrow/abi.h")
+           comment = "Arrow C Data Interface header in src/vendor/arrow/abi.h"),
+    person("Stichting DuckDB Foundation", role = "cph",
+           comment = "DuckDB's VARCHAR to DECIMAL state machine, ported in src/zu_fixed.c (dk_*)")
   )
 Description: Wide integer vectors, signed and unsigned 64-bit and 128-bit,
     matching the integer types of databases and columnar formats. The four
     types share one 'C' core and one lossless promotion order, with exact
     arithmetic, comparison, parsing and formatting, and explicit overflow
-    policies. The signed 64-bit type keeps the 'bit64' 'integer64' storage
+    policies. The signed 64-bit type keeps the 'bit64' integer64 storage
     layout. With 'zuarrow' installed, the types read and write Arrow columns
     exactly.
 License: MIT + file LICENSE
