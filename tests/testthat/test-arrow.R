@@ -230,8 +230,11 @@ test_that("corrupt schema metadata reads as no metadata", {
     i32(-3),
     charToRaw("x")
   )))
-  # too many entries, and lengths that run past the end
-  expect_null(get(c(i32(1e6), entry("ARROW:extension:name", "x"))))
+  # too many entries is an error (#166); lengths that run past the end
+  expect_error(
+    get(c(i32(1e6), entry("ARROW:extension:name", "x"))),
+    "more than 4096 entries"
+  )
   expect_null(get(c(i32(1), i32(400), charToRaw("ARROW"))))
   expect_null(get(good[1:10]))
   expect_null(get(raw(2)))
@@ -257,12 +260,64 @@ test_that("the metadata entry cap is 4096, straddled", {
   get <- function(n) .Call(zu_metadata_get_c, md(n), "ARROW:extension:name")
   expect_identical(get(4095), "arrow.opaque")
   expect_identical(get(4096), "arrow.opaque")
-  expect_null(get(4097))
+  # past the cap the lookup fails rather than finding nothing (#166)
+  expect_error(get(4097), "more than 4096 entries")
+  # a key that is not one string (#166)
+  expect_error(.Call(zu_metadata_get_c, md(1), character(0)), "expected")
+  expect_error(.Call(zu_metadata_get_c, md(1), NA_character_), "expected")
+})
+
+test_that("past the metadata cap the import fails rather than change type (#166)", {
+  i32 <- function(v) {
+    writeBin(as.integer(v), raw(), size = 4, endian = .Platform$endian)
+  }
+  entry <- function(k, v) {
+    c(i32(nchar(k)), charToRaw(k), i32(nchar(v)), charToRaw(v))
+  }
+  # `extra` filler entries, then DuckDB's hugeint extension
+  md <- function(extra) {
+    c(
+      i32(extra + 2),
+      rep(entry("k", "v"), extra),
+      entry("ARROW:extension:name", "arrow.opaque"),
+      entry(
+        "ARROW:extension:metadata",
+        '{"type_name":"hugeint","vendor_name":"DuckDB"}'
+      )
+    )
+  }
+  to <- zu_arrow_to(NA_integer_)
+  read <- function(extra) {
+    a <- zu_arrow_from(int128(c(1, -2)))
+    .Call(zu_arrow_metadata_c, a, md(extra))
+    to(a, zu_arrow_tag(a), "error")
+  }
+  expect_identical(read(0), int128(c(1, -2)))
+  expect_identical(read(4094), int128(c(1, -2)))
+  expect_error(read(4095), class = "zuint_arrow_error")
+  expect_error(read(4095), "more than 4096 entries")
+  # the cap applies wherever the metadata decides the type
+  expect_error(
+    .Call(zu_arrow_format_type_c, "d:38,0", md(4095)),
+    "more than 4096 entries"
+  )
+  expect_identical(.Call(zu_arrow_format_type_c, "l", md(4095)), 1L)
+})
+
+test_that("the handler's schema errors are zuint_arrow_error (#166)", {
+  for (target in list(1L, NA_integer_)) {
+    to <- zu_arrow_to(target)
+    expect_error(to(1, 2, "error"), class = "zuint_arrow_error")
+    a <- zu_arrow_from(int64(1:3))
+    .Call(zu_arrow_corrupt_c, a, 5L)
+    expect_error(to(a, zu_arrow_tag(a), "error"), class = "zuint_arrow_error")
+    expect_error(to(a, zu_arrow_tag(a), "error"), "released")
+  }
 })
 
 test_that("decimal128 imports up to precision 38, straddled", {
   type_of <- function(format) {
-    t <- .Call(zu_arrow_format_type_c, format)
+    t <- .Call(zu_arrow_format_type_c, format, NULL)
     if (is.integer(t)) t else NA_integer_
   }
   for (f in c("d:37,0", "d:38,0", "d:37,0,128", "d:38,0,128")) {
@@ -298,4 +353,230 @@ test_that("the import refuses a schema that is not the array's own (#61)", {
     zuarrow::arrow_to_r(zuarrow::arrow_array(int128(c(1, NA)))),
     int128(c(1, NA))
   )
+})
+
+test_that("the decimal format is read in the spec's form only (#156)", {
+  type_of <- function(format) {
+    t <- .Call(zu_arrow_format_type_c, format, NULL)
+    if (is.integer(t)) t else NA_integer_
+  }
+  for (f in c("d:1,0", "d:5,0", "d:38,0", "d:38,0,128", "d:038,00")) {
+    expect_identical(type_of(f), 3L, label = f)
+  }
+  # numbers past INT_MAX wrapped under sscanf("%d"); signs, spaces and
+  # missing or extra parts were accepted
+  for (f in c(
+    "d:5,4294967296",
+    "d:4294967301,0",
+    "d:4294967334,0",
+    "d:5,18446744073709551616",
+    "d:99999999999999999999999,0",
+    "d:5,0,4294967424",
+    "d: 5,0",
+    "d:5, 0",
+    "d:5,0 ",
+    "d:+5,+0",
+    "d:5,+0",
+    "d:5,-0",
+    "d:-5,0",
+    "d:5",
+    "d:5,",
+    "d:,0",
+    "d:5,0,",
+    "d:5,0,128x",
+    "d:5,0,64",
+    "d:5,0,256",
+    "d:5;0",
+    "d:",
+    "d:0x5,0"
+  )) {
+    expect_identical(type_of(f), NA_integer_, label = f)
+  }
+})
+
+test_that("DuckDB's extension is read when DuckDB reads it, from its JSON (#154)", {
+  con <- local_duckdb()
+  hugeint <- '{"type_name":"hugeint","vendor_name":"DuckDB"}'
+  cases <- list(
+    c(hugeint, "w:16"),
+    c('{"vendor_name":"DuckDB","type_name":"hugeint"}', "w:16"),
+    c('{"type_name":"uhugeint","vendor_name":"DuckDB"}', "w:16"),
+    c(' {\t"type_name" :\n"hugeint" ,\r"vendor_name": "DuckDB" } ', "w:16"),
+    c('{"type_name":"hugeint","vendor_name":"Other"}', "w:16"),
+    c('{"type_name":"hugeint"}', "w:16"),
+    c('{"type_name":"HUGEINT","vendor_name":"DuckDB"}', "w:16"),
+    c('{"type_name":"hugeint128","vendor_name":"DuckDB"}', "w:16"),
+    c('{"type_name":"uuid","vendor_name":"DuckDB"}', "w:16"),
+    c(
+      '{"extra":{"type_name":"hugeint"},"type_name":"uuid","vendor_name":"DuckDB"}',
+      "w:16"
+    ),
+    c(
+      '{"vendor_name":"DuckDB","note":"type_name","type_name":"hugeint"}',
+      "w:16"
+    ),
+    c(
+      '{"note":"a \\"type_name\\":\\"hugeint\\" b","type_name":"uuid","vendor_name":"DuckDB"}',
+      "w:16"
+    ),
+    c('{"type_name":"huge\\u0069nt","vendor_name":"Duck\\u0044B"}', "w:16"),
+    c('{"type\\u005fname":"hugeint","vendor_name":"DuckDB"}', "w:16"),
+    c(
+      '{"type_name":"hugeint","type_name":"uhugeint","vendor_name":"DuckDB"}',
+      "w:16"
+    ),
+    c(
+      '{"a":[1,-2.5e3,{"b":null},[]],"type_name":"hugeint","c":true,"vendor_name":"DuckDB","d":{}}',
+      "w:16"
+    ),
+    c(
+      '{"type_name":"hugeint","vendor_name":"DuckDB","n":"caf\u00e9 \\ud83d\\ude00"}',
+      "w:16"
+    ),
+    c('{"type_name":7,"vendor_name":"DuckDB"}', "w:16"),
+    c('{"type_name":"hugeint","vendor_name":"DuckDB"} x', "w:16"),
+    c('{"type_name":"hugeint', "w:16"),
+    c('{"type_name":"hugeint"', "w:16"),
+    c("", "w:16"),
+    c('["type_name","hugeint"]', "w:16"),
+    # a decimal's storage: DuckDB's two types read as their bits, any
+    # other opaque type is not an integer
+    c(hugeint, "d:38,0"),
+    c('{"type_name":"uhugeint","vendor_name":"DuckDB"}', "d:38,0"),
+    c('{"type_name":"uuid","vendor_name":"DuckDB"}', "d:38,0")
+  )
+  for (case in cases) {
+    bytes <- arrow_bytes(
+      "opaque_bytes",
+      json = case[[1L]],
+      storage = case[[2L]]
+    )
+    duck <- duck_ipc(con, bytes, "typeof(x)")[[1L]]
+    # "character" gives a decimal zuint does not read as its text
+    x <- zuarrow::arrow_read(bytes, lossy = "character")$x
+    label <- paste(case, collapse = " on ")
+    if (duck == "HUGEINT") {
+      expect_identical(x, int128(c(1, -2)), label = label)
+    } else if (duck == "UHUGEINT") {
+      expect_identical(
+        x,
+        uint128(c("1", "340282366920938463463374607431768211454")),
+        label = label
+      )
+    } else {
+      expect_false(
+        inherits(x, c("zu_int128", "zu_uint128")),
+        label = paste(label, "read by DuckDB as", duck)
+      )
+    }
+  }
+})
+
+test_that("a small integer column reads exactly into a zuint prototype (#155)", {
+  skip_without_zuarrow()
+  skip_if_not_installed("gmp")
+  two <- gmp::as.bigz(2)
+  formats <- list(
+    c = c(-(two^7), two^7 - 1),
+    C = c(gmp::as.bigz(0), two^8 - 1),
+    s = c(-(two^15), two^15 - 1),
+    S = c(gmp::as.bigz(0), two^16 - 1),
+    i = c(-(two^31), two^31 - 1),
+    I = c(gmp::as.bigz(0), two^32 - 1)
+  )
+  for (f in names(formats)) {
+    ends <- formats[[f]]
+    v <- c(as.character(ends), as.character(ends + c(1, -1)), "0", NA)
+    bytes <- arrow_bytes("int_bytes", format = f, values = as.numeric(v))
+    expect_identical(
+      zuarrow::arrow_read(bytes, to = list(x = int64()))$x,
+      int64(v),
+      label = f
+    )
+    if (ends[[1L]] < 0) {
+      # a negative value has no uint64: zuint's cast warns, as for int64
+      expect_warning(
+        u <- zuarrow::arrow_read(bytes, to = list(x = uint64()))$x,
+        class = "zuint_cast_warning"
+      )
+      v[which(gmp::as.bigz(v) < 0)] <- NA
+      expect_identical(u, uint64(v), label = f)
+    } else {
+      expect_identical(
+        zuarrow::arrow_read(bytes, to = list(x = uint64()))$x,
+        uint64(v),
+        label = f
+      )
+    }
+  }
+})
+
+test_that("the extension's JSON must be valid JSON throughout (#154)", {
+  i32 <- function(v) {
+    writeBin(as.integer(v), raw(), size = 4, endian = .Platform$endian)
+  }
+  entry <- function(k, v) {
+    v <- charToRaw(enc2utf8(v))
+    c(i32(nchar(k)), charToRaw(k), i32(length(v)), v)
+  }
+  type_of <- function(json, format = "w:16") {
+    md <- c(
+      i32(2),
+      entry("ARROW:extension:name", "arrow.opaque"),
+      entry("ARROW:extension:metadata", json)
+    )
+    t <- .Call(zu_arrow_format_type_c, format, md)
+    if (is.integer(t)) t else NA_integer_
+  }
+  ok <- '{"type_name":"hugeint","vendor_name":"DuckDB"'
+  expect_identical(type_of(paste0(ok, "}")), 3L)
+  expect_identical(type_of(paste0(ok, ',"n":[1,{"a":"\\u00e9"}]}')), 3L)
+  # Arrow's parser reads these, as it looks only at the keys it wants, and
+  # DuckDB then reads HUGEINT; zuint reads no invalid document
+  for (rest in c(
+    ',"n":"\\q"}',
+    ',"n":01}',
+    ",}",
+    ',"n":tru}',
+    ',"n":[1,]}',
+    ',"n":"\\ud800"}',
+    ',"n":"\\udc00"}',
+    ',"n":"a\tb"}',
+    ',"n":1.}',
+    ',"n":-}',
+    ',"n":1e}',
+    ',"n":{"a"}}',
+    ',"n":{1:2}}',
+    ',"n":[}',
+    ',"n":"\\u12"}',
+    "}}"
+  )) {
+    expect_identical(type_of(paste0(ok, rest)), NA_integer_, label = rest)
+  }
+  # nesting deeper than 1024, the top-level object counted, is refused, as
+  # by simdjson
+  deep <- function(n) {
+    paste0(ok, ',"n":', strrep("[", n), strrep("]", n), "}")
+  }
+  expect_identical(type_of(deep(1023)), 3L)
+  expect_identical(type_of(deep(1024)), NA_integer_)
+  # invalid UTF-8 in a string
+  bad <- c(charToRaw(paste0(ok, ',"n":"')), as.raw(0xc3), charToRaw('"}'))
+  md <- c(
+    i32(2),
+    entry("ARROW:extension:name", "arrow.opaque"),
+    i32(nchar("ARROW:extension:metadata")),
+    charToRaw("ARROW:extension:metadata"),
+    i32(length(bad)),
+    bad
+  )
+  expect_false(is.integer(.Call(zu_arrow_format_type_c, "w:16", md)))
+  # the extension decides before the decimal format does
+  expect_identical(
+    type_of('{"type_name":"uuid","vendor_name":"DuckDB"}', "d:38,0"),
+    NA_integer_
+  )
+  expect_identical(type_of(paste0(ok, "}"), "d:5,2"), 3L)
+  expect_identical(type_of(paste0(ok, "}"), "d:38,0,256"), NA_integer_)
+  expect_identical(type_of(paste0(ok, "}"), "w:8"), NA_integer_)
 })

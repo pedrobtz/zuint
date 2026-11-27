@@ -135,6 +135,96 @@ test_that("mean and median are doubles from the exact values", {
   )
 })
 
+test_that("mean and median are the exact value, rounded once (#148)", {
+  skip_if_not_installed("gmp")
+  # random vectors across each type's whole range, against gmp's exact
+  # rational, correctly rounded
+  for (type in zu_all_types) {
+    for (k in 1:60) {
+      v <- oracle_random(type, 2L + k %% 9L, seed = k)
+      x <- zu_ctor(type)(v)
+      expect_identical(mean(x), oracle_mean(v), label = paste(type, k))
+      s <- as.character(sort(gmp::as.bigz(v)))
+      mid <- s[unique(c((length(s) + 1L) %/% 2L, (length(s) + 2L) %/% 2L))]
+      expect_identical(median(x), oracle_mean(mid), label = paste(type, k))
+    }
+  }
+  # n copies of one value: the mean is the value, rounded, and never above
+  # max()
+  one <- c(
+    int64 = "9007199254740993",
+    uint64 = "18446744073709551613",
+    int128 = "-170141183460469231731687303715884105727",
+    uint128 = "340282366920938463463374607431768211453"
+  )
+  for (type in names(one)) {
+    v <- rep(one[[type]], 3)
+    expect_identical(mean(zu_ctor(type)(v)), oracle_mean(v), label = type)
+  }
+  x <- int64(rep("9007199254740993", 3))
+  expect_false(mean(x) > x[1])
+  u <- uint64(c("18446744073709551614", "18446744073709551612"))
+  expect_identical(mean(u), oracle_mean(as.character(u)))
+  expect_identical(median(u), oracle_mean(as.character(u)))
+  # a small total over a large n, where the remainder is all there is
+  for (type in c("int64", "int128")) {
+    v <- c(rep("2", 600000), rep("-3", 399999))
+    expect_identical(mean(zu_ctor(type)(v)), oracle_mean(v), label = type)
+    v <- c(rep("-2", 600000), rep("3", 399999))
+    expect_identical(mean(zu_ctor(type)(v)), oracle_mean(v), label = type)
+  }
+  expect_identical(mean(int128(c(0, 2, 3))), oracle_mean(c("0", "2", "3")))
+  expect_identical(mean(int128(c(0, 2, 3))), mean(c(0, 2, 3)))
+  # exactly halfway in the bits kept, with a remainder beyond them: the
+  # remainder decides, rounding up
+  half <- c("9007199254740993", "1267650600228229542234191560704")
+  for (type in c("int64", "int128", "uint128")) {
+    h <- half[[if (type == "int64") 1L else 2L]]
+    up <- as.character(gmp::as.bigz(h) + 1)
+    v <- c(rep(h, 2999), up)
+    expect_identical(mean(zu_ctor(type)(v)), oracle_mean(v), label = type)
+    expect_gt(mean(zu_ctor(type)(v)), as.double(gmp::as.bigz(h)))
+    if (type != "uint128") {
+      v <- paste0("-", v)
+      expect_identical(mean(zu_ctor(type)(v)), oracle_mean(v), label = type)
+    }
+  }
+  # quotient and remainder of opposite signs, and a zero mean
+  for (type in c("int64", "int128")) {
+    v <- c("-7", "1", "1")
+    expect_identical(mean(zu_ctor(type)(v)), oracle_mean(v), label = type)
+    v <- c("5", "-5")
+    expect_identical(mean(zu_ctor(type)(v)), 0, label = type)
+  }
+})
+
+test_that("a decimal's mean and median are the exact value, rounded once (#148)", {
+  skip_if_not_installed("gmp")
+  x <- decimal128(c(rep("0.02", 600000), rep("-0.03", 399999)), 5, 2)
+  coefs <- c(rep("2", 600000), rep("-3", 399999))
+  expect_identical(mean(x), oracle_mean(coefs, 2L))
+  for (type in list(
+    c(5L, 2L),
+    c(18L, 9L),
+    c(38L, 0L),
+    c(38L, 30L),
+    c(38L, 38L)
+  )) {
+    p <- type[[1L]]
+    s <- type[[2L]]
+    for (k in 1:10) {
+      coefs <- fx_coefs(3L + k, p, seed = 100L * p + k)
+      x <- decimal128(fx_format(coefs, p, s), p, s)
+      label <- sprintf("DECIMAL(%d, %d) %d", p, s, k)
+      expect_identical(mean(x), oracle_mean(coefs, s), label = label)
+      o <- as.character(sort(gmp::as.bigz(coefs)))
+      n <- length(o)
+      mid <- o[unique(c((n + 1L) %/% 2L, (n + 2L) %/% 2L))]
+      expect_identical(median(x), oracle_mean(mid, s), label = label)
+    }
+  }
+})
+
 test_that("any and all use the logical values", {
   expect_true(any(int64(c(0, 3))))
   expect_false(all(uint128(c(0, 3))))

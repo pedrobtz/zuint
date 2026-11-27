@@ -372,7 +372,8 @@ fixed-point is a small layer on top.
     `sum()` (as `DECIMAL(38, s)`), `min()`, `max()` and `range()` reuse
     the `int128` code on the coefficients, which share one scale within
     a vector; `mean()` is within an ulp or two of DuckDB's `avg()`,
-    whose last bit depends on the platform's `long double`. The
+    whose last bit depends on the platform's `long double`: it is the
+    exact sum ÷ (n · 10^s), rounded once (2026-11-27, #148). The
     accessors are `decimal_precision()` and `decimal_scale()`, since
     base `scale()` is already a generic. `match()`, `%in%` and `table()`
     compare values, not text at the vector's scale: `mtfrm()` writes a
@@ -571,7 +572,7 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
 | --- | --- |
 | `sum` | type stable (decided 2026-10-15): the result has the input's type, and overflow gives NA plus a warning, as base R's `sum()` on integers does. int64 and uint64 accumulate in 128 bits so the overflow check is exact; `sum(int128(x))` is the wide sum |
 | `cumsum`, `cumprod` | same type as input; overflow gives NA from that point on |
-| `mean` | exact sum ÷ n, returned as double; `mean_exact()` returns the quotient and remainder |
+| `mean` | exact sum ÷ n, returned as double; `mean_exact()` returns the quotient and remainder. The double is the exact quotient rounded once, to nearest with ties to even (decided 2026-11-27, #148): the 128-bit (or wider) sum is divided in integers and its quotient and remainder rounded together, never a double sum divided by n. `median()` is the mean of the middle pair, the same way |
 | `min`, `max`, `range` | exact; `na.rm` supported |
 | `sort`, `order`, `rank`, `xtfrm` | LSD radix sort on the unsigned-key transform (sign bit flipped for signed types); stable. `xtfrm` returns integer ranks (ties `"min"`, NA kept), never a double proxy, so base `order()` on several keys stays exact |
 | `unique`, `duplicated`, `match`, `%in%`, `table` | open-addressing hash on the exact bits, never through double |
@@ -615,6 +616,28 @@ duckdb (which imports and exports Arrow streams), ADBC drivers and polars.
     `"uhugeint"` → uint128. DuckDB produces this with
     `SET arrow_lossless_conversion = true`, and re-imports it as HUGEINT /
     UHUGEINT. It is the only schema-exact form for 128-bit values.
+  - How the extension is recognised (decided 2026-11-27, #154): the
+    metadata must be one valid JSON object (RFC 8259, UTF-8, nesting at
+    most 1024 deep) whose own top-level `vendor_name` is the string
+    `"DuckDB"` and whose own `type_name` is `"hugeint"` or `"uhugeint"`,
+    values with their escapes decoded, keys as written, the first of a
+    repeated key counting; this is how DuckDB reads the stream through
+    arrow, recorded for 26 pairs of metadata string and storage. Arrow's
+    simdjson parser looks only at the keys it wants and so reads some
+    invalid documents (a bad escape or number elsewhere, a trailing
+    comma); zuint reads none of them, so such a column is zuarrow's to
+    convert. The extension is
+    checked before the format: on decimal128 storage DuckDB reads the two
+    types as their bits too, and so does zuint, but any other
+    `arrow.opaque` type on a decimal is not an integer and never imports
+    as int128, `to = int128()` or not. More than 4096 metadata entries
+    (`ZU_METADATA_MAX_ENTRIES`) is a `zuint_arrow_error` (#166): the
+    extension cannot be read, and reading the storage instead would change
+    the column's type.
+  - The decimal format is read by hand in the C Data Interface's form only
+    (2026-11-27, #156): `d:`, digits, a comma, digits, and an optional
+    comma and digits for the bit width, which must be 128. A sign, a space
+    or a missing part is not that form, and a number cannot wrap.
   - Nulls become the NA sentinel; that always needs a pass over the buffer.
 - **Zero-copy** is a v0.4 feature (§13). A plain REALSXP owns its memory, so
   v0.2 copies every buffer. From v0.4, an ALTREP payload wraps the engine
@@ -665,7 +688,12 @@ names a zuint prototype for a column of another format, zuarrow calls that
 class's handler, which reads the column, through zuarrow's built-in
 conversion if zuint does not read the format itself, and casts it to the
 prototype's type under zuint's rules. The `arrow.opaque` handler serves
-two classes, so it casts nothing.
+two classes, so it casts nothing. Under an `int64()` or `uint64()`
+prototype, zuint reads the small integer formats (`c`, `C`, `s`, `S`, `i`,
+`I`) itself, exactly, before the cast (decided 2026-11-27, #155): through
+zuarrow they became R integers first, whose `NA` is INT32_MIN. Every
+handler error about the schema or the array is a `zuint_arrow_error`
+(#166).
 
 ### 9.2 Per-partner mapping
 

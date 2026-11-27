@@ -1,4 +1,4 @@
-# Mutates the text parser, the Arrow metadata reader and the fixed-point
+# Mutates the text parser, the Arrow metadata readers and the fixed-point
 # core (src/zu_fixed.c, whose fuzz target checks its parser and invariants
 # of the rest; tools/fixed/ and the R tests are its full oracles) and runs
 # tools/fuzz/driver against each mutant (#92): the fuzz harness over a

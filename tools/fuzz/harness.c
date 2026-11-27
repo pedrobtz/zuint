@@ -1,6 +1,6 @@
 /*
- * Fuzz target for zuint's two readers of untrusted bytes, each compared
- * with a reference written from its specification, not from the code:
+ * Fuzz target for zuint's readers of untrusted bytes, each compared with a
+ * reference written from its specification, not from the code:
  *
  *   - zu_parse() (src/zu_parse.c), the one text parser, against
  *     ref_parse() below, written from the grammar in zu_parse.c's header
@@ -8,6 +8,11 @@
  *   - zu_metadata_get_bounded() (src/zu_metadata.c), Arrow's binary schema
  *     metadata, against ref_metadata() below, written from the Arrow C Data
  *     Interface's description of the format;
+ *   - zu_opaque_duckdb_type() (src/zu_metadata.c), the JSON of DuckDB's
+ *     arrow.opaque extension, against ref_opaque(), a recursive-descent
+ *     reader written from RFC 8259 and design 9.1;
+ *   - zu_decimal_format() (src/zu_metadata.c), the C Data Interface's
+ *     decimal format string, against ref_format();
  *   - zu_fx_parse() (src/zu_fixed.c), DuckDB's text to DECIMAL(p, s), against
  *     ref_dec_grammar() and ref_dec_exact() below, written from design 2.2:
  *     a text outside the grammar is invalid, one inside it is refused only
@@ -130,15 +135,17 @@ static int32_t ref_i32(const unsigned char *p)
 }
 
 /* int32 count, then per entry an int32 key length, the key, an int32 value
-   length and the value. A negative count or length, more than
-   ZU_METADATA_MAX_ENTRIES entries, or bytes past the end: no metadata.
-   Returns the offset of the first matching key's value, or -1. */
-static long ref_metadata(const unsigned char *md, size_t n, const char *key, int32_t *len)
+   length and the value. A negative count or length, or bytes past the end:
+   no metadata. More than ZU_METADATA_MAX_ENTRIES entries: no metadata, and
+   too many. Returns the offset of the first matching key's value, or -1. */
+static long ref_metadata(const unsigned char *md, size_t n, const char *key, int32_t *len, bool *too_many)
 {
     size_t want = strlen(key), off = 0;
+    *too_many = false;
     if (n < 4) return -1;
     int32_t count = ref_i32(md);
     off = 4;
+    if (count > ZU_METADATA_MAX_ENTRIES) *too_many = true;
     if (count < 0 || count > ZU_METADATA_MAX_ENTRIES) return -1;
     for (int32_t i = 0; i < count; i++) {
         if (n - off < 4) return -1;
@@ -165,8 +172,11 @@ static void fuzz_metadata(const unsigned char *data, size_t size)
     static const char *keys[] = {"ARROW:extension:name", "ARROW:extension:metadata", "", "k"};
     for (size_t i = 0; i < sizeof keys / sizeof keys[0]; i++) {
         int32_t glen = -7, rlen = -7;
-        const char *got = zu_metadata_get_bounded((const char *)data, (const char *)data + size, keys[i], &glen);
-        long want = ref_metadata(data, size, keys[i], &rlen);
+        bool gmany = false, rmany = false;
+        const char *got = zu_metadata_get_bounded((const char *)data, (const char *)data + size, keys[i], &glen, &gmany);
+        long want = ref_metadata(data, size, keys[i], &rlen, &rmany);
+        CHECK(gmany == rmany);
+        CHECK(zu_metadata_get_bounded((const char *)data, (const char *)data + size, keys[i], &glen, NULL) == got);
         if (want < 0) {
             CHECK(got == NULL);
         } else {
@@ -174,6 +184,271 @@ static void fuzz_metadata(const unsigned char *data, size_t size)
             CHECK(glen == rlen);
         }
     }
+}
+
+/* ---- the arrow.opaque extension's JSON ---------------------------------- */
+
+/* RFC 8259, by recursive descent: whitespace is space, tab, LF and CR; a
+   string holds no control character, its escapes are the eight letters and
+   \uXXXX (a surrogate only as a high-low pair), and its bytes are UTF-8 with
+   no overlong form, surrogate or code point past U+10FFFF; at most 1024
+   levels of objects and arrays. The answer is DuckDB's hugeint (1) or
+   uhugeint (2) when the document is one object whose first top-level
+   member written exactly "type_name" is that string, and whose first
+   written exactly "vendor_name" is "DuckDB", escapes in values decoded. */
+typedef struct {
+    const unsigned char *s;
+    size_t n, i;
+    int depth;
+} rj;
+
+static void rj_ws(rj *r)
+{
+    while (r->i < r->n && strchr(" \t\n\r", r->s[r->i]) != NULL && r->s[r->i] != 0) r->i++;
+}
+
+static int rj_hex(unsigned char c)
+{
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+static bool rj_u4(rj *r, unsigned long *cp)
+{
+    if (r->n - r->i < 4) return false;
+    *cp = 0;
+    for (int k = 0; k < 4; k++) {
+        int d = rj_hex(r->s[r->i + k]);
+        if (d < 0) return false;
+        *cp = *cp * 16 + (unsigned long)d;
+    }
+    r->i += 4;
+    return true;
+}
+
+/* Decoded into out (as UTF-8) while it fits; *len the decoded length. */
+static bool rj_string(rj *r, unsigned char *out, size_t cap, size_t *len)
+{
+    size_t k = 0;
+    if (r->i >= r->n || r->s[r->i] != '"') return false;
+    r->i++;
+    while (r->i < r->n) {
+        unsigned char c = r->s[r->i];
+        unsigned long cp;
+        if (c == '"') { r->i++; *len = k; return true; }
+        if (c < 0x20) return false;
+        if (c == '\\') {
+            if (r->n - r->i < 2) return false;
+            unsigned char e = r->s[r->i + 1];
+            r->i += 2;
+            const char *from = "\"\\/bfnrt", *to = "\"\\/\b\f\n\r\t";
+            const char *at = e ? strchr(from, e) : NULL;
+            if (at) {
+                cp = (unsigned char)to[at - from];
+            } else if (e == 'u') {
+                if (!rj_u4(r, &cp)) return false;
+                if (cp >= 0xD800 && cp < 0xDC00) {
+                    unsigned long lo;
+                    if (r->n - r->i < 2 || r->s[r->i] != '\\' || r->s[r->i + 1] != 'u') return false;
+                    r->i += 2;
+                    if (!rj_u4(r, &lo) || lo < 0xDC00 || lo >= 0xE000) return false;
+                    cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+                } else if (cp >= 0xDC00 && cp < 0xE000) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        } else if (c < 0x80) {
+            cp = c;
+            r->i++;
+        } else {
+            int ones = 0;
+            while (ones < 8 && (c << ones) & 0x80) ones++;
+            if (ones < 2 || ones > 4 || r->n - r->i < (size_t)ones) return false;
+            cp = c & (0xFFu >> (ones + 1));
+            for (int b = 1; b < ones; b++) {
+                unsigned char t = r->s[r->i + b];
+                if (t < 0x80 || t > 0xBF) return false;
+                cp = cp << 6 | (t & 0x3F);
+            }
+            static const unsigned long least[5] = {0, 0, 0x80, 0x800, 0x10000};
+            if (cp < least[ones] || cp > 0x10FFFF || (cp >= 0xD800 && cp < 0xE000)) return false;
+            r->i += (size_t)ones;
+        }
+        /* write cp as UTF-8 */
+        unsigned char u[4];
+        int m = cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+        if (m == 1) u[0] = (unsigned char)cp;
+        else {
+            for (int b = m - 1; b > 0; b--) { u[b] = (unsigned char)(0x80 | (cp & 0x3F)); cp >>= 6; }
+            u[0] = (unsigned char)((0xF00u >> m) | cp);
+        }
+        for (int b = 0; b < m; b++, k++) if (k < cap) out[k] = u[b];
+    }
+    return false;
+}
+
+static bool rj_value(rj *r);
+
+static bool rj_digits(rj *r)
+{
+    size_t from = r->i;
+    while (r->i < r->n && r->s[r->i] >= '0' && r->s[r->i] <= '9') r->i++;
+    return r->i > from;
+}
+
+static bool rj_number(rj *r)
+{
+    if (r->i < r->n && r->s[r->i] == '-') r->i++;
+    if (r->i < r->n && r->s[r->i] == '0') r->i++;
+    else if (!(r->i < r->n && r->s[r->i] >= '1' && r->s[r->i] <= '9' && rj_digits(r))) return false;
+    if (r->i < r->n && r->s[r->i] == '.') { r->i++; if (!rj_digits(r)) return false; }
+    if (r->i < r->n && (r->s[r->i] | 0x20) == 'e') {
+        r->i++;
+        if (r->i < r->n && (r->s[r->i] == '+' || r->s[r->i] == '-')) r->i++;
+        if (!rj_digits(r)) return false;
+    }
+    return true;
+}
+
+static bool rj_lit(rj *r, const char *w)
+{
+    size_t k = strlen(w);
+    if (r->n - r->i < k || memcmp(r->s + r->i, w, k) != 0) return false;
+    r->i += k;
+    return true;
+}
+
+/* An object or array, r->i on its bracket. */
+static bool rj_container(rj *r)
+{
+    unsigned char close = r->s[r->i] == '{' ? '}' : ']';
+    if (++r->depth > 1024) return false;
+    r->i++;
+    rj_ws(r);
+    if (r->i < r->n && r->s[r->i] == close) { r->i++; r->depth--; return true; }
+    for (;;) {
+        size_t len;
+        if (close == '}') {
+            if (!rj_string(r, NULL, 0, &len)) return false;
+            rj_ws(r);
+            if (r->i >= r->n || r->s[r->i] != ':') return false;
+            r->i++;
+        }
+        if (!rj_value(r)) return false;
+        rj_ws(r);
+        if (r->i >= r->n) return false;
+        if (r->s[r->i] == close) { r->i++; r->depth--; return true; }
+        if (r->s[r->i] != ',') return false;
+        r->i++;
+        rj_ws(r);
+    }
+}
+
+static bool rj_value(rj *r)
+{
+    rj_ws(r);
+    if (r->i >= r->n) return false;
+    unsigned char c = r->s[r->i];
+    size_t len;
+    if (c == '{' || c == '[') return rj_container(r);
+    if (c == '"') return rj_string(r, NULL, 0, &len);
+    if (c == '-' || (c >= '0' && c <= '9')) return rj_number(r);
+    return rj_lit(r, "true") || rj_lit(r, "false") || rj_lit(r, "null");
+}
+
+static int ref_opaque(const unsigned char *s, size_t n)
+{
+    rj r = {s, n, 0, 0};
+    /* the whole document must be valid */
+    if (!rj_value(&r)) return 0;
+    rj_ws(&r);
+    if (r.i != n) return 0;
+    /* then its top-level members, read again */
+    r.i = 0;
+    rj_ws(&r);
+    if (s[r.i] != '{') return 0;
+    r.i++;
+    unsigned char type[16], vendor[16];
+    int have_t = 0, have_v = 0;   /* 0 unseen, 1 a string, 2 something else */
+    size_t tlen = 0, vlen = 0, len;
+    rj_ws(&r);
+    while (s[r.i] != '}') {
+        size_t k0 = r.i + 1;
+        rj_string(&r, NULL, 0, &len);
+        size_t kraw = r.i - 1 - k0;
+        bool is_t = kraw == 9 && memcmp(s + k0, "type_name", 9) == 0;
+        bool is_v = kraw == 11 && memcmp(s + k0, "vendor_name", 11) == 0;
+        rj_ws(&r);
+        r.i++;   /* ':' */
+        rj_ws(&r);
+        if (is_t && !have_t) have_t = s[r.i] == '"' && rj_string(&r, type, sizeof type, &tlen) ? 1 : (rj_value(&r), 2);
+        else if (is_v && !have_v) have_v = s[r.i] == '"' && rj_string(&r, vendor, sizeof vendor, &vlen) ? 1 : (rj_value(&r), 2);
+        else rj_value(&r);
+        rj_ws(&r);
+        if (s[r.i] == ',') { r.i++; rj_ws(&r); }
+    }
+    if (have_v != 1 || vlen != 6 || memcmp(vendor, "DuckDB", 6) != 0 || have_t != 1) return 0;
+    if (tlen == 7 && memcmp(type, "hugeint", 7) == 0) return 1;
+    if (tlen == 8 && memcmp(type, "uhugeint", 8) == 0) return 2;
+    return 0;
+}
+
+static void fuzz_opaque(const unsigned char *data, size_t size)
+{
+    CHECK(zu_opaque_duckdb_type((const char *)data, size) == ref_opaque(data, size));
+}
+
+/* ---- the decimal format string -------------------------------------------- */
+
+/* The C Data Interface's "d:P,S" or "d:P,S,N", each a run of decimal
+   digits; a value past ZU_FORMAT_NUMBER_MAX reads as that. */
+static bool ref_format_number(const char *s, size_t *i, int *v)
+{
+    size_t from = *i;
+    while (s[*i] == '0') (*i)++;
+    size_t sig = *i;
+    while (s[*i] >= '0' && s[*i] <= '9') (*i)++;
+    if (*i == from) return false;
+    if (*i - sig > 6) { *v = ZU_FORMAT_NUMBER_MAX; return true; }
+    long acc = 0;
+    for (size_t k = sig; k < *i; k++) acc = acc * 10 + (s[k] - '0');
+    *v = acc > ZU_FORMAT_NUMBER_MAX ? ZU_FORMAT_NUMBER_MAX : (int)acc;
+    return true;
+}
+
+static bool ref_format(const char *s, int *p, int *sc, int *bits)
+{
+    size_t i = 2;
+    if (strncmp(s, "d:", 2) != 0) return false;
+    if (!ref_format_number(s, &i, p) || s[i++] != ',' || !ref_format_number(s, &i, sc)) return false;
+    *bits = 128;
+    if (s[i] == ',') {
+        i++;
+        if (!ref_format_number(s, &i, bits)) return false;
+    }
+    return s[i] == '\0';
+}
+
+static void fuzz_format(const unsigned char *data, size_t size)
+{
+    /* as given, and after "d:", the input up to its first NUL */
+    char *f = malloc(size + 3);
+    if (f == NULL) return;
+    for (int pass = 0; pass < 2; pass++) {
+        size_t off = pass ? 2 : 0;
+        memcpy(f, "d:", off);
+        memcpy(f + off, data, size);
+        f[off + size] = '\0';
+        int gp = -1, gs = -1, gb = -1, rp = -2, rs = -2, rb = -2;
+        bool got = zu_decimal_format(f, &gp, &gs, &gb), want = ref_format(f, &rp, &rs, &rb);
+        CHECK(got == want);
+        if (got) CHECK(gp == rp && gs == rs && gb == rb);
+    }
+    free(f);
 }
 
 /* ---- DECIMAL text ---------------------------------------------------------- */
@@ -433,6 +708,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     if (size) memcpy(copy, data, size);
     fuzz_parse(copy, size);
     fuzz_metadata(copy, size);
+    fuzz_opaque(copy, size);
+    fuzz_format(copy, size);
     fuzz_decimal_contract();
     fuzz_decimal(copy, size);
     free(copy);

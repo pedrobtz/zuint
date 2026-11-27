@@ -94,10 +94,20 @@ zu_mean <- function(x, trim = 0, na.rm = FALSE, ...) {
       call = sys.call()
     )
   }
-  .Call(zu_mean_c, x, zu_code(x), isTRUE(na.rm))
+  zu_mean_scaled(x, na.rm, 0L)
+}
+
+# The exact mean divided by 10^scale, rounded once to a double: a decimal's
+# mean is its coefficients' at its scale.
+zu_mean_scaled <- function(x, na.rm, scale) {
+  .Call(zu_mean_c, x, zu_code(x), isTRUE(na.rm), as.integer(scale))
 }
 
 zu_median <- function(x, na.rm = FALSE, ...) {
+  zu_median_scaled(x, na.rm, 0L)
+}
+
+zu_median_scaled <- function(x, na.rm, scale) {
   if (anyNA(x)) {
     if (!na.rm) {
       return(NA_real_)
@@ -110,7 +120,7 @@ zu_median <- function(x, na.rm = FALSE, ...) {
   }
   s <- zu_sort(x)
   mid <- s[c((n + 1L) %/% 2L, (n + 2L) %/% 2L)]
-  zu_mean(mid)
+  zu_mean_scaled(mid, FALSE, scale)
 }
 
 # Values sorted in C, with the NAs put back as na.last says. Names follow

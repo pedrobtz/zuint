@@ -1058,13 +1058,21 @@ dec_any_duplicated <- function(
   if (any(d)) which(d)[[if (fromLast) sum(d) else 1L]] else 0L
 }
 
-# The mean of the coefficients, then the scale: DuckDB's avg() is a double.
+# The exact mean of the values, rounded once: DuckDB's avg() is a double,
+# within an ulp or two of it (design 2.2).
 dec_mean <- function(x, trim = 0, na.rm = FALSE, ...) {
-  zu_mean(dec_view(x), trim = trim, na.rm = na.rm) / 10^dec_s(x)
+  if (!identical(trim, 0) && !identical(trim, 0L)) {
+    zu_abort(
+      "mean() with `trim` is not supported for zuint vectors.",
+      "unsupported",
+      call = sys.call()
+    )
+  }
+  zu_mean_scaled(dec_view(x), na.rm, dec_s(x))
 }
 
 dec_median <- function(x, na.rm = FALSE, ...) {
-  zu_median(dec_view(x), na.rm = na.rm) / 10^dec_s(x)
+  zu_median_scaled(dec_view(x), na.rm, dec_s(x))
 }
 
 # min() or max() of values that are not all NA.

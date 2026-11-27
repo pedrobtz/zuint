@@ -247,6 +247,14 @@ duck_receive <- function(con, tables, queries) {
   })
 }
 
+# DuckDB's answer to `expr` over column `x` of an Arrow IPC stream, which
+# it reads through arrow, or "ERROR" when either refuses the stream.
+duck_ipc <- function(con, bytes, expr) {
+  engine_answer(list("ipc", con$setup, bytes, expr), function(live) {
+    live$over_ipc(con$db, bytes, expr)
+  })
+}
+
 # ---- Arrow and Parquet ---------------------------------------------------------
 
 # A check that runs in the arrow package on a data frame zuint wrote through
