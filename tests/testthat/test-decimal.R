@@ -69,17 +69,20 @@ test_that("decimal128() casts integers, doubles and decimals as DuckDB does", {
       sprintf("TRY_CAST(x AS DECIMAL(%d, %d))::VARCHAR", p, s)
     )
     expect_identical(as.character(x), duck, label = paste(label, "integer"))
+    # In hex, so that every platform has the same doubles: R on macOS arm64
+    # has no long double, and its parser rounds a decimal like 1e30 to a
+    # neighbouring double.
     d <- c(
       0,
       -0.5,
-      2.675,
-      1.005,
+      0x1.5666666666666p+1, # 2.675
+      0x1.0147ae147ae14p+0, # 1.005
       0.125,
-      123.456,
-      -99.995,
+      0x1.edd2f1a9fbe77p+6, # 123.456
+      -0x1.8ffae147ae148p+6, # -99.995
       1e10,
-      1e30,
-      -1e37,
+      0x1.93e5939a08ceap+99, # 1e30
+      -0x1.e17b84357691bp+122, # -1e37
       NA
     )
     x <- suppressWarnings(decimal128(d, p, s))
