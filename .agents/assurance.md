@@ -40,6 +40,12 @@ One row per boundary the package crosses. An oracle knows the answer:
 
 "No crash" is not an oracle.
 
+DuckDB 2.0.1's, arrow's and nanoarrow's answers below are recorded, not
+asked live: the tests replay them from `tests/testthat/fixtures/engines.rds`
+(`helper-engines.R`), keyed by the query, the inputs and the fingerprint of
+what zuint wrote, so a changed output finds no answer and fails. The
+fixture's own row is the last one.
+
 <!-- markdownlint-disable MD013 -->
 | Boundary | Oracle | Carried by |
 | -------- | ------ | ---------- |
@@ -62,6 +68,7 @@ One row per boundary the package crosses. An oracle knows the answer:
 | DECIMAL to and from double | reference implementation: DuckDB's casts, bit for bit; Python's correctly rounded division, and zufast's correctly rounded parser under the fuzzer | tests/testthat/test-fixed.R, tools/fixed/diff.py, tools/fuzz/harness.c |
 | `zuint_api_v1`, the C table | the other side: `zuint.h` compiles alone with no R headers; a translation unit resolves the table through `zuint-r.h`; the C binary calls it with no R in the process, from 8 threads at once against one | tests/testthat/test-fixed.R, tools/fixed/fixed.c |
 <!-- markdownlint-enable MD013 -->
+| recorded engine answers (`engines.rds`) | reference implementation: the live DuckDB, arrow and nanoarrow, recorded afresh and compared answer by answer; two recordings are identical | .github/workflows/oracle.yaml, tools/oracle/compare.R |
 
 ## Objects
 
