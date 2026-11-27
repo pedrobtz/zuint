@@ -1,0 +1,5 @@
+source("helper.R")
+print(zuarrow::arrow_registry())
+print(args(zuarrow::arrow_to_r)); print(ls("package:zuarrow") -> x)
+a <- mk(na_int64(), bytes(c("1","-1","-9223372036854775807","9223372036854775807"), 8), 4)
+show(try_(zuarrow::arrow_to_r(a)))

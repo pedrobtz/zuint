@@ -1,0 +1,6 @@
+source("pre.R")
+s <- decimal128(c("0.5", "1.5", "2.5"), 5, 1)
+P(is.unsorted(s)); P(is.unsorted(rev(s))); P(is.unsorted(s, strictly = TRUE)); P(all(s[-1] >= s[-3]))
+P(is.unsorted(int128(1:3))); P(is.unsorted(int64(1:3))); P(is.unsorted(int64(3:1)))
+P(is.unsorted(decimal128(c("1","2","3"), 5, 0))); P(is.unsorted(decimal128(c("3","2","1"), 5, 0)))
+print(base::is.unsorted)

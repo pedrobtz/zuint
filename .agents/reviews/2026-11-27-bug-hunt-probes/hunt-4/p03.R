@@ -1,0 +1,22 @@
+source("helper.R")
+protos <- list(none = NULL, int64 = int64(), uint64 = uint64(), int128 = int128(), uint128 = uint128())
+run <- function(label, f, lossy = c("error")) {
+  cat("==", label, "\n")
+  for (p in names(protos)) for (l in lossy) { cat(" to", p, "lossy", l, ":"); r <- try_(zuarrow::arrow_to_r(f(), to = protos[[p]], lossy = l)); if (!is.null(r)) show(r) }
+}
+all4 <- c("error","warn","character","allow")
+run("i with INT32_MIN", function() mk(na_int32(), bytes(c("-2147483648","5"), 4), 2), all4)
+run("d:38,0", function() mk(na_decimal128(38, 0), bytes(c("1","-1","99999999999999999999999999999999999999","170141183460469231731687303715884105727","-170141183460469231731687303715884105727"), 16), 5))
+run("d:38,0 sentinel", function() mk(na_decimal128(38, 0), bytes(c("1","-170141183460469231731687303715884105728"), 16), 2), all4)
+run("d:10,2 (1.50, -0.01)", function() mk(na_decimal128(10, 2), bytes(c("150","-1"), 16), 2))
+run("d:5,0", function() mk(na_decimal128(5, 0), bytes(c("150","-1"), 16), 2))
+run("d:38,0,256", function() mk(na_decimal256(38, 0), bytes(c("150","-1"), 32), 2))
+run("hugeint", function() mk(opaque("hugeint"), bytes(c("1","-1","170141183460469231731687303715884105727","-170141183460469231731687303715884105727"), 16), 4))
+run("uhugeint", function() mk(opaque("uhugeint"), bytes(c("1","340282366920938463463374607431768211454","170141183460469231731687303715884105728"), 16), 3))
+run("hugeint sentinel", function() mk(opaque("hugeint"), bytes(c("1","-170141183460469231731687303715884105728"), 16), 2), all4)
+run("uhugeint sentinel", function() mk(opaque("uhugeint"), bytes(c("1","340282366920938463463374607431768211455"), 16), 2), all4)
+run("L sentinel", function() mk(na_uint64(), bytes(c("1","18446744073709551615"), 8), 2), all4)
+run("l sentinel", function() mk(na_int64(), bytes(c("1","-9223372036854775808"), 8), 2), all4)
+run("double", function() as_nanoarrow_array(c(1.5, 2^53, 2^63, -1, NA, Inf)))
+run("string", function() as_nanoarrow_array(c("12", "x", "18446744073709551615", NA)))
+run("bool", function() as_nanoarrow_array(c(TRUE, NA)))

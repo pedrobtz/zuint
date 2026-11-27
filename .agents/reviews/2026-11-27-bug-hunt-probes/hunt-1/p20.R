@@ -1,0 +1,11 @@
+source("pre.R")
+x <- decimal128(c(rep("0.02", 600000), rep("-0.03", 399999)), 5, 2)
+m <- mean(x); true <- 3 / 999999 / 100
+cat(sprintf("mean %.17g  true %.17g  rel.err %.3g  ulps %.0f\n", m, true, (m - true) / true, (m - true) / (2^(floor(log2(true)) - 52))))
+cat(sprintf("as.double(sum(x))/n: %.17g\n", as.double(sum(x)) / length(x)))
+con <- duck(); duckdb::duckdb_register(con, "t", data.frame(v = as.double(x)))
+cat(sprintf("duckdb avg(v::DECIMAL(5,2)): %.17g\n", DBI::dbGetQuery(con, "SELECT avg(v::DECIMAL(5,2)) FROM t")[[1]]))
+y <- decimal128(c("0.02", "0.02", "-0.03"), 5, 2); cat(sprintf("n=3: %.17g vs %.17g\n", mean(y), 0.01/3))
+z <- decimal128(c(rep("5", 6), rep("-5", 5), "-4"), 5, 0); cat(sprintf("n=12 sum=1: %.17g vs %.17g\n", mean(z), 1/12))
+i <- int128(c(rep(2, 600000), rep(-3, 399999))); cat(sprintf("int128 mean %.17g true %.17g\n", mean(i), 3/999999))
+cat(sprintf("median of two: %.17g\n", median(decimal128(c("0.01","0.02"), 5, 2))))

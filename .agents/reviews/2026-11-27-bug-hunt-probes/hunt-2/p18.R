@@ -1,0 +1,6 @@
+source("pre.R")
+T(format(1234567L, big.mark = ".")); options(OutDec = ","); T(format(1234567L, big.mark = ".")); T(format(int64(1234567), big.mark = "."))
+options(OutDec = ".")
+T(mean(int64(rep("9007199254740993", 3))) > max(as.double(int64("9007199254740992")) + 1)); T(format(mean(int64(rep("9007199254740993", 3))), digits = 17)); T(mean(int64(rep("9007199254740993", 3))) > int64("9007199254740993"))
+T(format(mean(uint64(c("4294967296", "10", "114477108840258782"))), digits = 17)); T(format(mean(int128(c(0, 2, 3))), digits = 17)); T(format(mean(c(0, 2, 3)), digits = 17)); T(mean(int128(c(0, 2, 3))) == mean(int64(c(0, 2, 3))))
+T(names(!c(a = int64(1)))); T(names(!c(a = 1L)))

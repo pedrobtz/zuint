@@ -1,0 +1,8 @@
+loadNamespace("zuarrow"); library(nanoarrow)
+print(zuarrow:::zar_element_lengths)
+zuarrow::arrow_register("i", to = function(array, schema, lossy) structure(zuarrow::arrow_to_r(array), class = "toy"), from = function(x) as_nanoarrow_array(unclass(x)), class = "toy", package = "base")
+c.toy <- function(...) structure(unlist(lapply(list(...), unclass)), class = "toy")
+df <- data.frame(k = 1:2); df$l <- list(structure(1:2, class = "toy"), structure(3L, class = "toy"))
+r <- tryCatch(zuarrow::arrow_write(df, NULL, format = "stream"), error = function(e) conditionMessage(e)); print(if (is.raw(r)) "ok" else r)
+df2 <- data.frame(k = 1:3); df2$v <- structure(1:3, class = "toy"); r <- tryCatch(zuarrow::arrow_write(df2, NULL, format = "stream"), error = function(e) conditionMessage(e)); print(if (is.raw(r)) "ok" else r)
+cat("zuint not loaded:", !"zuint" %in% loadedNamespaces(), "\n")
