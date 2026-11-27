@@ -287,6 +287,12 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   the key), fails with "no recorded engine answer" until
   `tools/oracle/record` is run and the fixture committed. Recording draws no
   random numbers, so two recordings are identical.
+- **An engine call's inputs must be the same bits on every platform,** or
+  CI finds no recorded answer. The key holds numbers as their bytes, since
+  `sprintf("%a")` writes a subnormal differently on glibc and macOS, and an
+  int64 payload is one. Write a test's doubles in hex where a decimal
+  literal could round differently: R on macOS arm64 has no long double,
+  and its parser read `1e30` as a neighbouring double.
 - **`xtfrm()` must return exact integer ranks.** Base `order()`, `rank()`
   and `sort()` on several keys go through it; a double proxy would tie
   values beyond 2^53. `match()`, `%in%` and `table()` go through `mtfrm()`,
