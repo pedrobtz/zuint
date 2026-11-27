@@ -41,8 +41,9 @@ engine_fixture <- function() {
   engine_state$fixture
 }
 
-# Text that determines a value exactly: doubles in hex, strings with their
-# lengths, zuint vectors by class and bits.
+# Text that determines a value exactly and is the same on every platform:
+# numbers by their bytes, strings with their lengths, zuint vectors by class
+# and text.
 engine_canon <- function(x) {
   if (inherits(x, "zu_decimal")) {
     return(paste0(
@@ -80,12 +81,21 @@ engine_canon <- function(x) {
       ifelse(is.na(x), "NA", paste0(nchar(x, "bytes"), ":", enc2utf8(x))),
       collapse = ","
     )
-  } else if (is.double(x)) {
-    paste(ifelse(is.na(x), "NA", sprintf("%a", x)), collapse = ",")
   } else if (is.raw(x)) {
     paste(as.character(x), collapse = "")
+  } else if (is.atomic(x)) {
+    # the bits, little-endian: the same on every platform, where sprintf("%a")
+    # writes a subnormal differently on glibc and macOS
+    if (is.factor(x)) {
+      return(paste0("factor", engine_canon(as.character(x))))
+    }
+    v <- as.vector(unclass(x))
+    paste(
+      as.character(writeBin(v, raw(), endian = "little")),
+      collapse = ""
+    )
   } else {
-    paste(as.character(x), collapse = ",")
+    stop("engine_canon() cannot key a ", typeof(x))
   }
   paste0(typeof(x), length(x), "(", body, ")")
 }
