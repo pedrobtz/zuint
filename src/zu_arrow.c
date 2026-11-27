@@ -167,6 +167,21 @@ SEXP zu_arrow_type_c(SEXP schema)
     return t ? Rf_ScalarInteger(t) : Rf_ScalarString(Rf_mkChar(why));
 }
 
+/* For the tests: the type a schema with this format and no metadata maps
+   to, so a format no Arrow library will build (decimal128 precision 39)
+   can be classified. The schema lives on the stack for the call. */
+SEXP zu_arrow_format_type_c(SEXP format)
+{
+    if (!Rf_isString(format) || XLENGTH(format) != 1 || STRING_ELT(format, 0) == NA_STRING)
+        Rf_error("zuint: `format` must be a string");
+    struct ArrowSchema s;
+    memset(&s, 0, sizeof s);
+    s.format = CHAR(STRING_ELT(format, 0));
+    const char *why;
+    int t = zu_schema_type(&s, &why);
+    return t ? Rf_ScalarInteger(t) : Rf_ScalarString(Rf_mkChar(why));
+}
+
 /* The schema's format string, for messages. */
 SEXP zu_arrow_format_c(SEXP schema)
 {
