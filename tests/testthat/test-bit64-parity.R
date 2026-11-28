@@ -50,7 +50,7 @@ test_that("decimal128 behaves the same with bit64 attached and absent", {
   expect_true(length(res$attached$value) > 20)
 })
 
-test_that("every base generic bit64 has an integer64 method for has a zu_int64 method", {
+test_that("every base generic bit64 has an integer64 method for has a zu_int64 method (#33)", {
   skip_if_not_installed("bit64")
   ns <- asNamespace("bit64")
   generics <- unique(sub(
@@ -156,7 +156,7 @@ test_that("the bit64-shadowed predicates and conversions agree with bit64 absent
   expect_bit64_parity("predicates")
 })
 
-test_that("a plain integer64 on the left of a wider type is exact or NA, never truncated", {
+test_that("a plain integer64 on the left of a wider type is exact or NA, never truncated (#26)", {
   skip_if_not_installed("bit64")
   withr::local_package("bit64")
   big <- bit64::as.integer64("9007199254740993")

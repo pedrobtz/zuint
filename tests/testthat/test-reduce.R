@@ -23,6 +23,18 @@ test_that("sum is type stable: exact, or NA with a warning when it does not fit"
       expect_warning(r <- sum(x), class = "zuint_overflow_warning")
       expect_identical(r, zu_na(type), label = type)
     }
+    # both branches for every type, whatever the seeded fill above did
+    mx <- as.character(oracle_range(type)$max)
+    expect_identical(
+      as.character(sum(zu_ctor(type)(c(mx, "0")))),
+      mx,
+      label = type
+    )
+    expect_warning(
+      r <- sum(zu_ctor(type)(c(mx, mx))),
+      class = "zuint_overflow_warning"
+    )
+    expect_identical(r, zu_na(type), label = type)
     small <- zu_ctor(type)(c(1, 2, NA, 3))
     expect_identical(sum(small), zu_ctor(type)(NA), label = type)
     expect_identical(sum(small, na.rm = TRUE), zu_ctor(type)(6), label = type)
@@ -140,7 +152,7 @@ test_that("mean and median are the exact value, rounded once (#148)", {
   # random vectors across each type's whole range, against gmp's exact
   # rational, correctly rounded
   for (type in zu_all_types) {
-    for (k in 1:60) {
+    for (k in test_thin(1:60, 6L)) {
       v <- oracle_random(type, 2L + k %% 9L, seed = k)
       x <- zu_ctor(type)(v)
       expect_identical(mean(x), oracle_mean(v), label = paste(type, k))
@@ -166,11 +178,15 @@ test_that("mean and median are the exact value, rounded once (#148)", {
   u <- uint64(c("18446744073709551614", "18446744073709551612"))
   expect_identical(mean(u), oracle_mean(as.character(u)))
   expect_identical(median(u), oracle_mean(as.character(u)))
-  # a small total over a large n, where the remainder is all there is
+  # a small total over a large n, where the remainder is all there is (a
+  # million values; a thousand under gctorture, which marks every one on each
+  # collection)
+  n_up <- test_size(600000L, 600L)
+  n_down <- test_size(399999L, 399L)
   for (type in c("int64", "int128")) {
-    v <- c(rep("2", 600000), rep("-3", 399999))
+    v <- c(rep("2", n_up), rep("-3", n_down))
     expect_identical(mean(zu_ctor(type)(v)), oracle_mean(v), label = type)
-    v <- c(rep("-2", 600000), rep("3", 399999))
+    v <- c(rep("-2", n_up), rep("3", n_down))
     expect_identical(mean(zu_ctor(type)(v)), oracle_mean(v), label = type)
   }
   expect_identical(mean(int128(c(0, 2, 3))), oracle_mean(c("0", "2", "3")))
@@ -181,7 +197,7 @@ test_that("mean and median are the exact value, rounded once (#148)", {
   for (type in c("int64", "int128", "uint128")) {
     h <- half[[if (type == "int64") 1L else 2L]]
     up <- as.character(gmp::as.bigz(h) + 1)
-    v <- c(rep(h, 2999), up)
+    v <- c(rep(h, test_size(2999L, 299L)), up)
     expect_identical(mean(zu_ctor(type)(v)), oracle_mean(v), label = type)
     expect_gt(mean(zu_ctor(type)(v)), as.double(gmp::as.bigz(h)))
     if (type != "uint128") {
@@ -200,8 +216,10 @@ test_that("mean and median are the exact value, rounded once (#148)", {
 
 test_that("a decimal's mean and median are the exact value, rounded once (#148)", {
   skip_if_not_installed("gmp")
-  x <- decimal128(c(rep("0.02", 600000), rep("-0.03", 399999)), 5, 2)
-  coefs <- c(rep("2", 600000), rep("-3", 399999))
+  n_up <- test_size(600000L, 600L)
+  n_down <- test_size(399999L, 399L)
+  x <- decimal128(c(rep("0.02", n_up), rep("-0.03", n_down)), 5, 2)
+  coefs <- c(rep("2", n_up), rep("-3", n_down))
   expect_identical(mean(x), oracle_mean(coefs, 2L))
   for (type in list(
     c(5L, 2L),
@@ -212,7 +230,7 @@ test_that("a decimal's mean and median are the exact value, rounded once (#148)"
   )) {
     p <- type[[1L]]
     s <- type[[2L]]
-    for (k in 1:10) {
+    for (k in test_thin(1:10, 4L)) {
       coefs <- fx_coefs(3L + k, p, seed = 100L * p + k)
       x <- decimal128(fx_format(coefs, p, s), p, s)
       label <- sprintf("DECIMAL(%d, %d) %d", p, s, k)
@@ -299,7 +317,7 @@ test_that("the 64-bit sum is exact at the edges of the range", {
   }
 })
 
-test_that("seq_zu runs downwards in unsigned types and across whole ranges", {
+test_that("seq_zu runs downwards in unsigned types and across whole ranges (#31)", {
   expect_identical(
     seq_zu(uint64(10), uint64(1), by = -3L),
     uint64(c(10, 7, 4, 1))
@@ -316,7 +334,7 @@ test_that("seq_zu runs downwards in unsigned types and across whole ranges", {
     up <- seq_zu(
       zu_ctor(type)(lo),
       zu_ctor(type)(hi),
-      by = zu_ctor(if (type %in% c("int64", "int128")) type else type)(half)
+      by = zu_ctor(type)(half)
     )
     expect_identical(
       as.character(up),
@@ -357,17 +375,6 @@ test_that("seq_zu runs downwards in unsigned types and across whole ranges", {
 test_that("mean with trim is unsupported rather than ignored", {
   expect_error(mean(int64(1:4), trim = 0.1), class = "zuint_unsupported_error")
   expect_identical(mean(int64(1:4), trim = 0), 2.5)
-})
-
-test_that("short and long sorts agree", {
-  withr::local_seed(3)
-  v <- c(round(runif(70000, -2^52, 2^52)), NA)
-  x <- int64(v)
-  expect_identical(as.double(sort(x)), sort(v))
-  expect_identical(
-    as.double(sort(x[1:50], decreasing = TRUE)),
-    sort(v[1:50], decreasing = TRUE)
-  )
 })
 
 test_that("range()'s finite is an argument, not data (#56)", {
@@ -477,8 +484,8 @@ test_that("seq_zu() and seq() agree with base seq() on small integers (#159)", {
     mk <- zu_ctor(type)
     signed <- !grepl("^u", type)
     ends <- if (signed) c(-3, 0, 1, 4, 10) else c(0, 1, 4, 10)
-    for (f in c(0, 1, 4, 10)) {
-      for (t in ends) {
+    for (f in test_thin(c(0, 1, 4, 10), 3L)) {
+      for (t in test_thin(ends, 2L)) {
         # to alone: the step defaults to 1, or -1 when to is below from
         expect_identical(
           as.double(seq(mk(f), mk(t))),

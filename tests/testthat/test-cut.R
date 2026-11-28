@@ -11,7 +11,7 @@ test_that("cut() agrees with base cut() where the values are exact", {
     }
     xi <- x_int[keep]
     x <- ctor(xi)
-    for (b in breaks_set) {
+    for (b in test_thin(breaks_set, 2L)) {
       for (right in c(TRUE, FALSE)) {
         for (lowest in c(TRUE, FALSE)) {
           label <- paste(type, paste(b, collapse = ","), right, lowest)

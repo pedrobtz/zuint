@@ -2,7 +2,7 @@
 
 test_that("+, -, *, %/% and %% are exact or NA with a warning, for every kind pair", {
   for (ka in zu_all_kinds) {
-    for (kb in zu_all_kinds) {
+    for (kb in test_thin(zu_all_kinds, 2L)) {
       if (ka == "integer" && kb == "integer") {
         next
       }
@@ -40,7 +40,7 @@ test_that("+, -, *, %/% and %% are exact or NA with a warning, for every kind pa
 
 test_that("checked_* errors exactly when a result is out of range", {
   for (ka in zu_all_kinds) {
-    for (kb in zu_all_types) {
+    for (kb in test_thin(zu_all_types, 2L)) {
       type <- oracle_common(ka, kb)
       if (is.na(type)) {
         next
@@ -79,7 +79,7 @@ test_that("checked_* errors exactly when a result is out of range", {
 
 test_that("wrapping_* computes modulo 2^width, with the NA pattern as NA", {
   for (ka in zu_all_kinds) {
-    for (kb in zu_all_types) {
+    for (kb in test_thin(zu_all_types, 2L)) {
       type <- oracle_common(ka, kb)
       if (is.na(type)) {
         next
@@ -373,7 +373,7 @@ test_that("c() takes the common type", {
   expect_identical(is.na(y), c(FALSE, TRUE))
 })
 
-test_that("round and signif with negative digits round half to even, as base R", {
+test_that("round and signif with negative digits round half to even, as base R (#28)", {
   withr::local_seed(17)
   v <- c(
     round(runif(200, -1e15, 1e15)),
@@ -420,7 +420,7 @@ test_that("round and signif with negative digits round half to even, as base R",
   expect_error(round(int64(1), c(1, 2)), class = "zuint_type_error")
 })
 
-test_that("checked_idiv and checked_mod error on a zero divisor", {
+test_that("checked_idiv and checked_mod error on a zero divisor (#32)", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(7, 9))
     expect_identical(checked_idiv(x, 2L), zu_ctor(type)(c(3, 4)), label = type)
@@ -548,7 +548,7 @@ test_that("Ops and Math keep the names of a named operand, as base R does (#164)
   )
   # the oracle: base R on the same values as integers
   v <- c(a = 1L, b = 2L)
-  for (type in zu_vector_types) {
+  for (type in test_thin(zu_vector_types, 2L)) {
     x <- zu_ctor(type)(v)
     names(x) <- names(v)
     for (op in ops) {

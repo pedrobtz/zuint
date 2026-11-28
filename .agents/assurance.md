@@ -84,7 +84,7 @@ cannot apply.
 <!-- markdownlint-disable MD013 -->
 | Object | Sequences | Fork | Unwind | Owner |
 | ------ | --------- | ---- | ------ | ----- |
-| exported Arrow array and schema (`zu_to_arrow_c()`) | tests/testthat/test-arrow.R: read after release is a `zuint_arrow_error`, release runs once, collection releases | n/a: plain `malloc` buffers with no PID-bound resource, which a fork copies | gap #91 | tests/testthat/test-arrow.R: the finalizer releases unless a consumer moved the struct out, counted by `zu_arrow_releases_c()` |
+| exported Arrow array and schema (`zu_to_arrow_c()`) | tests/testthat/test-arrow.R: read after release is a `zuint_arrow_error`, release runs once, collection releases | n/a: plain `malloc` buffers with no PID-bound resource, which a fork copies | gap #91 | tests/testthat/test-arrow.R: the finalizer releases unless a consumer moved the struct out, counted by `zu_arrow_releases_c()`, the array's and its schema's, exactly once each (#73) |
 <!-- markdownlint-enable MD013 -->
 
 ## Limits

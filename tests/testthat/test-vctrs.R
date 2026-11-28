@@ -118,7 +118,7 @@ test_that("slots vctrs creates are the type's NA, never R's NA bits", {
   )
 })
 
-test_that("vctrs padding, unmatched rows, lag and if_else give NA", {
+test_that("vctrs padding, unmatched rows, lag and if_else give NA (#25)", {
   skip_if_not_installed("vctrs")
   skip_if_not(exists("vec_case_when", asNamespace("vctrs")))
   for (type in zu_all_types) {
@@ -146,7 +146,7 @@ test_that("vctrs padding, unmatched rows, lag and if_else give NA", {
   }
 })
 
-test_that("zu_ifelse keeps the names of test", {
+test_that("zu_ifelse keeps the names of test (#35)", {
   expect_identical(
     zu_ifelse(c(a = TRUE, b = FALSE), int64(1), int64(2)),
     int64(c(a = 1, b = 2))
@@ -169,5 +169,28 @@ test_that("vctrs casts zuint vectors to double and integer exactly or not at all
   expect_error(
     vctrs::vec_cast(int64(2^40), integer()),
     class = "vctrs_error_cast_lossy"
+  )
+})
+
+test_that("vctrs methods register whichever of vctrs and zuint loads first (#82)", {
+  skip_on_cran()
+  skip_if_not_installed("vctrs")
+  probe <- c(
+    "ok <- tryCatch(",
+    "  inherits(vctrs::vec_c(zuint::int64(1), 2L), 'zu_int64'),",
+    "  error = function(e) FALSE",
+    ")",
+    "cat(ok)"
+  )
+  loader <- zuint_loader()
+  # zuint first: the hook on vctrs' load registers the methods
+  expect_identical(
+    fresh_r(c(loader, probe)),
+    "TRUE"
+  )
+  # vctrs first: zuint's .onLoad finds it loaded and registers at once
+  expect_identical(
+    fresh_r(c("invisible(loadNamespace('vctrs'))", loader, probe)),
+    "TRUE"
   )
 })

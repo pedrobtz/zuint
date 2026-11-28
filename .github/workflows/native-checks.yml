@@ -29,6 +29,21 @@ jobs:
       r-version: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'full-ci') && 'release' || 'devel' }}
       profile: auto
 
+  # zufast's portable fallback (ZUF_NO_INT128) under UBSan and ASan, as
+  # R-CMD-check.yaml's no-int128 job builds it: the fallback paths of
+  # zu_arith.c and zu_reduce.c ran under no sanitizer before (#134). Full
+  # profile only: a manual dispatch and a pull request labelled `full-ci`.
+  sanitizers-no-int128:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+    uses: pedrobtz/r-actions/.github/workflows/sanitizers.yml@v1
+    with:
+      asan: true
+      r-version: devel
+      profile: auto
+      env: |
+        ZUINT_CPPFLAGS=-DZUF_NO_INT128
+        ZUINT_EXPECT_INT128=false
+
   valgrind:
     uses: pedrobtz/r-actions/.github/workflows/valgrind.yml@v1
     with:

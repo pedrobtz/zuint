@@ -155,3 +155,14 @@ test_that("sort() keeps names under every na.last, and unique() its options (#64
     expect_identical(as.double(unique(x)), unique(unname(v)), label = type)
   }
 })
+
+test_that("short and long sorts agree", {
+  withr::local_seed(3)
+  v <- c(round(runif(70000, -2^52, 2^52)), NA)
+  x <- int64(v)
+  expect_identical(as.double(sort(x)), sort(v))
+  expect_identical(
+    as.double(sort(x[1:50], decreasing = TRUE)),
+    sort(v[1:50], decreasing = TRUE)
+  )
+})

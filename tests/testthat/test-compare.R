@@ -1,7 +1,7 @@
 test_that("comparison is exact across every pair of kinds", {
   ops <- c("==", "!=", "<", "<=", ">", ">=")
   for (ka in zu_all_kinds) {
-    for (kb in zu_all_kinds) {
+    for (kb in test_thin(zu_all_kinds, 2L)) {
       if (ka == "integer" && kb == "integer") {
         next
       }

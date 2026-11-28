@@ -46,6 +46,8 @@
 
 #define ZU_ARROW_FLAG_NULLABLE 2
 
+/* The big-endian branches below are not reachable on any machine CI
+   builds on (x86-64 and arm64 are little-endian), so no test runs them. */
 static int zu_little_endian(void)
 {
     const uint16_t one = 1;
@@ -321,8 +323,8 @@ SEXP zu_from_arrow_small_c(SEXP array, SEXP schema)
 
 /* ---- export ------------------------------------------------------------- */
 
-/* Release callbacks run, for the tests. Atomic: a consumer may call release
-   from any thread. */
+/* Release callbacks run (array and schema), for the tests. Atomic: a
+   consumer may call release from any thread. */
 static atomic_long zu_arrow_releases = 0;
 
 typedef struct {
@@ -350,6 +352,7 @@ static void zu_release_schema(struct ArrowSchema *s)
     s->private_data = NULL;
     s->metadata = NULL;
     s->release = NULL;
+    atomic_fetch_add(&zu_arrow_releases, 1);
 }
 
 static void zu_finalize_array(SEXP xp)

@@ -412,6 +412,14 @@ Add each new one when a stage establishes it.
   suite checks the vctrs calls dplyr makes, and pillar prints a `tbl`
   without tibble (`helper-pillar.R`); dplyr and data.table themselves run
   in CI's oracle job, from `tools/oracle/test-interop.R`.
+- **A test with a large input or a wide grid caps it under gctorture:**
+  `test_size(full, small)` and `test_thin(x, every)` in
+  `helper-gctorture.R` give the small form only when `gctorture2()` is on,
+  and `skip_if_gctorture()` skips a timing test. gctorture costs
+  allocations times the live heap, so a vector of a million strings or a
+  loop over every type pair is what dominates the job. Cap the size or skip
+  whole iterations, never change an engine query (the fixture is keyed by
+  it), and every other leg still runs the full size.
 - **The suite runs in about 10 seconds locally** (2026-10-16), most of it
   the bit64 processes.
 
@@ -423,9 +431,15 @@ The shared workflows this package calls:
   and a second job, `no-int128`, that builds zufast's portable fallback (see
   Commands).
 - `native-checks.yml`: `sanitizers.yml`, `valgrind.yml`, `lto.yml`,
-  `gctorture.yml` (step 20 with a 330-minute timeout: the full suite
-  passed 180 on 2026-11-26, `test-decimal.R` alone taking 84), `rchk.yml`, `analyzers.yml`, `cran-special.yml` and
-  `vendor.yml`. Until zufast 0.1.1 is on CRAN, `rchk.yml` installs it
+  `gctorture.yml` (step 20 with a 330-minute timeout, never raised: the full
+  suite passed 180 on 2026-11-26, and took 5h28m, 90 seconds under the
+  limit, on 2026-11-28 with 7,700 expectations; the large inputs and wide
+  grids now take their small form there, see Testing, and the log's
+  per-file times show where the rest goes), `rchk.yml`, `analyzers.yml`,
+  `cran-special.yml` and `vendor.yml`. A second `sanitizers.yml` call,
+  `sanitizers-no-int128`, runs UBSan and ASan over zufast's portable
+  fallback (`ZUINT_CPPFLAGS`, as `R-CMD-check.yaml`'s `no-int128`), in the
+  full profile only. Until zufast 0.1.1 is on CRAN, `rchk.yml` installs it
   through `github-packages`, because the rchk image ignores `Remotes:`.
 - `coverage.yaml`: `coverage.yml`, pinned to a commit, with its badge on
   `gh-pages` because `main` takes no direct pushes.

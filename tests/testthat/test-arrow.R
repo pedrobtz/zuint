@@ -181,7 +181,9 @@ test_that("an exported array is released when collected", {
   before <- settled_releases()
   a <- zu_arrow_from(int64(1:3))
   rm(a)
-  expect_gte(settled_releases() - before, 1)
+  # exactly one release of the array and one of its schema (#73): a double
+  # release would also move the count
+  expect_identical(settled_releases() - before, 2)
 })
 
 test_that("an exported array carries its schema in the r.h layout", {
@@ -201,7 +203,7 @@ test_that("a released or unreadable struct is a zuint_arrow_error", {
   expect_error(zu_arrow_from(1L), class = "zuint_arrow_error")
 })
 
-test_that("corrupt schema metadata reads as no metadata", {
+test_that("corrupt schema metadata reads as no metadata (#34)", {
   i32 <- function(v) {
     writeBin(as.integer(v), raw(), size = 4, endian = .Platform$endian)
   }
