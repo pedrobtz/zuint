@@ -249,7 +249,7 @@ zu_c <- function(...) {
     r <- zu_convert(args[[i]], kinds[[i]], code)
     if (kinds[[i]] == zu_kind_dbl && r[[2L]] > 0) {
       zu_double_problem(zu_types[[code]], call)
-      return(unlist(lapply(args, zu_dbl_quiet)))
+      return(do.call(c, lapply(args, dec_dbl_quiet)))
     }
     lost <- lost + r[[2L]]
     # bare, or c() below would dispatch back here

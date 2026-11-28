@@ -675,7 +675,11 @@ dec_binary <- function(op, e1, e2, call) {
     "%/%" = ,
     "^" = dec_in_double(op, e1, e2, call, check = FALSE),
     "&" = ,
-    "|" = get(op, baseenv())(dec_logical(e1), dec_logical(e2)),
+    "|" = {
+      out <- get(op, baseenv())(dec_logical(e1), dec_logical(e2))
+      names(out) <- zu_result_names(e1, e2, length(out))
+      out
+    },
     dec_compare(op, e1, e2, call)
   )
 }
