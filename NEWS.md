@@ -1,5 +1,9 @@
 # zuint 0.0.0.9000
 
+* A zuint class, or bit64's `integer64`, on the wrong storage type (an
+  `integer64` over an integer vector, say) is a `zuint_type_error` in the
+  constructors and every method, instead of an unclassed "corrupt payload"
+  error from the C code (#69, #81).
 * `cut()` of a zuint or decimal vector compares exactly against the breaks,
   zuint or numbers, with base's `labels`, `right`, `include.lowest` and
   `ordered_result`; the default labels write the breaks in full. A single
