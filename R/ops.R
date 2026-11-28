@@ -275,8 +275,9 @@ zu_divide <- function(x, y, call) {
 }
 
 # Exact when every exponent is a non-negative integer; anything else is
-# computed in double. The result type is the base's, or the common type
-# when the base is not a zuint vector.
+# computed in double under `^`, and refused under an explicit policy, whose
+# result is always a zuint vector (#67). The result type is the base's, or
+# the common type when the base is not a zuint vector.
 zu_pow <- function(x, y, policy, call) {
   kinds <- c(zu_kind(x), zu_kind(y))
   zu_check_operands(kinds, list(x, y), call)
@@ -291,6 +292,13 @@ zu_pow <- function(x, y, policy, call) {
     !isTRUE(any(zu_compare("<", y, 0L, call)))
   }
   if (!exact) {
+    if (policy != zu_policy_default) {
+      zu_abort(
+        "`y` must be whole and non-negative under an explicit overflow policy.",
+        "type",
+        call = call
+      )
+    }
     return(zu_in_double("^", x, y))
   }
   if (ky == zu_kind_dbl) {
@@ -357,12 +365,15 @@ zu_compare <- function(op, x, y, call) {
 #' `checked_mod()`, where it is an error of class `zuint_division_error`. `/` divides in double. `^` is exact
 #' for a non-negative integer exponent, however large (at or past the type's
 #' width, only the bases 0, 1 and -1 have an answer; any other overflows), and
-#' computed in double otherwise. `NA ^ 0` and `1 ^ NA` are 1, as in base R.
+#' computed in double otherwise. `checked_pow()` and `wrapping_pow()` have no
+#' double result: a negative or fractional exponent is an error of class
+#' `zuint_type_error`. `NA ^ 0` and `1 ^ NA` are 1, as in base R.
 #' Comparison is exact across all the types and doubles.
 #'
 #' @param x,y zuint vectors, or a zuint vector and a logical, integer or
 #'   double vector. They are recycled.
-#' @return A zuint vector of the common type.
+#' @return A zuint vector of the common type; for `checked_pow()` and
+#'   `wrapping_pow()`, of the base's type when the base is a zuint vector.
 #' @examples
 #' x <- int64("9223372036854775807")
 #' x + 1L

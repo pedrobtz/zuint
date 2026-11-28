@@ -1,5 +1,9 @@
 # zuint 0.0.0.9000
 
+* `checked_pow()` and `wrapping_pow()` refuse a negative or fractional
+  exponent with a `zuint_type_error`. They had computed in double, returning
+  `0.5` for `checked_pow(int64(2), -1L)` and rounding the exact elements
+  beside such an exponent. `^` still computes those in double (#67).
 * The Arrow import refuses an array whose offset and length would overflow
   the index or byte arithmetic with a `zuint_arrow_error`, instead of
   reading outside its buffers (#81).

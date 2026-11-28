@@ -628,7 +628,9 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
   Division by zero gives NA under every policy except `checked_`, which
   errors. `MIN %/% -1` cannot overflow because MIN is the NA sentinel.
 - **`^`** with a non-negative integer exponent stays exact; anything else gives
-  double.
+  double. `checked_pow()` and `wrapping_pow()` have no double result: a
+  negative or fractional exponent is a `zuint_type_error`, so an explicit
+  policy never returns a rounded value (decided 2026-11-28, #67).
 - **`^` with an exponent at or past the type's width, and with NA**
   (decided 2026-11-28, #158): an integral double exponent of any size,
   `Inf` included, never leaves the type. Every base but 0, 1 and -1 overflows

@@ -45,7 +45,8 @@ wrapping_neg(x)
 double vector. They are recycled.}
 }
 \value{
-A zuint vector of the common type.
+A zuint vector of the common type; for \code{checked_pow()} and
+\code{wrapping_pow()}, of the base's type when the base is a zuint vector.
 }
 \description{
 The operators \code{+}, \code{-}, \code{*}, \code{\%/\%}, \code{\%\%}, \code{^} and unary minus give \code{NA}
@@ -67,7 +68,9 @@ as in R; division by zero is \code{NA}, except in \code{checked_idiv()} and
 \code{checked_mod()}, where it is an error of class \code{zuint_division_error}. \code{/} divides in double. \code{^} is exact
 for a non-negative integer exponent, however large (at or past the type's
 width, only the bases 0, 1 and -1 have an answer; any other overflows), and
-computed in double otherwise. \code{NA ^ 0} and \code{1 ^ NA} are 1, as in base R.
+computed in double otherwise. \code{checked_pow()} and \code{wrapping_pow()} have no
+double result: a negative or fractional exponent is an error of class
+\code{zuint_type_error}. \code{NA ^ 0} and \code{1 ^ NA} are 1, as in base R.
 Comparison is exact across all the types and doubles.
 }
 \examples{

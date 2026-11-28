@@ -214,6 +214,40 @@ test_that("^ with a negative or fractional exponent is computed in double", {
   expect_identical(int128(2)^int64(c(-1, 2)), c(0.5, 4))
 })
 
+test_that("checked_pow() and wrapping_pow() refuse a negative or fractional exponent (#67)", {
+  bad <- list(
+    -1L,
+    -1,
+    0.5,
+    -0.5,
+    c(1, 0.5),
+    c(2L, -1L),
+    int64(c(2, -1)),
+    int128(-1)
+  )
+  for (type in zu_all_types) {
+    mk <- zu_ctor(type)
+    for (f in list(checked_pow, wrapping_pow)) {
+      for (e in bad) {
+        expect_error(
+          f(mk(c(2, 3)), e),
+          class = "zuint_type_error",
+          label = type
+        )
+      }
+      # whole exponents and NA keep working, as for ^
+      expect_identical(f(mk(c(2, 3)), c(2, NA)), mk(c(4, NA)), label = type)
+    }
+  }
+  # an integer base meeting a zuint exponent
+  expect_error(checked_pow(2L, int64(-1)), class = "zuint_type_error")
+  expect_error(wrapping_pow(2L, int128(-1)), class = "zuint_type_error")
+  # exactness the double path lost: 2^53 + 1 to the first power
+  x <- int64("9007199254740993")
+  expect_error(checked_pow(x, c(1, -1)), class = "zuint_type_error")
+  expect_identical(checked_pow(x, 1L), x)
+})
+
 test_that("/ divides in double", {
   expect_identical(int64(7) / 2L, 3.5)
   expect_identical(uint128(1) / uint128(0), Inf)
