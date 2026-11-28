@@ -6,10 +6,17 @@ test_that("zuarrow's registry lists zuint's entries once zuarrow loads", {
   skip_without_zuarrow()
   reg <- zuarrow::arrow_registry()
   reg <- reg[reg$package %in% "zuint", ]
-  expect_setequal(reg$key, c("l", "L", "arrow.opaque"))
+  expect_setequal(
+    reg$key,
+    c("l", "L", "arrow.opaque", "zuint.int128", "zuint.uint128")
+  )
   expect_true(all(reg$exact))
   classes <- stats::setNames(reg$class, reg$key)
-  expect_identical(classes[["arrow.opaque"]], "zu_int128/zu_uint128")
+  # each class in one registration, so zuarrow's dispatch by prototype
+  # finds the handler of its type; arrow.opaque claims none (#167)
+  expect_identical(classes[["arrow.opaque"]], "")
+  expect_identical(classes[["zuint.int128"]], "zu_int128")
+  expect_identical(classes[["zuint.uint128"]], "zu_uint128")
   expect_identical(classes[["l"]], "zu_int64")
   expect_identical(classes[["L"]], "zu_uint64")
   # no registration claims decimal128 (review X5)
@@ -135,23 +142,128 @@ test_that("int128() as the prototype reads DuckDB's default decimal export", {
   )
 })
 
-test_that("a zuint prototype casts a column of another format", {
-  skip_without_zuarrow()
-  a <- zuarrow::arrow_array(uint64(c(1, 5, NA)))
-  expect_identical(
-    zuarrow::arrow_to_r(a, to = int64()),
-    int64(c(1, 5, NA))
+test_that("a zuint prototype gives its type or follows the lossy policy (#167)", {
+  kinds <- prototype_kinds()
+  cons <- list(lossless = local_duckdb(), default = local_duckdb(FALSE))
+  policies <- c("error", "character", "warn", "allow")
+  for (k in names(kinds)) {
+    kind <- kinds[[k]]
+    con <- cons[[if (kind$lossless) "lossless" else "default"]]
+    for (type in zu_all_types) {
+      keep <- oracle_fits(type, kind$seen) %in% TRUE
+      null <- is.na(kind$values)
+      lost <- !keep & !null
+      want <- zu_ctor(type)(ifelse(keep, kind$seen, NA))
+      sql <- prototype_sql(kind$sql, kind$values)
+      for (lossy in policies) {
+        label <- sprintf("%s to %s under %s", k, type, lossy)
+        got <- read_to(con, sql, zu_ctor(type)(), lossy)
+        if (any(lost) && lossy %in% c("error", "character")) {
+          expect_s3_class(got$value, "zuarrow_lossy_error")
+          expect_identical(got$value$column, "x", label = label)
+          expect_identical(got$warnings, character(), label = label)
+        } else {
+          expect_identical(exactly(got$value), exactly(want), label = label)
+          warned <- if (any(lost) && lossy == "warn") {
+            "zuarrow_lossy_warning"
+          } else {
+            character()
+          }
+          expect_identical(unique(got$warnings), warned, label = label)
+        }
+      }
+      # the rows the type holds read exactly under every policy, silently
+      rows <- which(keep | null)
+      sql <- prototype_sql(kind$sql, kind$values[rows])
+      for (lossy in policies) {
+        label <- sprintf("%s to %s under %s, no loss", k, type, lossy)
+        got <- read_to(con, sql, zu_ctor(type)(), lossy)
+        expect_identical(
+          exactly(got$value),
+          exactly(want[rows]),
+          label = label
+        )
+        expect_identical(got$warnings, character(), label = label)
+      }
+    }
+  }
+})
+
+test_that("a lost value names the column, the format and the remedy (#167)", {
+  con <- local_duckdb()
+  sql <- prototype_sql("BIGINT", c("5", "-1", "-2"))
+  err <- read_to(con, sql, uint64(), "error")$value
+  expect_s3_class(err, "zuarrow_error")
+  expect_identical(err$arrow_type, "l")
+  expect_identical(err$package, "zuint")
+  expect_snapshot(conditionMessage(err))
+  w <- expect_warning(
+    duckdb_to_r(con, sql, to = list(x = uint64()), lossy = "warn"),
+    class = "zuarrow_lossy_warning"
   )
-  b <- zuarrow::arrow_array(int64(-1))
-  expect_warning(
-    zuarrow::arrow_to_r(b, to = uint64()),
-    class = "zuint_cast_warning"
+  expect_snapshot(conditionMessage(w))
+  # a decimal is read by value, and DuckDB's default UHUGEINT export of
+  # 2^127 and above is a negative decimal, so the error says how to avoid it
+  default <- local_duckdb(FALSE)
+  sql <- prototype_sql("UHUGEINT", "340282366920938463463374607431768211454")
+  err <- read_to(default, sql, uint128(), "error")$value
+  expect_s3_class(err, "zuarrow_lossy_error")
+  expect_snapshot(conditionMessage(err))
+  # the column of an array has no name
+  a <- zuarrow::arrow_array(int128(c(1, -1)))
+  expect_snapshot(
+    zuarrow::arrow_to_r(a, to = uint128()),
+    error = TRUE
+  )
+})
+
+test_that("a lossy cast applies the policy batch by batch (#167)", {
+  skip_without_zuarrow()
+  df <- data.frame(a = int64(c(-1, 1, 2, -2, 3)))
+  stream <- function() zuarrow::arrow_stream(df, batch = 2)
+  expect_error(
+    zuarrow::arrow_to_r(stream(), to = list(a = uint64())),
+    class = "zuarrow_lossy_error"
+  )
+  warnings <- 0L
+  got <- withCallingHandlers(
+    zuarrow::arrow_to_r(stream(), to = list(a = uint64()), lossy = "warn"),
+    zuarrow_lossy_warning = function(w) {
+      warnings <<- warnings + 1L
+      invokeRestart("muffleWarning")
+    }
+  )
+  # one warning for each batch that lost a value: the first two
+  expect_identical(warnings, 2L)
+  expect_identical(got$a, uint64(c(NA, 1, 2, NA, 3)))
+  expect_identical(
+    zuarrow::arrow_to_r(stream(), to = list(a = uint64()), lossy = "allow"),
+    data.frame(a = uint64(c(NA, 1, 2, NA, 3)))
   )
   # a format zuint does not read goes through zuarrow, then the cast
   expect_identical(
-    zuarrow::arrow_to_r(zuarrow::arrow_array(c(1L, NA)), to = int64()),
-    int64(c(1, NA))
+    zuarrow::arrow_to_r(zuarrow::arrow_array(c(1L, NA)), to = int128()),
+    int128(c(1, NA))
   )
+})
+
+test_that("writing int128 and uint128 still gives DuckDB's extension (#167)", {
+  skip_without_zuarrow()
+  for (type in c("int128", "uint128")) {
+    a <- zuarrow::arrow_array(zu_ctor(type)(c(1, NA)))
+    expect_identical(.Call(zu_arrow_format_c, zuarrow::arrow_schema(a)), "w:16")
+    expect_identical(
+      zuarrow::arrow_metadata(a),
+      c(
+        "ARROW:extension:name" = "arrow.opaque",
+        "ARROW:extension:metadata" = sprintf(
+          '{"type_name":"%s","vendor_name":"DuckDB"}',
+          c(int128 = "hugeint", uint128 = "uhugeint")[[type]]
+        )
+      ),
+      label = type
+    )
+  }
 })
 
 test_that("other arrow.opaque types keep zuarrow's own conversion", {
@@ -496,13 +608,14 @@ test_that("a small integer column reads exactly into a zuint prototype (#155)", 
       label = f
     )
     if (ends[[1L]] < 0) {
-      # a negative value has no uint64: zuint's cast warns, as for int64
-      expect_warning(
-        u <- zuarrow::arrow_read(bytes, to = list(x = uint64()))$x,
-        class = "zuint_cast_warning"
+      # a negative value has no uint64: zuarrow's lossy policy (#167)
+      expect_error(
+        zuarrow::arrow_read(bytes, to = list(x = uint64())),
+        class = "zuarrow_lossy_error"
       )
+      u <- zuarrow::arrow_read(bytes, to = list(x = uint64()), lossy = "allow")
       v[which(gmp::as.bigz(v) < 0)] <- NA
-      expect_identical(u, uint64(v), label = f)
+      expect_identical(u$x, uint64(v), label = f)
     } else {
       expect_identical(
         zuarrow::arrow_read(bytes, to = list(x = uint64()))$x,

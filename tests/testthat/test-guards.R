@@ -70,7 +70,13 @@ test_that("the Arrow import refuses a malformed array as a zuint_arrow_error", {
   expect_identical(to(a, zu_arrow_tag(a), "error"), int64())
   expect_error(.Call(zu_metadata_get_c, "x", "k"), class = "simpleError")
   expect_error(.Call(zu_arrow_schema_c, 1L), class = "simpleError")
-  expect_error(.Call(zu_from_arrow_c, 1L, 1L), class = "simpleError")
+  expect_error(.Call(zu_from_arrow_c, 1L, 1L, FALSE), class = "simpleError")
+  a <- zu_arrow_from(int64(1))
+  expect_error(
+    .Call(zu_from_arrow_c, a, zu_arrow_tag(a), NA),
+    class = "simpleError"
+  )
+  expect_error(.Call(zu_arrow_name_c, 1L), class = "simpleError")
 })
 
 test_that("the fixed-point entry points refuse bad arguments (#119)", {

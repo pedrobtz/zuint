@@ -198,6 +198,13 @@ SEXP zu_arrow_format_c(SEXP schema)
     return s->format ? Rf_mkString(s->format) : R_NilValue;
 }
 
+/* The schema's name, the column's, for messages: "" when it has none. */
+SEXP zu_arrow_name_c(SEXP schema)
+{
+    const struct ArrowSchema *s = zu_schema_arg(schema);
+    return Rf_ScalarString(Rf_mkCharCE(s->name ? s->name : "", CE_UTF8));
+}
+
 /* ---- import ------------------------------------------------------------- */
 
 static bool zu_valid(const struct ArrowArray *a, int64_t j)
@@ -206,16 +213,27 @@ static bool zu_valid(const struct ArrowArray *a, int64_t j)
     return a->null_count == 0 || v == NULL || (v[j >> 3] >> (j & 7)) & 1;
 }
 
-/* list(payload, n_lost, type) for an array whose schema maps to `type`. */
-static SEXP zu_import(const struct ArrowArray *a, zu_type t)
+/* list(payload, n_lost, type) for an array whose schema maps to `t`. With
+   `wide`, a 64-bit column is read as its 128-bit counterpart, int64 as
+   int128 and uint64 as uint128, so that a prototype of a 128-bit type gets
+   INT64_MIN and UINT64_MAX, which no 128-bit NA pattern equals, as values
+   (#167). */
+static SEXP zu_import(const struct ArrowArray *a, zu_type t, bool wide)
 {
+    zu_type to = wide && !zu_type_is_128(t) ? (zu_type)(t + 2) : t;
     R_xlen_t n = (R_xlen_t)a->length, lost = 0;
-    SEXP out = PROTECT(zu_alloc(t, n));
+    SEXP out = PROTECT(zu_alloc(to, n));
     const unsigned char *data = (const unsigned char *)a->buffers[1];
     for (R_xlen_t i = 0; i < n; i++) {
         int64_t j = a->offset + (int64_t)i;
         bool valid = zu_valid(a, j), sentinel;
-        if (zu_type_is_128(t)) {
+        if (to != t) {
+            uint64_t v = 0;
+            if (valid) memcpy(&v, data + 8 * j, 8);
+            uint64_t high = t == ZU_INT64 && (v & ZU_SIGN64) ? ~UINT64_C(0) : 0;
+            zu_set128(COMPLEX(out), i, valid ? zuf_u128_make(high, v) : zu_na128(to));
+            sentinel = false;
+        } else if (zu_type_is_128(t)) {
             zuf_u128 v = valid ? zu_read16(data + 16 * j) : zu_na128(t);
             sentinel = valid && zuf_u128_cmp(v, zu_na128(t)) == 0;
             zu_set128(COMPLEX(out), i, valid ? v : zu_na128(t));
@@ -230,7 +248,7 @@ static SEXP zu_import(const struct ArrowArray *a, zu_type t)
     SEXP res = PROTECT(Rf_allocVector(VECSXP, 3));
     SET_VECTOR_ELT(res, 0, out);
     SET_VECTOR_ELT(res, 1, Rf_ScalarReal((double)lost));
-    SET_VECTOR_ELT(res, 2, Rf_ScalarInteger(t));
+    SET_VECTOR_ELT(res, 2, Rf_ScalarInteger(to));
     UNPROTECT(2);
     return res;
 }
@@ -260,11 +278,13 @@ static void zu_check_own_schema(SEXP array, SEXP schema)
     }
 }
 
-SEXP zu_from_arrow_c(SEXP array, SEXP schema)
+SEXP zu_from_arrow_c(SEXP array, SEXP schema, SEXP wide)
 {
+    if (!Rf_isLogical(wide) || XLENGTH(wide) != 1 || LOGICAL(wide)[0] == NA_LOGICAL)
+        Rf_error("zuint: `wide` must be TRUE or FALSE");
     zu_check_own_schema(array, schema);
     zu_type t = zu_import_type(schema);
-    return zu_import(zu_array_arg(array), t);
+    return zu_import(zu_array_arg(array), t, LOGICAL(wide)[0]);
 }
 
 /* The byte width of a small integer format (int8 to uint32), negative for

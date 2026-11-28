@@ -18,6 +18,8 @@ and \code{zuarrow::arrow_array()} read and write zuint columns exactly.
    \code{L} \tab \code{uint64} \tab \code{uint64} \cr
    \code{arrow.opaque} \tab DuckDB's \code{hugeint} extension (\code{w:16}) \tab \code{int128} \cr
    \code{arrow.opaque} \tab DuckDB's \code{uhugeint} extension (\code{w:16}) \tab \code{uint128} \cr
+   \code{zuint.int128} \tab none: \code{to = int128()}, and writing \tab \code{int128} \cr
+   \code{zuint.uint128} \tab none: \code{to = uint128()}, and writing \tab \code{uint128} \cr
 }
 
 
@@ -25,17 +27,25 @@ An \code{arrow.opaque} column is DuckDB's when its JSON metadata says so at
 the top level: \code{vendor_name} \code{"DuckDB"} and \code{type_name} \code{"hugeint"} or
 \code{"uhugeint"}. Other \code{arrow.opaque} types, which DuckDB uses for types
 Arrow has no form for, keep zuarrow's own conversion, as does metadata
-that is not valid JSON.
+that is not valid JSON. The \code{zuint.int128} and \code{zuint.uint128} keys match
+no Arrow column: zuarrow finds a prototype's handler by its class, so
+each 128-bit class has a registration of its own.
 
-With \code{to = int64()} or \code{to = uint64()}, 8-, 16- and 32-bit integer
-columns are read exactly and cast to the prototype.
+A zuint prototype in \verb{to =}, such as \code{to = list(x = uint64())}, gives
+that type for a column of any format, or a condition. zuint reads its
+own formats and the 8-, 16- and 32-bit integers exactly, and any other
+column through zuarrow's own conversion, then casts the values to the
+prototype's type. A value the type cannot hold, such as \code{-1} under
+\code{uint64()}, \code{0.5} or the text \code{"abc"}, follows the \code{lossy} policy below.
 
 A \code{decimal128(p, 0)} column is a decimal, not an integer, so zuint does
 not register for it. Asking for \code{int128} with \code{to = int128()} in
 \code{zuarrow::arrow_to_r()} reads one with \code{p} up to 38 as the 128 bits it
-holds. DuckDB writes \code{HUGEINT} that way unless its
-\code{arrow_lossless_conversion} setting is on, so turn the setting on, and
-\code{HUGEINT} and \code{UHUGEINT} arrive as the extension:
+holds, and \code{to = uint128()} reads its value, so a negative one is lost.
+DuckDB writes \code{HUGEINT} and \code{UHUGEINT} that way unless its
+\code{arrow_lossless_conversion} setting is on, and a \code{UHUGEINT} of 2^127 or
+more is then a negative decimal. So turn the setting on, and \code{HUGEINT}
+and \code{UHUGEINT} arrive as the extension:
 
 \if{html}{\out{<div class="sourceCode r">}}\preformatted{DBI::dbExecute(con, "SET arrow_lossless_conversion = true")
 zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))
@@ -43,13 +53,16 @@ zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))
 
 A null reads as \code{NA} and an \code{NA} writes as a null. A valid value equal to
 a type's \code{NA} bit pattern, such as \code{UINT64_MAX} in a \code{UBIGINT} column,
-cannot be held. zuarrow's \code{lossy} policy decides what happens to it:
+cannot be held, nor can a value out of a prototype's range. zuarrow's
+\code{lossy} policy decides what happens to them, in zuarrow's condition
+classes:
 \itemize{
 \item \code{"error"} and \code{"character"} raise \code{zuarrow_lossy_error}, naming the
-value. \code{"character"} would give the column as text only when every
-batch held such a value, so it fails like \code{"error"} instead.
-\item \code{"warn"} reads it as \code{NA} with one \code{zuarrow_lossy_warning} per batch.
-\item \code{"allow"} reads it as \code{NA} silently.
+column, its format and a value. \code{"character"} would give the column as
+text only for the batches that lose a value, which could not be
+combined with the others, so it fails like \code{"error"} instead.
+\item \code{"warn"} reads them as \code{NA} with one \code{zuarrow_lossy_warning} per batch.
+\item \code{"allow"} reads them as \code{NA} silently.
 }
 
 Writing never loses a value: \code{int128} and \code{uint128} are written as the

@@ -252,18 +252,38 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   an array handle in nanoarrow's `r.h` layout (class `nanoarrow_array`, the
   schema's external pointer in its tag), which is what zuarrow requires of
   a `from` handler.
-- **A sentinel value is zuarrow's policy, in zuarrow's classes.** The `to`
-  handler raises `zuarrow_lossy_error` under `"error"` and `"character"`
-  and `zuarrow_lossy_warning` under `"warn"` (design §9.1, review X4), never
-  a zuint class, so a caller handles it with zuarrow's other conditions.
+- **A lost value is zuarrow's policy, in zuarrow's classes.** A sentinel
+  value, and a value a `to =` prototype's type cannot hold (#167), make the
+  `to` handler raise `zuarrow_lossy_error` under `"error"` and
+  `"character"` and `zuarrow_lossy_warning` under `"warn"` (design §9.1,
+  §9.4, review X4), through `zu_arrow_lost()`, never a zuint class: the
+  handler's casts go through `zu_arrow_cast()`, which counts the losses
+  itself, so no `zuint_cast_warning` reaches the caller.
+- **A named zuint prototype gives its type or a condition** (#167). Every
+  exit of `zu_arrow_to()` with a target casts to it, including a format
+  zuint does not read, which goes through `zuarrow::arrow_to_r()` first.
+- **zuint registers five keys so that dispatch by prototype knows the
+  type** (#167). zuarrow 0.1.0 picks a prototype's handler by its class,
+  the first registration listing it winning, and passes the handler no
+  prototype. So every class is in exactly one registration: `arrow.opaque`
+  reads DuckDB's extension and claims no class, and `zuint.int128` and
+  `zuint.uint128`, keys no column uses, carry the 128-bit classes and
+  write the extension. Adding a class back to `arrow.opaque` would make it
+  win `to = uint128()` and return int128.
 - **Import borrows; it never releases the caller's structs.** The struct
   owner (nanoarrow, an engine) releases them. Our own exported structs are
   released by their external pointer's finalizer unless a consumer moved
   them out, which sets `release` to NULL; `test-arrow.R` counts the calls.
 - **A decimal128 imports as its bits, with no 38-digit range check,** and
-  only when the caller asks with `to = int128()`: zuint registers no `d:*`
+  only when the caller names a zuint prototype: zuint registers no `d:*`
   key (review X5). DuckDB's default export writes HUGEINT values beyond 38
-  digits that way.
+  digits that way. `to = int128()` keeps the bits; any other prototype casts
+  that int128 by value (#167), so `to = uint128()` loses a negative one, as
+  it does DuckDB's default export of a UHUGEINT ≥ 2¹²⁷.
+- **Under a 128-bit prototype an `l` or `L` column imports wide.**
+  `zu_from_arrow_c(..., wide = TRUE)` reads int64 as int128 and uint64 as
+  uint128, so INT64_MIN and UINT64_MAX, the 64-bit NA patterns, are values
+  there and not sentinel losses (#167).
 - **DuckDB's hugeint/uhugeint extension is recognised by parsing its JSON,**
   as DuckDB reads it through arrow (#154, #169): the metadata must be one
   valid JSON object whose own top-level `vendor_name` is `"DuckDB"` and

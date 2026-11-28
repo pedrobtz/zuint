@@ -1,5 +1,18 @@
 # zuint 0.0.0.9000
 
+* A zuint prototype in zuarrow's `to =` now always gives its type, or a
+  condition, for a column of any format (#167). `to = int128()` on an
+  `int64` column had returned `int64`, and `to = uint128()` on a decimal or
+  on DuckDB's default `UHUGEINT` export a negative `int128`. A value the
+  type cannot hold follows zuarrow's `lossy` policy in zuarrow's classes:
+  a `zuarrow_lossy_error` under `"error"` and `"character"`, `NA` with a
+  `zuarrow_lossy_warning` under `"warn"`, `NA` under `"allow"`. This is a
+  breaking change: `to = uint64()` on a negative value was `NA` with a
+  `zuint_cast_warning`, and is now an error by default. A decimal128
+  column is cast to `uint128` by value, and `INT64_MIN` and `UINT64_MAX`
+  read exactly under a 128-bit prototype. zuint registers two more keys
+  with zuarrow, `zuint.int128` and `zuint.uint128`, which carry the
+  128-bit classes; writing is unchanged.
 * Every condition reports the call it came from (#80): the recycling
   warning, the error for an invalid `options(zuint.double = )`, and
   `min()`, `max()` and `range()` of nothing, which reported none. The
