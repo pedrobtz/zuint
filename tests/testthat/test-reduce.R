@@ -509,11 +509,17 @@ test_that("seq_zu() and seq() agree with base seq() on small integers (#159)", {
       expect_identical(as.double(seq(mk(n))), as.double(seq(n)), label = type)
     }
     # length.out: a fraction rounds up, as in base R
-    expect_identical(as.double(seq_zu(mk(5), length.out = 2.7)), seq(5, length.out = 2.7))
+    expect_identical(
+      as.double(seq_zu(mk(5), length.out = 2.7)),
+      seq(5, length.out = 2.7)
+    )
     expect_identical(seq_zu(mk(5), length.out = 0), mk(integer()))
     expect_error(seq_zu(mk(5), length.out = -1), class = "zuint_type_error")
     expect_error(seq_zu(mk(5), length.out = NA), class = "zuint_type_error")
-    expect_error(seq_zu(mk(5), length.out = c(1, 2)), class = "zuint_type_error")
+    expect_error(
+      seq_zu(mk(5), length.out = c(1, 2)),
+      class = "zuint_type_error"
+    )
     # three ends over-determine it
     expect_error(
       seq_zu(mk(1), mk(9), by = 2L, length.out = 3),
@@ -524,18 +530,181 @@ test_that("seq_zu() and seq() agree with base seq() on small integers (#159)", {
 
 test_that("seq_zu() with to and length.out is exact at the ends of the range (#159)", {
   expect_identical(
-    seq_zu(int64("-9223372036854775807"), int64("9223372036854775807"), length.out = 3),
+    seq_zu(
+      int64("-9223372036854775807"),
+      int64("9223372036854775807"),
+      length.out = 3
+    ),
     int64(c("-9223372036854775807", "0", "9223372036854775807"))
   )
   expect_identical(
-    seq_zu(uint128("340282366920938463463374607431768211454"), uint128(0), length.out = 3),
-    uint128(c("340282366920938463463374607431768211454", "170141183460469231731687303715884105727", "0"))
+    seq_zu(
+      uint128("340282366920938463463374607431768211454"),
+      uint128(0),
+      length.out = 3
+    ),
+    uint128(c(
+      "340282366920938463463374607431768211454",
+      "170141183460469231731687303715884105727",
+      "0"
+    ))
   )
   # a distance int128 cannot hold is refused, not wrapped
   expect_error(
-    seq_zu(int128("-100000000000000000000000000000000000000"), int128("100000000000000000000000000000000000000"), length.out = 3),
+    seq_zu(
+      int128("-100000000000000000000000000000000000000"),
+      int128("100000000000000000000000000000000000000"),
+      length.out = 3
+    ),
     class = "zuint_type_error"
   )
   # cut()'s breaks: 1, 2.5, 4 has no whole step
-  expect_error(seq(int64(1), int64(4), length.out = 3), class = "zuint_type_error")
+  expect_error(
+    seq(int64(1), int64(4), length.out = 3),
+    class = "zuint_type_error"
+  )
+})
+
+test_that("mean() and median() read na.rm as base R does (#163)", {
+  for (type in zu_all_types) {
+    x <- zu_ctor(type)(c(1, NA, 4))
+    # base's mean() tests isTRUE(na.rm), so it gives NA for 1; sum() and
+    # median() read 1 as TRUE, and so does this (#163)
+    expect_identical(mean(x, na.rm = 1), sum(c(1L, NA, 4L), na.rm = 1) / 2L)
+    expect_identical(mean(x, na.rm = 0), NA_real_)
+    expect_identical(median(x, na.rm = 1), median(c(1L, NA, 4L), na.rm = 1))
+    expect_error(mean(x, na.rm = NA), class = "zuint_type_error")
+    expect_error(mean(x, na.rm = "yes"), class = "zuint_type_error")
+    expect_error(median(x, na.rm = c(TRUE, TRUE)), class = "zuint_type_error")
+  }
+  d <- decimal128(c("1.5", NA, "2.5"), 5, 1)
+  expect_identical(mean(d, na.rm = 1), 2)
+  expect_error(mean(d, na.rm = NA), class = "zuint_type_error")
+  expect_error(median(d, na.rm = "x"), class = "zuint_type_error")
+})
+
+test_that("sort() honours index.return and na.last, and refuses partial (#163)", {
+  for (type in zu_all_types) {
+    mk <- zu_ctor(type)
+    v <- c(b = 3, a = NA, c = 1, d = 2, e = NA)
+    x <- mk(v)
+    for (na.last in list(NA, TRUE, FALSE)) {
+      for (dec in c(FALSE, TRUE)) {
+        want <- sort(
+          v,
+          decreasing = dec,
+          na.last = na.last,
+          index.return = TRUE
+        )
+        got <- sort(x, decreasing = dec, na.last = na.last, index.return = TRUE)
+        expect_named(got, c("x", "ix"))
+        expect_identical(as.double(got$x), unname(want$x), label = type)
+        expect_identical(names(got$x), names(want$x))
+        expect_identical(got$ix, want$ix, label = type)
+      }
+    }
+    expect_error(sort(x, partial = 2L), class = "zuint_unsupported_error")
+    expect_error(sort(x, na.last = "x"), class = "zuint_type_error")
+    expect_error(sort(x, na.last = c(TRUE, FALSE)), class = "zuint_type_error")
+    expect_error(sort(x, decreasing = NA), class = "zuint_type_error")
+    expect_error(sort(x, index.return = NA), class = "zuint_type_error")
+  }
+  d <- decimal128(c("2.5", NA, "1.5"), 5, 1)
+  got <- sort(d, index.return = TRUE)
+  expect_identical(got$ix, 2:1)
+  expect_identical(as.character(got$x), c("1.5", "2.5"))
+  expect_error(sort(d, partial = 1L), class = "zuint_unsupported_error")
+})
+
+test_that("incomparables is honoured by duplicated(), unique(), anyDuplicated() and match() (#163)", {
+  v <- c(NA, NA, 1, 1, 2, 2, 3)
+  for (type in zu_all_types) {
+    x <- zu_ctor(type)(v)
+    for (inc in list(FALSE, NA, 1, c(1, 2), c(2, NA), 9)) {
+      for (fl in c(FALSE, TRUE)) {
+        expect_identical(
+          duplicated(x, incomparables = inc, fromLast = fl),
+          duplicated(v, incomparables = inc, fromLast = fl),
+          label = paste(type, "duplicated", deparse(inc), fl)
+        )
+        expect_identical(
+          as.double(unique(x, incomparables = inc, fromLast = fl)),
+          unique(v, incomparables = inc, fromLast = fl),
+          label = paste(type, "unique", deparse(inc), fl)
+        )
+        expect_identical(
+          anyDuplicated(x, incomparables = inc, fromLast = fl),
+          anyDuplicated(v, incomparables = inc, fromLast = fl),
+          label = paste(type, "anyDuplicated", deparse(inc), fl)
+        )
+      }
+      expect_identical(
+        match(x, zu_ctor(type)(c(NA, 1, 2)), incomparables = inc),
+        match(v, c(NA, 1, 2), incomparables = inc),
+        label = paste(type, "match", deparse(inc))
+      )
+    }
+  }
+  d <- decimal128(c("1.5", "1.50", NA, NA), 5, 2)
+  expect_identical(
+    duplicated(d, incomparables = NA),
+    c(FALSE, TRUE, FALSE, FALSE)
+  )
+  expect_identical(
+    anyDuplicated(d, incomparables = decimal128("1.5", 5, 1)),
+    4L
+  )
+  expect_identical(length(unique(d, incomparables = NA)), 3L)
+})
+
+test_that("diff() refuses a lag or differences base R refuses (#163)", {
+  x <- int64(c(1, 4, 9, 16, 25))
+  v <- c(1L, 4L, 9L, 16L, 25L)
+  for (args in list(
+    list(lag = 2),
+    list(differences = 2),
+    list(lag = 2, differences = 2)
+  )) {
+    expect_identical(
+      as.double(do.call(diff, c(list(x), args))),
+      as.double(do.call(diff, c(list(v), args)))
+    )
+  }
+  for (args in list(
+    list(lag = 0),
+    list(differences = 0),
+    list(lag = -1),
+    list(lag = NA),
+    list(differences = NA),
+    list(lag = 1:2),
+    list(lag = 1.5)
+  )) {
+    expect_error(
+      do.call(diff, c(list(x), args)),
+      class = "zuint_type_error"
+    )
+  }
+})
+
+test_that("zu_match() takes one nomatch, truncated as base R does (#163)", {
+  for (type in zu_all_types) {
+    mk <- zu_ctor(type)
+    expect_identical(zu_match(mk(1), mk(2), nomatch = 2.9), 2L)
+    expect_identical(
+      zu_match(mk(1), mk(2), nomatch = 2.9),
+      match(1, 2, nomatch = 2.9)
+    )
+    expect_identical(zu_match(mk(1), mk(2), nomatch = NA), NA_integer_)
+    expect_error(
+      zu_match(mk(1), mk(2), nomatch = c(7L, 8L)),
+      class = "zuint_type_error"
+    )
+    expect_error(
+      zu_match(mk(1), mk(2), nomatch = "a"),
+      class = "zuint_type_error"
+    )
+  }
+  d <- decimal128("1.5", 5, 1)
+  expect_identical(zu_match(d, d + 1L, nomatch = 2.9), 2L)
+  expect_error(zu_match(d, d, nomatch = c(7L, 8L)), class = "zuint_type_error")
 })

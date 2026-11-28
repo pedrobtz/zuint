@@ -86,7 +86,67 @@ zu_extreme <- function(x, code, na.rm, which, call) {
   zu_new(r[which], code)
 }
 
+# A logical argument as base's `if (arg)` reads it: 1 is TRUE; NA, a vector
+# or text that is not a logical is an error.
+zu_flag <- function(x, arg, call) {
+  v <- if (length(x) == 1L) suppressWarnings(as.logical(x)) else NA
+  if (is.na(v)) {
+    zu_abort(
+      sprintf("`%s` must be TRUE or FALSE.", arg),
+      "type",
+      call = call
+    )
+  }
+  v
+}
+
+# `na.last` of sort(): TRUE, FALSE or NA.
+zu_na_last <- function(x, call) {
+  if (length(x) != 1L || !is.logical(x)) {
+    zu_abort("`na.last` must be TRUE, FALSE or NA.", "type", call = call)
+  }
+  x
+}
+
+# A whole number >= `min` for `lag` and `differences`. Base R's diff() gives
+# a fraction a meaningless answer (and a warning), so it is refused here.
+zu_whole_arg <- function(x, arg, min, call) {
+  x <- zu_index(x)
+  v <- if (length(x) == 1L && is.numeric(x) && isTRUE(x == floor(x))) {
+    suppressWarnings(as.integer(x))
+  } else {
+    NA_integer_
+  }
+  if (is.na(v) || v < min) {
+    zu_abort(
+      sprintf("`%s` must be a single whole number of at least %d.", arg, min),
+      "type",
+      call = call
+    )
+  }
+  v
+}
+
+# The values `incomparables` names, which are never duplicates of one
+# another; NULL for FALSE, which names none.
+zu_incomparable <- function(x, incomparables, call) {
+  if (isFALSE(incomparables)) {
+    return(NULL)
+  }
+  zu_match(x, incomparables, nomatch = 0L) > 0L
+}
+
+# `nomatch` of match(): one value, truncated to an integer.
+zu_nomatch_arg <- function(nomatch, call) {
+  nomatch <- zu_index(nomatch)
+  if (length(nomatch) != 1L || !(is.numeric(nomatch) || is.logical(nomatch))) {
+    zu_abort("`nomatch` must be a single number.", "type", call = call)
+  }
+  as.integer(nomatch)
+}
+
 zu_mean <- function(x, trim = 0, na.rm = FALSE, ...) {
+  na.rm <- zu_flag(na.rm, "na.rm", sys.call())
   if (!identical(trim, 0) && !identical(trim, 0L)) {
     zu_abort(
       "mean() with `trim` is not supported for zuint vectors.",
@@ -104,6 +164,7 @@ zu_mean_scaled <- function(x, na.rm, scale) {
 }
 
 zu_median <- function(x, na.rm = FALSE, ...) {
+  na.rm <- zu_flag(na.rm, "na.rm", sys.call())
   zu_median_scaled(x, na.rm, 0L)
 }
 
@@ -125,16 +186,44 @@ zu_median_scaled <- function(x, na.rm, scale) {
 
 # Values sorted in C, with the NAs put back as na.last says. Names follow
 # their values, which needs the positions.
-zu_sort <- function(x, decreasing = FALSE, na.last = NA, ...) {
-  code <- zu_code(x)
-  if (!is.null(names(x))) {
-    return(x[.Call(zu_order_c, x, code, isTRUE(decreasing), na.last)])
+zu_sort <- function(
+  x,
+  decreasing = FALSE,
+  na.last = NA,
+  index.return = FALSE,
+  partial = NULL,
+  ...
+) {
+  call <- sys.call()
+  if (!is.null(partial)) {
+    zu_abort(
+      "sort() with `partial` is not supported for zuint vectors.",
+      "unsupported",
+      call = call
+    )
   }
-  s <- .Call(zu_sort_values_c, x, code, isTRUE(decreasing))
+  decreasing <- zu_flag(decreasing, "decreasing", call)
+  na.last <- zu_na_last(na.last, call)
+  index.return <- zu_flag(index.return, "index.return", call)
+  code <- zu_code(x)
+  if (index.return) {
+    # as sort.int(): `ix` indexes x, with the NAs dropped first when
+    # na.last is NA
+    if (is.na(na.last)) {
+      x <- x[!zu_is_na(x)]
+      na.last <- TRUE
+    }
+    ix <- .Call(zu_order_c, x, code, decreasing, na.last)
+    return(list(x = x[ix], ix = ix))
+  }
+  if (!is.null(names(x))) {
+    return(x[.Call(zu_order_c, x, code, decreasing, na.last)])
+  }
+  s <- .Call(zu_sort_values_c, x, code, decreasing)
   n_na <- length(x) - length(s)
   if (n_na > 0L && !is.na(na.last)) {
     nas <- zu_bare(zu_cast(rep(NA, n_na), code))
-    s <- if (isTRUE(na.last)) c(s, nas) else c(nas, s)
+    s <- if (na.last) c(s, nas) else c(nas, s)
   }
   zu_new(s, code)
 }
@@ -146,13 +235,22 @@ zu_xtfrm <- function(x) {
 }
 
 zu_duplicated <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
-  .Call(zu_duplicated_c, x, zu_code(x), isTRUE(fromLast))
+  fromLast <- zu_flag(fromLast, "fromLast", sys.call())
+  d <- .Call(zu_duplicated_c, x, zu_code(x), fromLast)
+  inc <- zu_incomparable(x, incomparables, sys.call())
+  if (!is.null(inc)) {
+    d[inc] <- FALSE
+  }
+  d
 }
 
 # Names go, as base unique() drops them.
 zu_unique <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
-  if (isTRUE(fromLast) || !is.null(names(x))) {
-    out <- x[!zu_duplicated(x, fromLast = fromLast)]
+  fromLast <- zu_flag(fromLast, "fromLast", sys.call())
+  if (fromLast || !is.null(names(x)) || !isFALSE(incomparables)) {
+    out <- x[
+      !zu_duplicated(x, incomparables = incomparables, fromLast = fromLast)
+    ]
     names(out) <- NULL
     return(out)
   }
@@ -160,7 +258,8 @@ zu_unique <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
 }
 
 zu_any_duplicated <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
-  d <- zu_duplicated(x, fromLast = fromLast)
+  fromLast <- zu_flag(fromLast, "fromLast", sys.call())
+  d <- zu_duplicated(x, incomparables = incomparables, fromLast = fromLast)
   if (any(d)) which(d)[[if (fromLast) sum(d) else 1L]] else 0L
 }
 
@@ -182,7 +281,8 @@ zu_mtfrm <- function(x) zu_as_character(x)
 #' @param x Values to look up: a zuint vector, or an integer vector when
 #'   `table` is one.
 #' @param table Values to look them up in.
-#' @param nomatch The position to give values not in `table`.
+#' @param nomatch The position to give values not in `table`: one number,
+#'   truncated to an integer, as [match()] does.
 #' @return `zu_match()` returns an integer vector of positions in `table`;
 #'   `%zin%` a logical vector.
 #' @examples
@@ -194,12 +294,12 @@ zu_match <- function(x, table, nomatch = NA_integer_) {
   x <- zu_from_bit64(x)
   table <- zu_from_bit64(table)
   if (is_decimal128(x) || is_decimal128(table)) {
-    return(dec_match(x, table, as.integer(nomatch), call))
+    return(dec_match(x, table, zu_nomatch_arg(nomatch, call), call))
   }
   kinds <- c(zu_kind(x), zu_kind(table))
   zu_check_operands(kinds, list(x, table), call)
   code <- zu_common_code(kinds, call)
-  nomatch <- as.integer(nomatch)
+  nomatch <- zu_nomatch_arg(nomatch, call)
   # A value the common type can't hold matches nothing, quietly: a lookup
   # that finds nothing loses nothing (#58). Cast to NA, it must not match
   # the table's NA, nor may an NA match a table value lost the same way.
@@ -222,8 +322,9 @@ zu_match <- function(x, table, nomatch = NA_integer_) {
 `%zin%` <- function(x, table) zu_match(x, table, nomatch = 0L) > 0L
 
 zu_diff <- function(x, lag = 1L, differences = 1L, ...) {
-  lag <- zu_index(lag)
-  differences <- zu_index(differences)
+  call <- sys.call()
+  lag <- zu_whole_arg(lag, "lag", 1L, call)
+  differences <- zu_whole_arg(differences, "differences", 1L, call)
   for (i in seq_len(differences)) {
     n <- length(x)
     if (lag >= n) {

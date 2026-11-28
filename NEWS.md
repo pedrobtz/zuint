@@ -1,5 +1,17 @@
 # zuint 0.0.0.9000
 
+* Arguments zuint methods ignored are now honoured or refused (#163):
+  `mean()` and `median()` read `na.rm` as a logical (`NA` or text is a
+  `zuint_type_error`); `sort()` returns `list(x, ix)` for `index.return =
+  TRUE`, checks `na.last`, and refuses `partial` with a
+  `zuint_unsupported_error`; `duplicated()`, `unique()` and
+  `anyDuplicated()` honour `incomparables`; `format()` honours
+  `big.interval`, `zero.print`, `trim` and a textual `width`, and
+  `format(big.mark = ".")` no longer warns under `options(OutDec = ",")`;
+  `diff()` refuses a `lag` or `differences` below 1 or fractional;
+  `zu_match()` refuses a `nomatch` of length other than one; `print()`
+  accepts `quote` and truncates a fractional `max` as base R does, and
+  refuses a missing, negative or non-numeric one.
 * `seq_zu()` and `seq()` of a zuint vector no longer ignore `to` when
   `length.out` is given: the whole step between them is computed, and a
   fractional one is a `zuint_type_error`. The step defaults to -1 when `to`

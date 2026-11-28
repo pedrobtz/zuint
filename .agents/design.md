@@ -627,6 +627,23 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
 | `diff`, `rev`, `rep`, `seq_zu()` | exact |
 | `quantile` | exact order statistics; type-7 interpolation returns double |
 
+Decisions of 2026-11-28 (#159, #163):
+
+- `seq_zu(from, to, length.out = n)` computes the step `(to - from) / (n - 1)`
+  when it is whole and is a `zuint_type_error` when it is not (a vector of
+  integers has no fractions); `cut(int64(1:4), 2)` is therefore refused at
+  `seq()` with that error, until `cut()` has a method. `by` defaults to -1
+  when `to` is below `from`, `seq(n)` is `1:n` as in base, a fractional
+  `length.out` rounds up as base does, and `to` with `by` and `length.out`
+  is an error, as in base.
+- Arguments base takes and zuint cannot honour are refused with
+  `zuint_unsupported_error` (`sort(partial =)`, a `zero.print` that is not a
+  string) or `zuint_type_error` (an NA, negative or non-numeric `max`, `lag`
+  or `differences` below 1 or fractional, which base answers with garbage and
+  a warning, a `nomatch` of length other than one), never ignored.
+  `na.rm` is read as a logical, so 1 is TRUE; base's `mean()` tests
+  `isTRUE(na.rm)` and gives NA for 1, which is not copied.
+
 ## 8. Construction, parsing, formatting
 
 - `int64(x)`, `uint64(x)`, `int128(x)`, `uint128(x)`: casts from

@@ -9,9 +9,12 @@ seq_zu(from, to = NULL, by = 1L, length.out = NULL)
 \arguments{
 \item{from, to}{The ends: zuint vectors or integers, length 1.}
 
-\item{by}{The step, length 1, not zero.}
+\item{by}{The step, length 1, not zero. Without it the step is 1, or -1
+when \code{to} is below \code{from}; with \code{to} and \code{length.out} it is the whole
+step between them, and an error if there is none.}
 
-\item{length.out}{The number of values, instead of \code{to}.}
+\item{length.out}{The number of values, instead of \code{to} (or with it, to fix
+the step). A fraction rounds up, as in \code{\link[=seq]{seq()}}. \code{seq_zu(n)} is \code{1:n}.}
 }
 \value{
 A zuint vector.

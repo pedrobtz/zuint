@@ -65,7 +65,9 @@ Operands take their common type first (see \code{\link[=zu_common_type]{zu_commo
 rounds towards negative infinity and \code{\%\%} takes the sign of the divisor,
 as in R; division by zero is \code{NA}, except in \code{checked_idiv()} and
 \code{checked_mod()}, where it is an error of class \code{zuint_division_error}. \code{/} divides in double. \code{^} is exact
-for a non-negative integer exponent and computed in double otherwise.
+for a non-negative integer exponent, however large (at or past the type's
+width, only the bases 0, 1 and -1 have an answer; any other overflows), and
+computed in double otherwise. \code{NA ^ 0} and \code{1 ^ NA} are 1, as in base R.
 Comparison is exact across all the types and doubles.
 }
 \examples{

@@ -585,7 +585,19 @@ test_that("round and signif take a fractional or infinite digits as base R does 
   for (type in c("int64", "int128", "uint64", "uint128")) {
     x <- zu_ctor(type)(if (grepl("^u", type)) abs(v) else v)
     xv <- if (grepl("^u", type)) abs(v) else v
-    for (d in c(-2.7, -1.7, -1.5, -0.5, 2.5, 0.4, -Inf, Inf, 2^31, -2^31, 2^40)) {
+    for (d in c(
+      -2.7,
+      -1.7,
+      -1.5,
+      -0.5,
+      2.5,
+      0.4,
+      -Inf,
+      Inf,
+      2^31,
+      -2^31,
+      2^40
+    )) {
       expect_identical(
         as.double(round(x, d)),
         round(xv, d),
