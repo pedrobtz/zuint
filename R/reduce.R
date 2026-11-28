@@ -241,15 +241,35 @@ zu_diff <- function(x, lag = 1L, differences = 1L, ...) {
 #' arguments.
 #'
 #' @param from,to The ends: zuint vectors or integers, length 1.
-#' @param by The step, length 1, not zero.
-#' @param length.out The number of values, instead of `to`.
+#' @param by The step, length 1, not zero. Without it the step is 1, or -1
+#'   when `to` is below `from`; with `to` and `length.out` it is the whole
+#'   step between them, and an error if there is none.
+#' @param length.out The number of values, instead of `to` (or with it, to fix
+#'   the step). A fraction rounds up, as in [seq()]. `seq_zu(n)` is `1:n`.
 #' @return A zuint vector.
 #' @examples
 #' seq_zu(uint64("18446744073709551600"), uint64("18446744073709551614"), by = 7L)
 #' seq_zu(int128(-2), by = int128("1000000000000000000000"), length.out = 3)
 #' @export
 seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
-  call <- sys.call()
+  zu_seq_impl(from, to, if (missing(by)) NULL else by, length.out, sys.call())
+}
+
+# `by` is NULL when the caller gave none: a step of 1, or -1 when `to` is
+# below `from`; or, with `to` and `length.out`, the whole step between them.
+zu_seq_impl <- function(from, to, by, length.out, call) {
+  by_given <- !is.null(by)
+  if (!by_given) {
+    by <- 1L
+  }
+  if (is.null(to) && is.null(length.out) && !by_given) {
+    # seq(n) is 1:n, as in base R; a longer vector is seq_along()
+    if (length(from) != 1L) {
+      return(seq_along(from))
+    }
+    to <- from
+    from <- 1L
+  }
   args <- list(from, to, by)
   kinds <- vapply(
     args,
@@ -265,9 +285,25 @@ seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
   }
   from <- zu_cast(from, code, call = call)
   by <- zu_from_bit64(by)
-  if (!is.na(zu_code(length.out))) {
-    # a count, compared with the integer range below (#153)
-    length.out <- zu_dbl_quiet(length.out)
+  if (!is.null(length.out)) {
+    if (!is.na(zu_code(length.out))) {
+      # a count, compared with the integer range below (#153)
+      length.out <- zu_dbl_quiet(length.out)
+    }
+    if (
+      length(length.out) != 1L ||
+        !is.numeric(length.out) ||
+        is.na(length.out) ||
+        length.out < 0
+    ) {
+      zu_abort(
+        "`length.out` must be a single non-negative number.",
+        "type",
+        call = call
+      )
+    }
+    # a fractional count is rounded up, as base seq() does
+    length.out <- ceiling(length.out)
   }
   if (length(from) != 1L || is.na(from) || length(by) != 1L || is.na(by)) {
     zu_abort(
@@ -278,6 +314,16 @@ seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
   }
   if (by == 0L) {
     zu_abort("`by` must not be zero.", "type", call = call)
+  }
+  if (!is.null(to) && !is.null(length.out)) {
+    if (by_given) {
+      zu_abort(
+        "`to`, `by` and `length.out` together over-determine the sequence.",
+        "type",
+        call = call
+      )
+    }
+    return(zu_seq_between(from, to, length.out, code, call))
   }
   down <- by < 0L
   # the step's magnitude, in the elements' type
@@ -295,6 +341,9 @@ seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
     to <- zu_cast(to, code, call = call)
     if (length(to) != 1L || is.na(to)) {
       zu_abort("`to` must be a single non-missing value.", "type", call = call)
+    }
+    if (!by_given && to < from) {
+      down <- TRUE
     }
     if ((to > from && down) || (to < from && !down)) {
       zu_abort(
@@ -323,6 +372,56 @@ seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
   } else {
     from - cumsum(c(step * 0L, steps))
   }
+}
+
+# from, to and length.out: n values from `from` to `to`, whose step must be
+# whole (a zuint vector has no fractions); anything else is an error.
+zu_seq_between <- function(from, to, n, code, call) {
+  to <- zu_cast(to, code, call = call)
+  if (length(to) != 1L || is.na(to)) {
+    zu_abort("`to` must be a single non-missing value.", "type", call = call)
+  }
+  if (n > .Machine$integer.max) {
+    zu_abort("The sequence is too long.", "type", call = call)
+  }
+  if (n == 0) {
+    return(from[0L])
+  }
+  if (n == 1) {
+    return(from)
+  }
+  down <- to < from
+  # |to - from| in a type that holds it: int128 for the 64-bit types
+  wide <- if (code %in% c(1L, 2L)) 3L else code
+  hi <- zu_cast(if (down) from else to, wide, call = call)
+  lo <- zu_cast(if (down) to else from, wide, call = call)
+  d <- withCallingHandlers(
+    hi - lo,
+    zuint_overflow_warning = function(w) {
+      zu_abort(
+        "The distance from `from` to `to` is too wide for `length.out`.",
+        "type",
+        call = call
+      )
+    }
+  )
+  m <- as.integer(n) - 1L
+  if (!(d %% m == 0L)) {
+    zu_abort(
+      "The step from `from` to `to` in `length.out` values is not whole.",
+      "type",
+      call = call
+    )
+  }
+  step <- zu_cast(d %/% m, code, call = call)
+  if (step == 0L) {
+    return(rep(from, length.out = n))
+  }
+  if (down) {
+    # up from `to`, then reversed: a step of -step may not exist in the type
+    return(rev(zu_seq_impl(to, NULL, step, n, call)))
+  }
+  zu_seq_impl(from, NULL, step, n, call)
 }
 
 # floor(|to - from| / step) + 1 without forming to - from, which may not fit:

@@ -330,7 +330,6 @@ test_that("seq_zu runs downwards in unsigned types and across whole ranges", {
     expect_identical(as.character(utils::tail(up, 1)), hi, label = type)
     steps <- seq_zu(
       zu_ctor(type)(hi),
-      zu_ctor(type)(lo),
       by = -2L,
       length.out = 3
     )
@@ -471,4 +470,72 @@ test_that("seq_zu() refuses what it can't step and stops at length.out = 0 (#64)
     expect_error(do.call(seq_zu, args), class = "zuint_type_error")
   }
   expect_identical(seq_zu(uint64(1), length.out = 0), uint64())
+})
+
+test_that("seq_zu() and seq() agree with base seq() on small integers (#159)", {
+  for (type in zu_all_types) {
+    mk <- zu_ctor(type)
+    signed <- !grepl("^u", type)
+    ends <- if (signed) c(-3, 0, 1, 4, 10) else c(0, 1, 4, 10)
+    for (f in c(0, 1, 4, 10)) {
+      for (t in ends) {
+        # to alone: the step defaults to 1, or -1 when to is below from
+        expect_identical(
+          as.double(seq(mk(f), mk(t))),
+          as.double(seq(f, t)),
+          label = paste(type, f, t)
+        )
+        expect_identical(as.double(seq_zu(mk(f), mk(t))), as.double(seq(f, t)))
+        # to and length.out: a whole step is computed
+        for (n in 2:5) {
+          want <- try(seq(f, t, length.out = n), silent = TRUE)
+          if (isTRUE(all(want == round(want)))) {
+            expect_identical(
+              as.double(seq_zu(mk(f), mk(t), length.out = n)),
+              want,
+              label = paste(type, f, t, n)
+            )
+          } else {
+            expect_error(
+              seq_zu(mk(f), mk(t), length.out = n),
+              class = "zuint_type_error"
+            )
+          }
+        }
+      }
+    }
+    # seq(n) is 1:n
+    for (n in c(5, 1, 0)) {
+      expect_identical(as.double(seq(mk(n))), as.double(seq(n)), label = type)
+    }
+    # length.out: a fraction rounds up, as in base R
+    expect_identical(as.double(seq_zu(mk(5), length.out = 2.7)), seq(5, length.out = 2.7))
+    expect_identical(seq_zu(mk(5), length.out = 0), mk(integer()))
+    expect_error(seq_zu(mk(5), length.out = -1), class = "zuint_type_error")
+    expect_error(seq_zu(mk(5), length.out = NA), class = "zuint_type_error")
+    expect_error(seq_zu(mk(5), length.out = c(1, 2)), class = "zuint_type_error")
+    # three ends over-determine it
+    expect_error(
+      seq_zu(mk(1), mk(9), by = 2L, length.out = 3),
+      class = "zuint_type_error"
+    )
+  }
+})
+
+test_that("seq_zu() with to and length.out is exact at the ends of the range (#159)", {
+  expect_identical(
+    seq_zu(int64("-9223372036854775807"), int64("9223372036854775807"), length.out = 3),
+    int64(c("-9223372036854775807", "0", "9223372036854775807"))
+  )
+  expect_identical(
+    seq_zu(uint128("340282366920938463463374607431768211454"), uint128(0), length.out = 3),
+    uint128(c("340282366920938463463374607431768211454", "170141183460469231731687303715884105727", "0"))
+  )
+  # a distance int128 cannot hold is refused, not wrapped
+  expect_error(
+    seq_zu(int128("-100000000000000000000000000000000000000"), int128("100000000000000000000000000000000000000"), length.out = 3),
+    class = "zuint_type_error"
+  )
+  # cut()'s breaks: 1, 2.5, 4 has no whole step
+  expect_error(seq(int64(1), int64(4), length.out = 3), class = "zuint_type_error")
 })

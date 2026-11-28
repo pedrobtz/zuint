@@ -1,5 +1,10 @@
 # zuint 0.0.0.9000
 
+* `seq_zu()` and `seq()` of a zuint vector no longer ignore `to` when
+  `length.out` is given: the whole step between them is computed, and a
+  fractional one is a `zuint_type_error`. The step defaults to -1 when `to`
+  is below `from`, `seq(n)` is `1:n`, and a fractional `length.out` rounds up
+  as in base R; a negative or `NA` one is a `zuint_type_error` (#159).
 * `round()` and `signif()` take a fractional `digits` as base R does (round
   half up, so `round(x, 2.5)` rounds to 3 digits), and an infinite or very
   large one no longer fails with an unclassed error; an `NA` `digits` is a
