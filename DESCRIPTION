@@ -22,6 +22,7 @@ BugReports: https://github.com/pedrobtz/zuint/issues
 Depends: 
     R (>= 4.3.0)
 Imports: 
+    methods,
     stats
 LinkingTo: 
     zufast (>= 0.1.0.9000)

@@ -2,6 +2,7 @@
 "_PACKAGE"
 
 ## usethis namespace: start
+#' @importFrom methods setOldClass
 #' @importFrom stats median quantile
 #' @useDynLib zuint, .registration = TRUE
 ## usethis namespace: end

@@ -241,6 +241,18 @@ list(
   decimal_lossy = lossy(vctrs::vec_cast(B("9223372036854775807"), decimal128("0", 10, 2))),
   combine = zu_storage(vctrs::vec_c(int64(5), B(NA, -1)))
 )
+',
+  # bit64 masks these five and calls methods::as(x, "integer64") (#161)
+  sets = '
+x <- int64(c("-2", "-1", "0", "9007199254740993", NA))
+y <- int64(c("-1", "9007199254740992", NA))
+list(
+  setdiff = zu_storage(setdiff(x, y)),
+  union = zu_storage(union(x, y)),
+  intersect = zu_storage(intersect(x, y)),
+  is_element = is.element(x, y),
+  setequal = c(setequal(x, rev(x)), setequal(x, y))
+)
 '
 )
 

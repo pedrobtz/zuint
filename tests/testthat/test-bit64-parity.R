@@ -216,3 +216,66 @@ test_that("vctrs casts a plain integer64 by its values with bit64 absent (#150)"
   expect_identical(v$decimal_lossy, "lossy")
   expect_identical(v$combine, zu_storage(int64(c(5, NA, -1))))
 })
+
+test_that("bit64's masked set functions work on int64 (#161)", {
+  res <- expect_bit64_parity("sets")
+  v <- res$attached$value
+  expect_identical(
+    v$setdiff,
+    zu_storage(int64(c("-2", "0", "9007199254740993")))
+  )
+  expect_identical(
+    v$union,
+    zu_storage(int64(c(
+      "-2",
+      "-1",
+      "0",
+      "9007199254740993",
+      NA,
+      "9007199254740992"
+    )))
+  )
+  expect_identical(v$intersect, zu_storage(int64(c("-1", NA))))
+  expect_identical(v$is_element, c(FALSE, TRUE, FALSE, FALSE, TRUE))
+  expect_identical(v$setequal, c(TRUE, FALSE))
+})
+
+test_that("integer64 with any zuint type on the right is exact with bit64 attached (#151)", {
+  skip_if_not_installed("bit64")
+  skip_if_not_installed("gmp")
+  withr::local_package("bit64")
+  a <- c("-9007199254740993", "-2", "3", "7", NA)
+  b <- c("1", "5", "2", "3", "4")
+  ga <- gmp::as.bigz(a)
+  gb <- gmp::as.bigz(b)
+  x <- bit64::as.integer64(a)
+  for (type in zu_all_types) {
+    y <- zu_ctor(type)(b)
+    for (op in c("+", "-", "*", "%/%", "%%")) {
+      expect_identical(
+        as.character(get(op)(x, y)),
+        oracle_chr(oracle_op(op, ga, gb)),
+        label = paste(type, op)
+      )
+    }
+    expect_identical(
+      as.character(x^y),
+      oracle_chr(ga^as.integer(b)),
+      label = paste(type, "^")
+    )
+    expect_equal(
+      x / y,
+      as.numeric(gmp::as.bigq(ga) / gmp::as.bigq(gb)),
+      label = paste(type, "/")
+    )
+    expect_identical(x < y, c(TRUE, TRUE, FALSE, FALSE, NA), label = type)
+  }
+  # bit64's [<- asks is.double() too: a uint64 is assigned by its value
+  z <- x
+  z[2] <- uint64(5)
+  z[[3]] <- uint64("9007199254740993")
+  expect_identical(
+    as.character(z),
+    c("-9007199254740993", "5", "9007199254740993", "7", NA)
+  )
+})

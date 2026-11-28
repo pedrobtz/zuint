@@ -309,6 +309,7 @@ export(zu_ifelse)
 export(zu_match)
 export(zu_storage)
 export(zu_vapply)
+importFrom(methods,setOldClass)
 importFrom(stats,
   median,
   quantile
