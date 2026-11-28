@@ -314,6 +314,8 @@ dec_methods <- c(
   anyDuplicated = "dec_any_duplicated",
   mtfrm = "dec_mtfrm",
   diff = "zu_diff",
+  "utils::head" = "zu_head",
+  "utils::tail" = "zu_tail",
   chooseOpsMethod = "zu_choose_ops_method",
   is.numeric = "zu_is_numeric",
   is.nan = "zu_is_nan",
@@ -331,11 +333,15 @@ dec_methods <- c(
   rbind = "zu_matrix_unsupported",
   as.matrix = "zu_matrix_unsupported",
   aperm = "zu_matrix_unsupported",
-  scale = "zu_matrix_unsupported"
+  scale = "zu_matrix_unsupported",
+  "%*%" = "zu_matrix_unsupported",
+  crossprod = "zu_matrix_unsupported",
+  tcrossprod = "zu_matrix_unsupported",
+  Complex = "zu_complex_unsupported"
 )
 
 dec_s3_registrations <- function() {
-  sprintf('S3method("%s", zu_decimal128, %s)', names(dec_methods), dec_methods)
+  zu_s3_lines(names(dec_methods), "zu_decimal128", dec_methods)
 }
 
 #' @evalNamespace dec_s3_registrations()
@@ -669,13 +675,17 @@ dec_binary <- function(op, e1, e2, call) {
     "%/%" = ,
     "^" = dec_in_double(op, e1, e2, call, check = FALSE),
     "&" = ,
-    "|" = get(op, baseenv())(dec_logical(e1), dec_logical(e2)),
+    "|" = {
+      out <- get(op, baseenv())(dec_logical(e1), dec_logical(e2))
+      names(out) <- zu_result_names(e1, e2, length(out))
+      out
+    },
     dec_compare(op, e1, e2, call)
   )
 }
 
 dec_logical <- function(x) {
-  if (is_decimal128(x)) dec_as_logical(x) else as.logical(x)
+  if (is_decimal128(x)) dec_as_logical(x) else as.logical(zu_from_bit64(x))
 }
 
 # The operation on the doubles each side stands for. With `check`, a double
@@ -759,6 +769,7 @@ dec_arith <- function(op, e1, e2, call) {
 # `beyond` is the sign of each value too large for 38 digits (0 for the
 # others), which is then larger or smaller than every decimal.
 dec_compare_operand <- function(x, call) {
+  x <- zu_from_bit64(x)
   if (is_decimal128(x)) {
     return(list(x = x, s = dec_s(x), beyond = 0L))
   }

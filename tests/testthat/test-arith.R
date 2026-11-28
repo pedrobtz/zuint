@@ -472,3 +472,112 @@ test_that("^ with a base the type can't hold, and operator edges (#64)", {
   expect_identical(int64(1) + NULL, int64())
   expect_error(1.5^int64(2), class = "zuint_double_error")
 })
+
+test_that("Ops and Math keep the names of a named operand, as base R does (#164)", {
+  ops <- c("+", "-", "*", "%/%", "%%", "^", "/", "==", "<", "&", "|")
+  math <- c(
+    "abs",
+    "sign",
+    "sqrt",
+    "floor",
+    "ceiling",
+    "trunc",
+    "round",
+    "signif",
+    "exp",
+    "log",
+    "expm1",
+    "log1p",
+    "log2",
+    "log10",
+    "cos",
+    "sin",
+    "tan",
+    "cospi",
+    "sinpi",
+    "tanpi",
+    "acos",
+    "asin",
+    "atan",
+    "cosh",
+    "sinh",
+    "tanh",
+    "acosh",
+    "asinh",
+    "atanh",
+    "lgamma",
+    "gamma",
+    "digamma",
+    "trigamma",
+    "cumsum",
+    "cumprod",
+    "cummax",
+    "cummin"
+  )
+  # the oracle: base R on the same values as integers
+  v <- c(a = 1L, b = 2L)
+  for (type in zu_vector_types) {
+    x <- zu_ctor(type)(v)
+    names(x) <- names(v)
+    for (op in ops) {
+      f <- get(op)
+      expect_identical(
+        names(suppressWarnings(f(x, 1L))),
+        names(f(v, 1L)),
+        label = paste(type, op)
+      )
+      expect_identical(
+        names(suppressWarnings(f(1L, x))),
+        names(f(1L, v)),
+        label = paste(type, op, "right")
+      )
+    }
+    for (op in c("-", "+", "!")) {
+      expect_identical(
+        names(suppressWarnings(get(op)(x))),
+        names(get(op)(v)),
+        label = paste(type, "unary", op)
+      )
+    }
+    for (fn in math) {
+      f <- get(fn)
+      expect_identical(
+        names(suppressWarnings(f(x))),
+        names(suppressWarnings(f(v))),
+        label = paste(type, fn)
+      )
+    }
+  }
+})
+
+test_that("the double fallback of zuint.double = \"allow\" keeps names (#164)", {
+  withr::local_options(zuint.double = "allow")
+  v <- c(a = 1, b = 2)
+  for (type in zu_vector_types) {
+    x <- zu_ctor(type)(v)
+    names(x) <- names(v)
+    for (op in c("+", "-", "*", "%/%", "%%")) {
+      f <- get(op)
+      expect_identical(
+        names(suppressWarnings(f(x, 0.5))),
+        names(f(v, 0.5)),
+        label = paste(type, op)
+      )
+      expect_identical(
+        names(suppressWarnings(f(c(a = 0.5, b = 1.5), x))),
+        c("a", "b"),
+        label = paste(type, op, "right")
+      )
+    }
+    expect_identical(
+      names(suppressWarnings(c(a = 1.5, b = 2.5)^x)),
+      c("a", "b"),
+      label = paste(type, "^")
+    )
+    expect_identical(
+      names(suppressWarnings(c(x, c = 0.5))),
+      c("a", "b", "c"),
+      label = paste(type, "c()")
+    )
+  }
+})

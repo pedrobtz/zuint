@@ -28,7 +28,11 @@ zu_ops <- function(e1, e2) {
       op,
       "-" = zu_negate(e1, zu_policy_default, call),
       "+" = e1,
-      "!" = !zu_as_logical(e1)
+      "!" = {
+        out <- !zu_as_logical(e1)
+        names(out) <- names(e1)
+        out
+      }
     ))
   }
   switch(
@@ -40,18 +44,33 @@ zu_ops <- function(e1, e2) {
     "%%" = zu_arith(op, e1, e2, zu_policy_default, call),
     "/" = zu_divide(e1, e2, call),
     "^" = zu_pow(e1, e2, zu_policy_default, call),
-    "&" = as.logical(e1) & as.logical(e2),
-    "|" = as.logical(e1) | as.logical(e2),
+    "&" = ,
+    "|" = zu_logic(op, e1, e2),
     zu_compare(op, e1, e2, call)
   )
+}
+
+# & and | on the logical values, names as base R gives them. A plain
+# integer64 operand is read by its values, not its bits (#150).
+zu_logic <- function(op, x, y) {
+  out <- get(op, baseenv())(
+    as.logical(zu_from_bit64(x)),
+    as.logical(zu_from_bit64(y))
+  )
+  names(out) <- zu_result_names(x, y, length(out))
+  out
 }
 
 zu_math <- function(x, ...) {
   code <- zu_code(x)
   switch(
     .Generic,
-    abs = zu_new(.Call(zu_abs_sign_c, zu_unclass(x), code, FALSE), code),
-    sign = zu_new(.Call(zu_abs_sign_c, zu_unclass(x), code, TRUE), code),
+    abs = ,
+    sign = {
+      out <- .Call(zu_abs_sign_c, x, code, .Generic == "sign")
+      names(out) <- names(x)
+      zu_new(out, code)
+    },
     floor = ,
     ceiling = ,
     trunc = x,
@@ -69,7 +88,11 @@ zu_math <- function(x, ...) {
       zu_new(out, code)
     },
     # everything else is a real function: compute it on the doubles
-    do.call(.Generic, list(zu_as_double(x), ...))
+    {
+      out <- do.call(.Generic, list(zu_as_double(x), ...))
+      names(out) <- names(x)
+      out
+    }
   )
 }
 
@@ -151,6 +174,13 @@ zu_dbl_quiet <- function(x) {
   if (is.na(code)) as.double(x) else .Call(zu_to_double_c, x, code)[[1L]]
 }
 
+# `op` on the doubles x and y stand for, names as base R gives them.
+zu_in_double <- function(op, x, y) {
+  out <- get(op, baseenv())(zu_dbl_quiet(x), zu_dbl_quiet(y))
+  names(out) <- zu_result_names(x, y, length(out))
+  out
+}
+
 # Names as base arithmetic gives them: the first operand's when it is as
 # long as the result, else the second's.
 zu_result_names <- function(x, y, n) {
@@ -199,7 +229,7 @@ zu_arith <- function(op, x, y, policy, call) {
     policy == zu_policy_checked &&
       op %in% c("%/%", "%%") &&
       length(x) > 0L &&
-      isTRUE(any(y == 0L, na.rm = TRUE))
+      isTRUE(any(zu_from_bit64(y) == 0L, na.rm = TRUE))
   ) {
     zu_abort("Division by zero.", "division", call = call)
   }
@@ -208,7 +238,7 @@ zu_arith <- function(op, x, y, policy, call) {
   oy <- zu_operand(y, kinds[[2L]], code)
   if (is.null(ox) || is.null(oy)) {
     zu_double_problem(zu_types[[code]], call)
-    return(get(op, baseenv())(zu_dbl_quiet(x), zu_dbl_quiet(y)))
+    return(zu_in_double(op, x, y))
   }
   res <- .Call(
     zu_arith_c,
@@ -261,15 +291,13 @@ zu_pow <- function(x, y, policy, call) {
     !isTRUE(any(zu_compare("<", y, 0L, call)))
   }
   if (!exact) {
-    out <- zu_dbl_quiet(x)^zu_dbl_quiet(y)
-    names(out) <- zu_result_names(x, y, length(out))
-    return(out)
+    return(zu_in_double("^", x, y))
   }
   e <- zu_convert(y, ky, 4L)[[1L]]
   ox <- zu_operand(x, kinds[[1L]], code)
   if (is.null(ox)) {
     zu_double_problem(zu_types[[code]], call)
-    return(zu_dbl_quiet(x)^zu_dbl_quiet(y))
+    return(zu_in_double("^", x, y))
   }
   res <- .Call(zu_pow_c, ox$value, ox$kind, e, code, policy)
   zu_report_overflow(res[[2L]], policy, call)
@@ -418,6 +446,7 @@ zu_signif <- function(x, digits = 6L, ..., call = NULL) {
 }
 
 zu_digits_arg <- function(digits, call) {
+  digits <- zu_index(digits)
   if (length(digits) != 1L || is.na(digits) || !is.numeric(digits)) {
     zu_abort("`digits` must be a single number.", "type", call = call)
   }

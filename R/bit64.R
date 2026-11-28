@@ -101,6 +101,15 @@ zu_unsupported <- function(x, ...) {
   )
 }
 
+# The Complex group's generics take `z`.
+zu_complex_unsupported <- function(z) {
+  zu_abort(
+    sprintf("%s() is not supported for zuint vectors.", .Generic),
+    "unsupported",
+    call = sys.call()
+  )
+}
+
 zu_quantile <- function(x, ...) {
   zu_abort(
     "quantile() for zuint vectors comes after zuint 0.1.0.",
@@ -122,6 +131,11 @@ zu_matrix_unsupported <- function(...) {
 # computes in int64: exact, or NA with a warning, never truncated.
 # A decimal refuses: bit64 would compute `integer64 * decimal` on the
 # integers, making every fraction NA, and keep the decimal's attributes.
+#
+# bit64's `*`, `/`, `^`, `[<-` and `[[<-` ask its is.double() generic
+# first, and use the operand's bits as a double when it says TRUE, which
+# base's does for a uint64 (#151). int64 inherits is.double.integer64(),
+# and the other types are complex, so uint64 is the one that needs it.
 zu_register_bit64 <- function(...) {
   ns <- asNamespace("bit64")
   for (cl in c("zu_uint64", "zu_int128", "zu_uint128")) {
@@ -133,7 +147,19 @@ zu_register_bit64 <- function(...) {
     dec_as_integer64_method,
     envir = ns
   )
+  # only when bit64 masks base's is.double() with a generic of its own
+  if (exists("is.double", envir = ns, inherits = FALSE)) {
+    registerS3method("is.double", "zu_uint64", zu_is_double_method, envir = ns)
+  }
 }
+
+zu_is_double_method <- function(x) FALSE
+
+# bit64 masks setdiff(), union(), intersect(), is.element() and setequal(),
+# and they call methods::as(x, "integer64"), which needs zu_int64 declared
+# as a subclass of integer64 (#161). bit64's own integer64 class is
+# unchanged by it.
+setOldClass(c("zu_int64", "integer64"))
 
 zu_as_integer64_method <- function(x, ...) as_integer64(x)
 

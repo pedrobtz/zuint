@@ -336,7 +336,7 @@ test_that("/, %%, %/%, ^ and most of Math are computed in double; abs and - keep
   expect_identical(-a, decimal128(c(x = "-7.50", y = "0.05", z = NA), 5, 2))
   expect_identical(+a, a)
   expect_identical(!a, c(x = FALSE, y = FALSE, z = NA))
-  expect_identical(a & TRUE, c(TRUE, TRUE, NA))
+  expect_identical(a & TRUE, c(x = TRUE, y = TRUE, z = NA))
   expect_error(a + "1", class = "zuint_type_error")
 })
 

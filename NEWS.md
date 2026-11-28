@@ -118,3 +118,31 @@
 * Errors about an Arrow schema are `zuint_arrow_error`, and a schema with
   more than 4096 metadata entries is one too, where a DuckDB `HUGEINT`
   column had silently read as raw bytes (#166).
+* A plain bit64 `integer64` operand is read by its values when bit64 is not
+  loaded: in `&`, `|` and `xor()`, `zu_match()` and `%zin%`, `zu_ifelse()`'s
+  `test`, `checked_idiv()` and `checked_mod()`, `seq_zu()`'s `by`,
+  `round()`'s `digits`, comparisons and `&` with a `decimal128`, and vctrs
+  casts to every zuint type. Base R had read its bits, where `-1` is `NA`
+  and `NA` is a value (#150).
+* With bit64 attached, `integer64 * uint64`, `/`, `^` and assigning a
+  uint64 into an `integer64` are exact: bit64 had computed on the uint64's
+  bits (#151).
+* `Conj()`, `Re()`, `Im()`, `Mod()` and `Arg()` are a
+  `zuint_unsupported_error` for every type, where they had computed on the
+  payload and kept the class (#152).
+* A zuint or `integer64` count is read as the number it stands for, as an
+  index is: `rep()`'s `times`, `each` and `length.out`, `diff()`'s `lag`
+  and `differences`, `head()` and `tail()`, `length<-`, `seq_zu()`'s and
+  `seq()`'s `length.out`, and `format()`'s `width`, `print()`'s `max` and
+  `str()`'s `vec.len` (#153).
+* `%*%`, and from R 4.4.0 `crossprod()` and `tcrossprod()`, are a
+  `zuint_unsupported_error` for every type, with or without bit64; for
+  int64 the answer had depended on whether bit64 was loaded. `matrix()`,
+  `array()`, `outer()` and `diag()` cannot be intercepted, as
+  `?zu_ifelse` says (#160).
+* With bit64 attached, its `setdiff()`, `union()`, `intersect()`,
+  `is.element()` and `setequal()` work on int64: zuint declares
+  `zu_int64` a subclass of `integer64` for `methods::as()` (#161).
+* `abs()`, `sign()`, the other `Math` functions computed in double, `!`,
+  `&`, `|` and the double fallback of `options(zuint.double = "allow")` in
+  arithmetic, `^` and `c()` keep names, as base R does (#164).

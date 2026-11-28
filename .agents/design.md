@@ -408,7 +408,13 @@ fixed-point is a small layer on top.
 - Arbitrary precision (`gmp`, `Rmpfr`), and decimals beyond 38 digits
   (`decimal256`). Fixed-point decimals up to 38 digits were a non-goal
   until 2026-11-20 and are now in scope (§2.2, #88).
-- Matrix algebra on wide integers.
+- Matrix algebra on wide integers. The functions that dispatch refuse a
+  zuint vector with a `zuint_unsupported_error` (`%*%`, `crossprod()`,
+  `tcrossprod()`, `cbind()`, `rbind()`, `as.matrix()`, `aperm()`,
+  `scale()`), and so does the `Complex` group (`Conj()`, `Re()`, `Im()`,
+  `Mod()`, `Arg()`; #152). `matrix()`, `array()`, `outer()` and `diag()`
+  do not dispatch and cannot be intercepted; they return the raw bits, as
+  `ifelse()` does, and `?zu_ifelse` says so (2026-11-28, #160).
 
 ## 4. Types and representation
 
@@ -448,6 +454,40 @@ Subclassing `integer64` has two consequences the implementation must handle:
   claim precedence; zuint's method returns TRUE for every `zu_*` class, so
   `zu_int64 + integer64` runs zuint's exact arithmetic. This sets the minimum
   R version: `Depends: R (>= 4.3.0)`.
+- **A plain `integer64` argument never reaches a base generic.** Decided
+  2026-11-28 (#150): wherever zuint's code calls `is.na()`, `as.logical()`
+  or `==` on an argument that may be a plain `integer64` (the other operand
+  of `&`, a `zu_match()` table, a vctrs cast's `x`, `zu_ifelse()`'s `test`,
+  a decimal comparison), it first swaps the class to `zu_int64`
+  (`zu_from_bit64()`). Without bit64 loaded those generics would read the
+  bits. Converting once at the entry, rather than testing NA by the
+  sentinel at each use, keeps every later call on zuint's methods.
+- **A count is a number, like an index.** Decided 2026-11-28 (#153): a
+  zuint or `integer64` value given as `rep()`'s `times`, `diff()`'s `lag`,
+  `head()`'s `n`, `length<-`, a width and the like is converted exactly to
+  an integer (`zu_index()`), or `NA` with a `zuint_cast_warning` beyond
+  its range, before base sees it. zuint registers `head()` and `tail()`
+  methods for this alone.
+- **bit64's own generics and S4 casts must see the zuint types by value.**
+  Decided 2026-11-28. bit64's `*`, `/`, `^`, `[<-` and `[[<-` ask its
+  `is.double()` generic and use a `TRUE` operand's bits as a double, so
+  zuint registers `is.double()` for `zu_uint64` (returning `FALSE`) in
+  bit64's namespace when bit64 loads (#151); the 128-bit types are
+  complex and `zu_int64` inherits `is.double.integer64()`. bit64's masked
+  `setdiff()`, `union()`, `intersect()`, `is.element()` and `setequal()`
+  call `methods::as(x, "integer64")`, so zuint declares
+  `setOldClass(c("zu_int64", "integer64"))` (#161), which imports
+  `methods`. That defines an `integer64` S4 class in zuint too when bit64
+  is not loaded; with both loaded bit64's coercions and `is()` answer as
+  before, whichever loaded first. A plain `integer64` with an int128 value
+  assigned into it still fails in bit64's `[<-`, which asks `is.complex()`
+  and converts the target with `as()`; that is bit64's object and zuint
+  leaves it.
+- **`%*%` is a bit64 method, not a mask.** Decided 2026-11-28 (#160):
+  bit64 defines `%*%.integer64` through R's `matrixOps` group, so zuint
+  defines `%*%` (and `crossprod()`, `tcrossprod()`, members from R 4.4.0)
+  for every zuint class as the matrix refusal (§3). The parity test's
+  allowlist no longer lists it.
 
 ### 4.2 Why the other types use ALTREP
 

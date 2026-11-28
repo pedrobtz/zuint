@@ -191,6 +191,8 @@ zu_mtfrm <- function(x) zu_as_character(x)
 #' @export
 zu_match <- function(x, table, nomatch = NA_integer_) {
   call <- sys.call()
+  x <- zu_from_bit64(x)
+  table <- zu_from_bit64(table)
   if (is_decimal128(x) || is_decimal128(table)) {
     return(dec_match(x, table, as.integer(nomatch), call))
   }
@@ -220,6 +222,8 @@ zu_match <- function(x, table, nomatch = NA_integer_) {
 `%zin%` <- function(x, table) zu_match(x, table, nomatch = 0L) > 0L
 
 zu_diff <- function(x, lag = 1L, differences = 1L, ...) {
+  lag <- zu_index(lag)
+  differences <- zu_index(differences)
   for (i in seq_len(differences)) {
     n <- length(x)
     if (lag >= n) {
@@ -260,6 +264,11 @@ seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {
     code <- zu_common_code(kinds, call)
   }
   from <- zu_cast(from, code, call = call)
+  by <- zu_from_bit64(by)
+  if (!is.na(zu_code(length.out))) {
+    # a count, compared with the integer range below (#153)
+    length.out <- zu_dbl_quiet(length.out)
+  }
   if (length(from) != 1L || is.na(from) || length(by) != 1L || is.na(by)) {
     zu_abort(
       "`from` and `by` must be single non-missing values.",

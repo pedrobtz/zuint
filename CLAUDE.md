@@ -25,7 +25,8 @@ a stricter second implementation: exact or explicit, overflow as a policy,
 summaries in the right type (design §0.1). Dependencies outside the zu-*
 family are allowed only in `Suggests` (design §2.1): zufast (>= 0.1.1) is
 `LinkingTo` only, R (>= 4.3.0) is required for `chooseOpsMethod()`, stats
-(part of R) is imported for the `median()` generic, and bit64, zuarrow,
+(part of R) is imported for the `median()` generic, methods (part of R) for
+`setOldClass()`, and bit64, zuarrow,
 vctrs, pillar and gmp are Suggests used in tests and lazily registered
 methods. DuckDB, arrow and nanoarrow are oracles but not Suggests: the tests
 replay their answers from a fixture (Testing). It does not
@@ -303,10 +304,33 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   passes beyond the range and comes back is exact, so the accumulator wraps
   modulo 2^128 and counts each wrap; only a non-zero count, or the NA
   pattern, at the end is an overflow.
-- **bit64 masks `order`, `match`, `%in%`, `table` and `rank` as functions,**
-  not methods. For int64 they agree with base R except `rank()`, which keeps
+- **bit64 masks `order`, `match`, `%in%`, `table`, `rank`, `setdiff`,
+  `union`, `intersect`, `is.element` and `setequal` as functions,** not
+  methods. For int64 they agree with base R except `rank()`, which keeps
   NA as NA under bit64 and ranks it last under base R. The parity tests
-  cover the generics; these are bit64's to define.
+  cover the generics; these are bit64's to define. The five set functions
+  call `methods::as(x, "integer64")`, which works only because zuint
+  declares `setOldClass(c("zu_int64", "integer64"))` (#161); the `sets`
+  topic of `bit64_parity_code` compares them.
+- **`%*%` is a bit64 method, not a mask.** bit64 defines `%*%.integer64`
+  (R's `matrixOps` group), so every zuint class has a `%*%`,
+  `crossprod()` and `tcrossprod()` method, the matrix refusal; it is off
+  the parity allowlist (#160). `matrix()`, `array()`, `outer()` and
+  `diag()` do not dispatch and cannot be refused.
+- **bit64's `is.double()` generic must say FALSE for uint64.** bit64's `*`,
+  `/`, `^`, `[<-` and `[[<-` use a `TRUE` operand's bits as a double, so
+  `zu_register_bit64()` registers `is.double.zu_uint64` in bit64's
+  namespace (#151). int64 inherits bit64's method; the 128-bit types and
+  decimal128 are complex.
+- **A plain `integer64` argument never reaches a base generic.** With bit64
+  not loaded, `is.na()`, `as.logical()` and `==` on it read the bits (-1 is
+  NaN, NA is -0.0, a value). Code that calls them on an argument that may
+  be one converts it first with `zu_from_bit64()` (#150), and a count
+  argument (`rep()`'s `times`, `head()`'s `n`, `length<-`, a width) goes
+  through `zu_index()` like an index (#153). The `operands` topics of
+  `bit64_parity_code` hold the probes.
+- **Every new method keeps names as base R does.** The C results carry
+  none, so each path restores them, double fallbacks included (#164).
 - **The vctrs equality and ordering proxy is exact 32-bit pieces, never the
   payload.** vctrs treats every NaN bit pattern as one value, and many int64
   values are NaN patterns as doubles (-1 and -2 among them).
