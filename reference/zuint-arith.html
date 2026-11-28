@@ -82,7 +82,8 @@ double vector. They are recycled.</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A zuint vector of the common type.</p>
+    <p>A zuint vector of the common type; for <code>checked_pow()</code> and
+<code>wrapping_pow()</code>, of the base's type when the base is a zuint vector.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -98,7 +99,9 @@ as in R; division by zero is <code>NA</code>, except in <code>checked_idiv()</co
 <code>checked_mod()</code>, where it is an error of class <code>zuint_division_error</code>. <code>/</code> divides in double. <code>^</code> is exact
 for a non-negative integer exponent, however large (at or past the type's
 width, only the bases 0, 1 and -1 have an answer; any other overflows), and
-computed in double otherwise. <code>NA ^ 0</code> and <code>1 ^ NA</code> are 1, as in base R.
+computed in double otherwise. <code>checked_pow()</code> and <code>wrapping_pow()</code> have no
+double result: a negative or fractional exponent is an error of class
+<code>zuint_type_error</code>. <code>NA ^ 0</code> and <code>1 ^ NA</code> are 1, as in base R.
 Comparison is exact across all the types and doubles.</p>
     </div>
 

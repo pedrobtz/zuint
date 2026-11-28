@@ -2,6 +2,37 @@
 
 ## zuint 0.0.0.9000
 
+- Every condition reports the call it came from
+  ([\#80](https://github.com/pedrobtz/zuint/issues/80)): the recycling
+  warning, the error for an invalid `options(zuint.double = )`, and
+  [`min()`](https://rdrr.io/r/base/Extremes.html),
+  [`max()`](https://rdrr.io/r/base/Extremes.html) and
+  [`range()`](https://rdrr.io/r/base/range.html) of nothing, which
+  reported none. The `Summary` group’s conditions name the generic,
+  `sum(...)`, instead of the method called on the payload as doubles,
+  which was slow to print.
+- [`checked_pow()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
+  and
+  [`wrapping_pow()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
+  refuse a negative or fractional exponent with a `zuint_type_error`.
+  They had computed in double, returning `0.5` for
+  `checked_pow(int64(2), -1L)` and rounding the exact elements beside
+  such an exponent. `^` still computes those in double
+  ([\#67](https://github.com/pedrobtz/zuint/issues/67)).
+- The Arrow import refuses an array whose offset and length would
+  overflow the index or byte arithmetic with a `zuint_arrow_error`,
+  instead of reading outside its buffers
+  ([\#81](https://github.com/pedrobtz/zuint/issues/81)).
+- `format(x, width = )` reads a bit64 `integer64` width by its value
+  when bit64 is not loaded, as the other counts do
+  ([\#153](https://github.com/pedrobtz/zuint/issues/153)); it had read
+  the bits as a double, so the width was 0.
+- A zuint class, or bit64’s `integer64`, on the wrong storage type (an
+  `integer64` over an integer vector, say) is a `zuint_type_error` in
+  the constructors and every method, instead of an unclassed “corrupt
+  payload” error from the C code
+  ([\#69](https://github.com/pedrobtz/zuint/issues/69),
+  [\#81](https://github.com/pedrobtz/zuint/issues/81)).
 - [`cut()`](https://rdrr.io/r/base/cut.html) of a zuint or decimal
   vector compares exactly against the breaks, zuint or numbers, with
   base’s `labels`, `right`, `include.lowest` and `ordered_result`; the

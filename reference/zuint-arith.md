@@ -41,7 +41,8 @@ wrapping_neg(x)
 
 ## Value
 
-A zuint vector of the common type.
+A zuint vector of the common type; for `checked_pow()` and
+`wrapping_pow()`, of the base's type when the base is a zuint vector.
 
 ## Details
 
@@ -60,8 +61,10 @@ and `checked_mod()`, where it is an error of class
 `zuint_division_error`. `/` divides in double. `^` is exact for a
 non-negative integer exponent, however large (at or past the type's
 width, only the bases 0, 1 and -1 have an answer; any other overflows),
-and computed in double otherwise. `NA ^ 0` and `1 ^ NA` are 1, as in
-base R. Comparison is exact across all the types and doubles.
+and computed in double otherwise. `checked_pow()` and `wrapping_pow()`
+have no double result: a negative or fractional exponent is an error of
+class `zuint_type_error`. `NA ^ 0` and `1 ^ NA` are 1, as in base R.
+Comparison is exact across all the types and doubles.
 
 ## Examples
 
