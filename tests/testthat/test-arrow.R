@@ -203,7 +203,7 @@ test_that("a released or unreadable struct is a zuint_arrow_error", {
   expect_error(zu_arrow_from(1L), class = "zuint_arrow_error")
 })
 
-test_that("corrupt schema metadata reads as no metadata", {
+test_that("corrupt schema metadata reads as no metadata (#34)", {
   i32 <- function(v) {
     writeBin(as.integer(v), raw(), size = 4, endian = .Platform$endian)
   }

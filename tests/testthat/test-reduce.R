@@ -311,7 +311,7 @@ test_that("the 64-bit sum is exact at the edges of the range", {
   }
 })
 
-test_that("seq_zu runs downwards in unsigned types and across whole ranges", {
+test_that("seq_zu runs downwards in unsigned types and across whole ranges (#31)", {
   expect_identical(
     seq_zu(uint64(10), uint64(1), by = -3L),
     uint64(c(10, 7, 4, 1))

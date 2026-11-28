@@ -249,7 +249,7 @@ test_that("each class claims mixed Ops calls", {
   }
 })
 
-test_that("is.nan, is.finite and is.infinite read values, not raw bits", {
+test_that("is.nan, is.finite and is.infinite read values, not raw bits (#29)", {
   for (type in zu_vector_types) {
     x <- zu_ctor(type)(c(a = "1", b = NA, c = "0"))
     expect_identical(
@@ -306,7 +306,7 @@ test_that("all.equal compares exactly", {
   expect_match(all.equal(int64(1), 1), "target is int64")
 })
 
-test_that("quantile and matrices are unsupported rather than computed on bits", {
+test_that("quantile and matrices are unsupported rather than computed on bits (#33)", {
   expect_error(quantile(int64(1:4)), class = "zuint_unsupported_error")
   expect_error(cbind(int64(1:2), 1:2), class = "zuint_unsupported_error")
   expect_error(rbind(uint128(1)), class = "zuint_unsupported_error")
@@ -315,7 +315,7 @@ test_that("quantile and matrices are unsupported rather than computed on bits", 
   expect_error(scale(uint64(1:2)), class = "zuint_unsupported_error")
 })
 
-test_that("a zuint vector used as an index is read as a number", {
+test_that("a zuint vector used as an index is read as a number (#30)", {
   x <- int64(c(10, 20, 30))
   expect_identical(x[int64(2)], int64(20))
   expect_identical(x[uint128(c(3, 1))], int64(c(30, 10)))

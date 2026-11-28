@@ -118,7 +118,7 @@ test_that("slots vctrs creates are the type's NA, never R's NA bits", {
   )
 })
 
-test_that("vctrs padding, unmatched rows, lag and if_else give NA", {
+test_that("vctrs padding, unmatched rows, lag and if_else give NA (#25)", {
   skip_if_not_installed("vctrs")
   skip_if_not(exists("vec_case_when", asNamespace("vctrs")))
   for (type in zu_all_types) {
@@ -146,7 +146,7 @@ test_that("vctrs padding, unmatched rows, lag and if_else give NA", {
   }
 })
 
-test_that("zu_ifelse keeps the names of test", {
+test_that("zu_ifelse keeps the names of test (#35)", {
   expect_identical(
     zu_ifelse(c(a = TRUE, b = FALSE), int64(1), int64(2)),
     int64(c(a = 1, b = 2))

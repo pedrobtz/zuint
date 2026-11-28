@@ -373,7 +373,7 @@ test_that("c() takes the common type", {
   expect_identical(is.na(y), c(FALSE, TRUE))
 })
 
-test_that("round and signif with negative digits round half to even, as base R", {
+test_that("round and signif with negative digits round half to even, as base R (#28)", {
   withr::local_seed(17)
   v <- c(
     round(runif(200, -1e15, 1e15)),
@@ -420,7 +420,7 @@ test_that("round and signif with negative digits round half to even, as base R",
   expect_error(round(int64(1), c(1, 2)), class = "zuint_type_error")
 })
 
-test_that("checked_idiv and checked_mod error on a zero divisor", {
+test_that("checked_idiv and checked_mod error on a zero divisor (#32)", {
   for (type in zu_all_types) {
     x <- zu_ctor(type)(c(7, 9))
     expect_identical(checked_idiv(x, 2L), zu_ctor(type)(c(3, 4)), label = type)
