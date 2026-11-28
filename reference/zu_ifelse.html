@@ -97,6 +97,12 @@ type of <code>FUN.VALUE</code> as <code>x[i] &lt;- value</code> does, exactly or
 <code>Summary</code> functions, which R dispatches on their first argument only:
 <code>sum(int128(5), 1L)</code> is exact, while <code>sum(1L, int128(5))</code> reads the raw
 bits. Put the zuint vector first.</p>
+<p><code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">base::matrix()</a></code>, <code><a href="https://rdrr.io/r/base/array.html" class="external-link">base::array()</a></code>, <code><a href="https://rdrr.io/r/base/outer.html" class="external-link">base::outer()</a></code> and <code><a href="https://rdrr.io/r/base/diag.html" class="external-link">base::diag()</a></code> are such functions too,
+and no method can intercept them: they return the raw bits. zuint
+vectors do not form matrices, and the functions that dispatch refuse
+them with an error of class <code>zuint_unsupported_error</code>: <code>%*%</code>,
+<code><a href="https://rdrr.io/r/base/crossprod.html" class="external-link">base::crossprod()</a></code> and <code><a href="https://rdrr.io/r/base/crossprod.html" class="external-link">base::tcrossprod()</a></code> (the last two from R 4.4.0),
+<code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code>, <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind()</a></code>, <code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix()</a></code>, <code><a href="https://rdrr.io/r/base/aperm.html" class="external-link">aperm()</a></code> and <code><a href="https://rdrr.io/r/base/scale.html" class="external-link">scale()</a></code>.</p>
     </div>
 
     <div class="section level2">

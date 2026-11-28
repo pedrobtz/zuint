@@ -245,3 +245,67 @@
   with more than 4096 metadata entries is one too, where a DuckDB
   `HUGEINT` column had silently read as raw bytes
   ([\#166](https://github.com/pedrobtz/zuint/issues/166)).
+- A plain bit64 `integer64` operand is read by its values when bit64 is
+  not loaded: in `&`, `|` and
+  [`xor()`](https://rdrr.io/r/base/Logic.html),
+  [`zu_match()`](https://pedrobtz.github.io/zuint/reference/zu_match.md)
+  and `%zin%`,
+  [`zu_ifelse()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)’s
+  `test`,
+  [`checked_idiv()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md)
+  and
+  [`checked_mod()`](https://pedrobtz.github.io/zuint/reference/zuint-arith.md),
+  [`seq_zu()`](https://pedrobtz.github.io/zuint/reference/seq_zu.md)’s
+  `by`, [`round()`](https://rdrr.io/r/base/Round.html)’s `digits`,
+  comparisons and `&` with a `decimal128`, and vctrs casts to every
+  zuint type. Base R had read its bits, where `-1` is `NA` and `NA` is a
+  value ([\#150](https://github.com/pedrobtz/zuint/issues/150)).
+- With bit64 attached, `integer64 * uint64`, `/`, `^` and assigning a
+  uint64 into an `integer64` are exact: bit64 had computed on the
+  uint64’s bits ([\#151](https://github.com/pedrobtz/zuint/issues/151)).
+- [`Conj()`](https://rdrr.io/r/base/complex.html),
+  [`Re()`](https://rdrr.io/r/base/complex.html),
+  [`Im()`](https://rdrr.io/r/base/complex.html),
+  [`Mod()`](https://rdrr.io/r/base/complex.html) and
+  [`Arg()`](https://rdrr.io/r/base/complex.html) are a
+  `zuint_unsupported_error` for every type, where they had computed on
+  the payload and kept the class
+  ([\#152](https://github.com/pedrobtz/zuint/issues/152)).
+- A zuint or `integer64` count is read as the number it stands for, as
+  an index is: [`rep()`](https://rdrr.io/r/base/rep.html)’s `times`,
+  `each` and `length.out`,
+  [`diff()`](https://rdrr.io/r/base/diff.html)’s `lag` and
+  `differences`, [`head()`](https://rdrr.io/r/utils/head.html) and
+  [`tail()`](https://rdrr.io/r/utils/head.html), `length<-`,
+  [`seq_zu()`](https://pedrobtz.github.io/zuint/reference/seq_zu.md)’s
+  and [`seq()`](https://rdrr.io/r/base/seq.html)’s `length.out`, and
+  [`format()`](https://rdrr.io/r/base/format.html)’s `width`,
+  [`print()`](https://rdrr.io/r/base/print.html)’s `max` and
+  [`str()`](https://rdrr.io/r/utils/str.html)’s `vec.len`
+  ([\#153](https://github.com/pedrobtz/zuint/issues/153)).
+- `%*%`, and from R 4.4.0
+  [`crossprod()`](https://rdrr.io/r/base/crossprod.html) and
+  [`tcrossprod()`](https://rdrr.io/r/base/crossprod.html), are a
+  `zuint_unsupported_error` for every type, with or without bit64; for
+  int64 the answer had depended on whether bit64 was loaded.
+  [`matrix()`](https://rdrr.io/r/base/matrix.html),
+  [`array()`](https://rdrr.io/r/base/array.html),
+  [`outer()`](https://rdrr.io/r/base/outer.html) and
+  [`diag()`](https://rdrr.io/r/base/diag.html) cannot be intercepted, as
+  [`?zu_ifelse`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
+  says ([\#160](https://github.com/pedrobtz/zuint/issues/160)).
+- With bit64 attached, its
+  [`setdiff()`](https://rdrr.io/r/base/sets.html),
+  [`union()`](https://rdrr.io/r/base/sets.html),
+  [`intersect()`](https://rdrr.io/r/base/sets.html),
+  [`is.element()`](https://rdrr.io/r/base/sets.html) and
+  [`setequal()`](https://rdrr.io/r/base/sets.html) work on int64: zuint
+  declares `zu_int64` a subclass of `integer64` for
+  [`methods::as()`](https://rdrr.io/r/methods/as.html)
+  ([\#161](https://github.com/pedrobtz/zuint/issues/161)).
+- [`abs()`](https://rdrr.io/r/base/MathFun.html),
+  [`sign()`](https://rdrr.io/r/base/sign.html), the other `Math`
+  functions computed in double, `!`, `&`, `|` and the double fallback of
+  `options(zuint.double = "allow")` in arithmetic, `^` and
+  [`c()`](https://rdrr.io/r/base/c.html) keep names, as base R does
+  ([\#164](https://github.com/pedrobtz/zuint/issues/164)).

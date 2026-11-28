@@ -64,6 +64,21 @@ functions, which R dispatches on their first argument only:
 `sum(int128(5), 1L)` is exact, while `sum(1L, int128(5))` reads the raw
 bits. Put the zuint vector first.
 
+[`base::matrix()`](https://rdrr.io/r/base/matrix.html),
+[`base::array()`](https://rdrr.io/r/base/array.html),
+[`base::outer()`](https://rdrr.io/r/base/outer.html) and
+[`base::diag()`](https://rdrr.io/r/base/diag.html) are such functions
+too, and no method can intercept them: they return the raw bits. zuint
+vectors do not form matrices, and the functions that dispatch refuse
+them with an error of class `zuint_unsupported_error`: `%*%`,
+[`base::crossprod()`](https://rdrr.io/r/base/crossprod.html) and
+[`base::tcrossprod()`](https://rdrr.io/r/base/crossprod.html) (the last
+two from R 4.4.0), [`cbind()`](https://rdrr.io/r/base/cbind.html),
+[`rbind()`](https://rdrr.io/r/base/cbind.html),
+[`as.matrix()`](https://rdrr.io/r/base/matrix.html),
+[`aperm()`](https://rdrr.io/r/base/aperm.html) and
+[`scale()`](https://rdrr.io/r/base/scale.html).
+
 ## Examples
 
 ``` r
