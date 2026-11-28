@@ -2,6 +2,24 @@
 
 ## zuint 0.0.0.9000
 
+- [`cut()`](https://rdrr.io/r/base/cut.html) of a zuint or decimal
+  vector compares exactly against the breaks, zuint or numbers, with
+  base’s `labels`, `right`, `include.lowest` and `ordered_result`; the
+  default labels write the breaks in full. A single number of intervals
+  is a `zuint_unsupported_error`
+  ([\#165](https://github.com/pedrobtz/zuint/issues/165)).
+- The help says what base R cannot dispatch
+  ([\#149](https://github.com/pedrobtz/zuint/issues/149),
+  [\#162](https://github.com/pedrobtz/zuint/issues/162),
+  [\#165](https://github.com/pedrobtz/zuint/issues/165)):
+  [`?zu_match`](https://pedrobtz.github.io/zuint/reference/zu_match.md)
+  no longer claims base [`match()`](https://rdrr.io/r/base/match.html)
+  and `%in%` agree with it, because a bare double is compared as text,
+  and
+  [`?zu_ifelse`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
+  lists the base functions that read the payload, each with its zuint
+  route, and the data-frame and data.table row padding that writes R’s
+  NA bits as a value.
 - Arguments zuint methods ignored are now honoured or refused
   ([\#163](https://github.com/pedrobtz/zuint/issues/163)):
   [`mean()`](https://rdrr.io/r/base/mean.html) and

@@ -93,16 +93,68 @@ of <code>FUN.VALUE</code>, a zuint prototype such as <code>int64(0)</code>; the 
 type. Both take <code><a href="decimal128.html">decimal128()</a></code> vectors too: <code>zu_ifelse()</code> combines <code>yes</code>
 and <code>no</code> as <code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code> does, and <code>zu_vapply()</code> converts each result to the
 type of <code>FUN.VALUE</code> as <code>x[i] &lt;- value</code> does, exactly or <code>NA</code>.</p>
-<p>The same goes for <code><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum()</a></code>, <code><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min()</a></code>, <code><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max()</a></code>, <code><a href="https://rdrr.io/r/base/range.html" class="external-link">range()</a></code> and the other
-<code>Summary</code> functions, which R dispatches on their first argument only:
-<code>sum(int128(5), 1L)</code> is exact, while <code>sum(1L, int128(5))</code> reads the raw
-bits. Put the zuint vector first.</p>
-<p><code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">base::matrix()</a></code>, <code><a href="https://rdrr.io/r/base/array.html" class="external-link">base::array()</a></code>, <code><a href="https://rdrr.io/r/base/outer.html" class="external-link">base::outer()</a></code> and <code><a href="https://rdrr.io/r/base/diag.html" class="external-link">base::diag()</a></code> are such functions too,
-and no method can intercept them: they return the raw bits. zuint
-vectors do not form matrices, and the functions that dispatch refuse
-them with an error of class <code>zuint_unsupported_error</code>: <code>%*%</code>,
-<code><a href="https://rdrr.io/r/base/crossprod.html" class="external-link">base::crossprod()</a></code> and <code><a href="https://rdrr.io/r/base/crossprod.html" class="external-link">base::tcrossprod()</a></code> (the last two from R 4.4.0),
-<code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code>, <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind()</a></code>, <code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix()</a></code>, <code><a href="https://rdrr.io/r/base/aperm.html" class="external-link">aperm()</a></code> and <code><a href="https://rdrr.io/r/base/scale.html" class="external-link">scale()</a></code>.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="base-functions-that-cannot-dispatch">Base functions that cannot dispatch<a class="anchor" aria-label="anchor" href="#base-functions-that-cannot-dispatch"></a></h2>
+
+
+<p>R dispatches most functions on their first argument only, and some read
+a vector's payload without dispatching at all. Design 4.1 accepts that
+cost. Each function below returns the raw bits of the values, or drops
+their class, so the answer is wrong, often with no warning. For
+<code>decimal128</code> the bits are the scaled coefficients.</p><ul><li><p><code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code> and <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind()</a></code> of data frames with a non-zuint first argument or
+first column: <code>c(1L, int128(5))</code> is complex bits, as is
+<code>rbind(data.frame(x = 1L), data.frame(x = int128(5)))</code>. Put the zuint
+vector first, or use <code><a href="https://vctrs.r-lib.org/reference/vec_bind.html" class="external-link">vctrs::vec_rbind()</a></code> or <code><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">dplyr::bind_rows()</a></code>.</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum()</a></code>, <code><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">min()</a></code>, <code><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">max()</a></code>, <code><a href="https://rdrr.io/r/base/range.html" class="external-link">range()</a></code> and the other <code>Summary</code> functions
+read only the first argument's class: <code>sum(int128(5), 1L)</code> is exact and
+<code>sum(1L, int128(5))</code> reads the raw bits. Put the zuint vector first.</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/is.unsorted.html" class="external-link">is.unsorted()</a></code>: use <code>is.unsorted(xtfrm(x))</code>, whose ranks are exact.</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/complete.cases.html" class="external-link">complete.cases()</a></code> reads the payload's NaN patterns, so its answer is
+inverted for negative <code>int64</code> values: use <code>!is.na(x)</code> on each column.</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/aggregate.html" class="external-link">aggregate()</a></code> and <code><a href="https://rdrr.io/r/base/rowsum.html" class="external-link">rowsum()</a></code> read the payload, as a group or as the
+values. A negative <code>int64</code> group vanishes. Group by <code>as.character(x)</code>,
+and sum each group with <code>zu_vapply(split(x, g), sum, x[0])</code>.</p></li>
+<li><p><code><a href="https://rdrr.io/r/stats/cor.html" class="external-link">var()</a></code> and <code><a href="https://rdrr.io/r/stats/cor.html" class="external-link">cor()</a></code> read the payload: <code>var(int64(1:10))</code> is 0. Use
+<code>var(as.double(x))</code>, which rounds to a double. <code><a href="https://rdrr.io/r/stats/sd.html" class="external-link">sd()</a></code> is right.</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/unlist.html" class="external-link">unlist()</a></code>, <code><a href="https://rdrr.io/r/base/lapply.html" class="external-link">sapply()</a></code> and <code><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply()</a></code> drop the class. Use
+<code>do.call(c, list)</code> and <code>zu_vapply()</code>.</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse()</a></code>: use <code>zu_ifelse()</code>.</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/formatc.html" class="external-link">formatC()</a></code> and <code>sprintf("%f")</code> read the bits (<code>sprintf("%d")</code> is an
+error). Use <code><a href="https://rdrr.io/r/base/format.html" class="external-link">format()</a></code>, <code><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character()</a></code> or <code><a href="format_hex.html">format_hex()</a></code>; <code><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste()</a></code>
+and <code>sprintf("%s")</code> are right.</p></li>
+<li><p>A zuint vector as an index or a count of a base function that does
+not dispatch on it: <code>letters[int64(2)]</code>, <code>rep(1, int64(3))</code>,
+<code><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep_len()</a></code>, <code><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len()</a></code>, <code><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric()</a></code> and <code><a href="https://rdrr.io/r/base/vector.html" class="external-link">vector()</a></code> are empty, and
+an <code>int128</code> index is an error. Pass
+<code>as.integer(i)</code>. A zuint vector as the vector being indexed, or as
+<code><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep()</a></code>'s <code>x</code>, is right.</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">base::matrix()</a></code>, <code><a href="https://rdrr.io/r/base/array.html" class="external-link">base::array()</a></code>, <code><a href="https://rdrr.io/r/base/outer.html" class="external-link">base::outer()</a></code> and <code><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag()</a></code> return the raw bits.
+zuint vectors do not form matrices, and the functions that dispatch
+refuse them with a <code>zuint_unsupported_error</code>: <code>%*%</code>, <code><a href="https://rdrr.io/r/base/crossprod.html" class="external-link">base::crossprod()</a></code> and
+<code><a href="https://rdrr.io/r/base/crossprod.html" class="external-link">base::tcrossprod()</a></code> (the last two from R 4.4.0), <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code>, <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind()</a></code>,
+<code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix()</a></code>, <code><a href="https://rdrr.io/r/base/aperm.html" class="external-link">aperm()</a></code> and <code><a href="https://rdrr.io/r/base/scale.html" class="external-link">scale()</a></code>.</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/match.html" class="external-link">base::match()</a></code>, <code>%in%</code>, <code><a href="https://rdrr.io/r/base/table.html" class="external-link">base::table()</a></code>, <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> and the set functions compare
+a bare double as text: see <code><a href="zu_match.html">zu_match()</a></code>.</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/cut.html" class="external-link">cut()</a></code> has a method: see <a href="zu_cut.html">zu_cut</a>.</p></li>
+</ul></div>
+    <div class="section level2">
+    <h2 id="padding-data-frames-and-data-table">Padding data frames and data.table<a class="anchor" aria-label="anchor" href="#padding-data-frames-and-data-table"></a></h2>
+
+
+<p>Base R fills new rows with its own <code>NA</code>, whose bits are a valid <code>int64</code>,
+<code>uint64</code>, <code>int128</code> or <code>uint128</code> value. Growing a data frame by row
+(<code>d[nrow(d) + 2, "id"] &lt;- 7L</code>, through <code><a href="https://rdrr.io/r/base/dataframeHelpers.html" class="external-link">xpdrows.data.frame()</a></code>) strips the
+class and fills the new rows of every zuint column with that value, not
+<code>NA</code>. The same holds for data.table's <code>rbindlist(fill = TRUE)</code>,
+<code>d[c(1, NA)]</code>, <code>shift()</code> and <code>:= NA</code> on <code>uint64</code>, <code>int128</code> and <code>uint128</code>
+columns, and a data.table <code>by</code> groups the <code>NA</code> of a <code>uint64</code> column with
+its neighbouring value (bit64 pads <code>int64</code> in base data frames the same
+way). No zuint method is reached.</p>
+<p>These pad correctly: <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind()</a></code> of data frames with a zuint first column,
+<code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>, <code><a href="https://vctrs.r-lib.org/reference/vec_bind.html" class="external-link">vctrs::vec_rbind()</a></code> and <code><a href="https://dplyr.tidyverse.org/reference/bind_rows.html" class="external-link">dplyr::bind_rows()</a></code>. With data.table,
+fill and join on <code><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character()</a></code> of the column, or convert the column
+after the operation. An <code>int64</code> column works natively in data.table.</p>
     </div>
 
     <div class="section level2">

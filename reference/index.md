@@ -16,6 +16,8 @@
   Exact sequences
 - [`zu_common_type()`](https://pedrobtz.github.io/zuint/reference/zu_common_type.md)
   : The common type of zuint vectors
+- [`zu_cut`](https://pedrobtz.github.io/zuint/reference/zu_cut.md) : Cut
+  a zuint vector into intervals
 - [`zu_ifelse()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
   [`zu_vapply()`](https://pedrobtz.github.io/zuint/reference/zu_ifelse.md)
   : Helpers for code that drops the class
