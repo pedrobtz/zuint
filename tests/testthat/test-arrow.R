@@ -181,7 +181,9 @@ test_that("an exported array is released when collected", {
   before <- settled_releases()
   a <- zu_arrow_from(int64(1:3))
   rm(a)
-  expect_gte(settled_releases() - before, 1)
+  # exactly one release of the array and one of its schema (#73): a double
+  # release would also move the count
+  expect_identical(settled_releases() - before, 2)
 })
 
 test_that("an exported array carries its schema in the r.h layout", {
