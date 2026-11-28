@@ -51,11 +51,10 @@ zu_summary_group <- function(..., na.rm = FALSE) {
     )
     code <- zu_code(x)
   }
-  p <- x
   switch(
     .Generic,
-    sum = zu_reduce_result(.Call(zu_sum_c, p, code, na.rm), code, call),
-    prod = zu_reduce_result(.Call(zu_prod_c, p, code, na.rm), code, call),
+    sum = zu_reduce_result(.Call(zu_sum_c, x, code, na.rm), code, call),
+    prod = zu_reduce_result(.Call(zu_prod_c, x, code, na.rm), code, call),
     min = zu_extreme(x, code, na.rm, 1L, call),
     max = zu_extreme(x, code, na.rm, 2L, call),
     range = c(
@@ -279,9 +278,9 @@ zu_mtfrm <- function(x) zu_as_character(x)
 
 #' Exact, fast matching
 #'
-#' `zu_match()` is [base::match()] for zuint vectors, and `%zin%` is `%in%`. Base
-#' `match()` and `%in%` compare exact decimal text when both sides are zuint
-#' vectors; these hash the values themselves and are much faster on long
+#' `zu_match()` is [base::match()] for zuint vectors, and `%zin%` is `%in%`.
+#' Base `match()` and `%in%` compare exact decimal text when both sides are
+#' zuint vectors; these hash the values themselves and are much faster on long
 #' vectors. They are also exact when one side is a bare number, which base
 #' `match()` is not (see below).
 #'
@@ -290,17 +289,17 @@ zu_mtfrm <- function(x) zu_as_character(x)
 #' `1.0` matches `1.00` and the integer `1`.
 #'
 #' @section Base functions and a bare number:
-#' [base::match()] and `%in%` are not generic. They turn the zuint side into text
-#' with `mtfrm()`, and the other side, if it is a bare double or logical,
+#' [base::match()] and `%in%` are not generic. They turn the zuint side into
+#' text with `mtfrm()`, and the other side, if it is a bare double or logical,
 #' into text by R's own rules. The two texts then differ: `1e5` is `"1e+05"`,
 #' and `int64(100000) %in% 100000` is `FALSE`. The answer also changes with
 #' `options(scipen =)` and `OutDec`, and with bit64 attached, whose masked
 #' `%in%` answers differently. A method cannot reach the bare side.
 #'
-#' [base::table()], [merge()] and the set functions [base::intersect()], [base::setdiff()],
-#' [base::union()] and [base::is.element()] go through `match()` and have the same
-#' limit. `intersect(int64(1e5), 1e5)` is empty, and `setdiff()` and
-#' `union()` return the raw bits of the zuint side.
+#' [base::table()], [merge()] and the set functions [base::intersect()],
+#' [base::setdiff()], [base::union()] and [base::is.element()] go through
+#' `match()` and have the same limit. `intersect(int64(1e5), 1e5)` is empty, and
+#' `setdiff()` and `union()` return the raw bits of the zuint side.
 #'
 #' Use `zu_match()` or `%zin%`, or convert the bare side first, for example
 #' `int64(1e5)`. Two zuint vectors of the same type are always safe.
@@ -379,7 +378,11 @@ zu_diff <- function(x, lag = 1L, differences = 1L, ...) {
 #'   the step). A fraction rounds up, as in [seq()]. `seq_zu(n)` is `1:n`.
 #' @return A zuint vector.
 #' @examples
-#' seq_zu(uint64("18446744073709551600"), uint64("18446744073709551614"), by = 7L)
+#' seq_zu(
+#'   uint64("18446744073709551600"),
+#'   uint64("18446744073709551614"),
+#'   by = 7L
+#' )
 #' seq_zu(int128(-2), by = int128("1000000000000000000000"), length.out = 3)
 #' @export
 seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {

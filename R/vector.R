@@ -72,7 +72,7 @@ zu_methods <- c(
 
 # NAMESPACE lines, written by roxygen through @evalNamespace.
 zu_s3_registrations <- function() {
-  classes <- c("zu_int64", "zu_uint64", "zu_int128", "zu_uint128")
+  classes <- zu_classes_all
   grid <- expand.grid(
     generic = names(zu_methods),
     class = classes,

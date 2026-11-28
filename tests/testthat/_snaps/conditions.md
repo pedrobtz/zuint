@@ -37,7 +37,7 @@
       int128(1) + uint128(1)
     Condition
       Error in `Ops.zu_int128()`:
-      ! int128 and uint128 have no common type; convert one explicitly.
+      ! int128 and uint128 have no common type: neither holds the other's range. Cast one explicitly, with `int128(y)` or `uint128(x)`; values out of range become NA with a `zuint_cast_warning`.
 
 ---
 

@@ -40,7 +40,11 @@ zu_common_code <- function(kinds, call = NULL) {
     if (is.na(nxt)) {
       zu_abort(
         sprintf(
-          "%s and %s have no common type; convert one explicitly.",
+          paste(
+            "%s and %s have no common type: neither holds the other's range.",
+            "Cast one explicitly, with `int128(y)` or `uint128(x)`;",
+            "values out of range become NA with a `zuint_cast_warning`."
+          ),
           zu_types[[code]],
           zu_types[[k]]
         ),

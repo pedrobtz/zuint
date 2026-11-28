@@ -24,15 +24,23 @@
 #'
 #' * `zuint_cast_warning`: values that could not be represented became `NA`.
 #' * `zuint_overflow_warning`: a result out of range became `NA`.
-#' * `zuint_precision_warning`: a conversion to double rounded.
+#' * `zuint_precision_warning`: an explicit conversion
+#'   to double (`as.double()`) rounded. `mean()` and `median()` round once
+#'   and do not warn.
 #' * `zuint_double_warning`: a double was computed in double, under
 #'   `options(zuint.double = "allow")`.
 #' * `zuint_recycling_warning`: operand lengths are not multiples.
 #' * `zuint_empty_warning`: `min()` or `max()` of nothing.
 #'
 #' @examples
-#' tryCatch(int128(1) + uint128(1), zuint_incompatible_error = function(e) "no common type")
-#' withCallingHandlers(int64(1.5), zuint_cast_warning = function(w) invokeRestart("muffleWarning"))
+#' tryCatch(
+#'   int128(1) + uint128(1),
+#'   zuint_incompatible_error = function(e) "no common type"
+#' )
+#' withCallingHandlers(
+#'   int64(1.5),
+#'   zuint_cast_warning = function(w) invokeRestart("muffleWarning")
+#' )
 #' @name zuint-conditions
 NULL
 
