@@ -90,9 +90,8 @@ SEXP zu_sum_c(SEXP x, SEXP type_, SEXP na_rm_)
     zu_wide_sum s = {zuf_u128_make(0, 0), 0};
     SEXP out = PROTECT(zu_alloc(t, 1));
     if (!zu_type_is_128(t)) {
-        /* 64-bit values: a 64-bit partial sum, folded into the two-word
-           total only when the next value would overflow it. No wrap of the
-           total is possible. */
+        /* 64-bit values: fewer than 2^63 of them cannot wrap the 128-bit
+           total. */
         const double *p = REAL(x);
         const uint64_t na = zu_na64(t);
         const bool sgn = t == ZU_INT64;
