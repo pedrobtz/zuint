@@ -1,5 +1,14 @@
 # zuint 0.0.0.9000
 
+* `cut()` of a zuint or decimal vector compares exactly against the breaks,
+  zuint or numbers, with base's `labels`, `right`, `include.lowest` and
+  `ordered_result`; the default labels write the breaks in full. A single
+  number of intervals is a `zuint_unsupported_error` (#165).
+* The help says what base R cannot dispatch (#149, #162, #165): `?zu_match`
+  no longer claims base `match()` and `%in%` agree with it, because a bare
+  double is compared as text, and `?zu_ifelse` lists the base functions
+  that read the payload, each with its zuint route, and the data-frame and
+  data.table row padding that writes R's NA bits as a value.
 * Arguments zuint methods ignored are now honoured or refused (#163):
   `mean()` and `median()` read `na.rm` as a logical (`NA` or text is a
   `zuint_type_error`); `sort()` returns `list(x, ix)` for `index.return =

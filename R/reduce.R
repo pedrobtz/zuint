@@ -265,29 +265,51 @@ zu_any_duplicated <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
 
 # What match(), %in% and table() compare: the exact decimal text. match()
 # is not generic, and no other atomic vector maps these values one to one.
+# An unclassed double or logical on the other side reaches match() as its
+# own text ("1e+05"), which this cannot change (design 7, #149).
 zu_mtfrm <- function(x) zu_as_character(x)
 
 #' Exact, fast matching
 #'
-#' `zu_match()` is [match()] for zuint vectors, and `%zin%` is `%in%`. Base
-#' `match()` and `%in%` give the same answers on zuint vectors, by comparing
-#' exact decimal text; these hash the values themselves and are much faster
-#' on long vectors.
+#' `zu_match()` is [base::match()] for zuint vectors, and `%zin%` is `%in%`. Base
+#' `match()` and `%in%` compare exact decimal text when both sides are zuint
+#' vectors; these hash the values themselves and are much faster on long
+#' vectors. They are also exact when one side is a bare number, which base
+#' `match()` is not (see below).
 #'
 #' Both arguments take their common type first (see [zu_common_type()]); `NA`
 #' matches `NA`. A [decimal128()] matches by value, whatever the scales:
 #' `1.0` matches `1.00` and the integer `1`.
 #'
+#' @section Base functions and a bare number:
+#' [base::match()] and `%in%` are not generic. They turn the zuint side into text
+#' with `mtfrm()`, and the other side, if it is a bare double or logical,
+#' into text by R's own rules. The two texts then differ: `1e5` is `"1e+05"`,
+#' and `int64(100000) %in% 100000` is `FALSE`. The answer also changes with
+#' `options(scipen =)` and `OutDec`, and with bit64 attached, whose masked
+#' `%in%` answers differently. A method cannot reach the bare side.
+#'
+#' [base::table()], [merge()] and the set functions [base::intersect()], [base::setdiff()],
+#' [base::union()] and [base::is.element()] go through `match()` and have the same
+#' limit. `intersect(int64(1e5), 1e5)` is empty, and `setdiff()` and
+#' `union()` return the raw bits of the zuint side.
+#'
+#' Use `zu_match()` or `%zin%`, or convert the bare side first, for example
+#' `int64(1e5)`. Two zuint vectors of the same type are always safe.
+#'
 #' @param x Values to look up: a zuint vector, or an integer vector when
 #'   `table` is one.
 #' @param table Values to look them up in.
 #' @param nomatch The position to give values not in `table`: one number,
-#'   truncated to an integer, as [match()] does.
+#'   truncated to an integer, as [base::match()] does.
 #' @return `zu_match()` returns an integer vector of positions in `table`;
 #'   `%zin%` a logical vector.
 #' @examples
 #' zu_match(uint64(c("18446744073709551614", "7")), uint64(c(7, 1)))
 #' int64(5) %zin% int64(1:10)
+#' # a bare double is compared as text by base R, and by value here
+#' int64(100000) %in% 100000
+#' int64(100000) %zin% 100000
 #' @export
 zu_match <- function(x, table, nomatch = NA_integer_) {
   call <- sys.call()
@@ -543,4 +565,159 @@ zu_seq_count <- function(from, to, step, down, call) {
     return(Inf)
   }
   zu_dbl_quiet(dq) - as.double(hi %% step < lo %% step) + 1
+}
+
+#' Cut a zuint vector into intervals
+#'
+#' `cut()` of a zuint or [decimal128()] vector compares each value with the
+#' breaks exactly, so values beyond 2^53 fall in the interval they belong to.
+#' Base `cut()` reads such a vector's raw bits.
+#'
+#' The arguments are those of [base::cut.default()]. `breaks` is a zuint
+#' vector or a number vector, in any order; the values are compared with it
+#' as `x > b` and `x <= b` are, never through a double. The default labels
+#' write each break in full, so `dig.lab` is accepted and not used.
+#'
+#' A single number of intervals as `breaks` is refused with a
+#' `zuint_unsupported_error`: base derives the breaks from the range with a
+#' fractional step, which a vector of integers cannot hold. Give the breaks.
+#' Breaks that are `NA`, repeated or not numbers, a `labels` vector of the
+#' wrong length and a flag that is not `TRUE` or `FALSE` are a
+#' `zuint_type_error`.
+#'
+#' @param x A zuint or `decimal128` vector.
+#' @param breaks At least two breaks, in any order.
+#' @param labels `NULL` for the default labels, `FALSE` for integer codes,
+#'   or one label for each interval.
+#' @param include.lowest Whether the lowest break (the highest, when
+#'   `right = FALSE`) belongs to its interval.
+#' @param right Whether the intervals are closed on the right.
+#' @param dig.lab Accepted for compatibility; the labels are not rounded.
+#' @param ordered_result Whether the factor is ordered.
+#' @param ... Not used.
+#' @return A factor, or an integer vector for `labels = FALSE`; `NA` for a
+#'   value outside every interval and for `NA`.
+#' @examples
+#' x <- int64(c("9007199254740993", "9007199254740994", "-5"))
+#' cut(x, int64(c("-10", "9007199254740993", "9007199254740995")))
+#' cut(x, c(-10, 0, 1e16), labels = FALSE)
+#' @name zu_cut
+NULL
+
+zu_cut <- function(
+  x,
+  breaks,
+  labels = NULL,
+  include.lowest = FALSE,
+  right = TRUE,
+  dig.lab = 3L,
+  ordered_result = FALSE,
+  ...
+) {
+  call <- sys.call()
+  include.lowest <- zu_flag(include.lowest, "include.lowest", call)
+  right <- zu_flag(right, "right", call)
+  ordered_result <- zu_flag(ordered_result, "ordered_result", call)
+  breaks <- zu_from_bit64(breaks)
+  plain <- !is.object(breaks) &&
+    typeof(breaks) %in% c("logical", "integer", "double")
+  if (!(plain || !is.na(zu_code(breaks)) || is_decimal128(breaks))) {
+    zu_abort("`breaks` must be numbers.", "type", call = call)
+  }
+  if (length(breaks) == 1L) {
+    zu_abort(
+      "`breaks` as a number of intervals is not supported for zuint vectors; give the breaks.",
+      "unsupported",
+      call = call
+    )
+  }
+  if (length(breaks) < 2L || anyNA(breaks)) {
+    zu_abort(
+      "`breaks` must be at least two values, none NA.",
+      "type",
+      call = call
+    )
+  }
+  breaks <- sort(breaks)
+  if (anyDuplicated(breaks)) {
+    zu_abort("`breaks` are not unique.", "type", call = call)
+  }
+  nb <- length(breaks)
+  codes_only <- is.logical(labels) &&
+    length(labels) == 1L &&
+    !is.na(labels) &&
+    !labels
+  if (is.null(labels)) {
+    text <- zu_break_text(breaks)
+    labels <- if (anyDuplicated(text)) {
+      paste0("Range_", seq_len(nb - 1L))
+    } else {
+      paste0(
+        if (right) "(" else "[",
+        text[-nb],
+        ",",
+        text[-1L],
+        if (right) "]" else ")"
+      )
+    }
+    if (include.lowest && !anyDuplicated(text)) {
+      if (right) {
+        substr(labels[1L], 1L, 1L) <- "["
+      } else {
+        substring(labels[nb - 1L], nchar(labels[nb - 1L], "c")) <- "]"
+      }
+    }
+  } else if (!codes_only && length(labels) != nb - 1L) {
+    zu_abort(
+      "The number of intervals and the length of `labels` differ.",
+      "type",
+      call = call
+    )
+  }
+  # the number of breaks below x (right) or at most x (left) is its interval
+  below <- integer(length(x))
+  for (j in seq_len(nb)) {
+    b <- breaks[j]
+    below <- below + if (right) as.integer(x > b) else as.integer(x >= b)
+  }
+  code <- below
+  if (include.lowest) {
+    if (right) {
+      code[zu_true(x == breaks[1L])] <- 1L
+    } else {
+      code[zu_true(x == breaks[nb])] <- nb - 1L
+    }
+  }
+  code[is.na(x) | code < 1L | code > nb - 1L] <- NA_integer_
+  if (codes_only) {
+    return(code)
+  }
+  factor(code, seq_len(nb - 1L), labels, ordered = ordered_result)
+}
+
+zu_true <- function(x) !is.na(x) & x
+
+# The breaks written in full: the exact text of a zuint, the shortest text
+# that reads back as the same double for a double.
+zu_break_text <- function(breaks) {
+  if (is.object(breaks)) {
+    return(as.character(breaks))
+  }
+  vapply(
+    as.double(breaks),
+    function(b) {
+      if (!is.finite(b)) {
+        return(as.character(b))
+      }
+      if (b == round(b)) {
+        return(sprintf("%.0f", 0 + b))
+      }
+      for (digits in 15:17) {
+        s <- sprintf(paste0("%.", digits, "g"), b)
+        if (as.double(s) == b) break
+      }
+      s
+    },
+    ""
+  )
 }

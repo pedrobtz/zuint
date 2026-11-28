@@ -264,6 +264,17 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   only when the caller asks with `to = int128()`: zuint registers no `d:*`
   key (review X5). DuckDB's default export writes HUGEINT values beyond 38
   digits that way.
+- **DuckDB's hugeint/uhugeint extension is recognised by parsing its JSON,**
+  as DuckDB reads it through arrow (#154, #169): the metadata must be one
+  valid JSON object whose own top-level `vendor_name` is `"DuckDB"` and
+  `type_name` is `"hugeint"` or `"uhugeint"`. That is stricter than
+  arrow's simdjson, which reads some invalid documents (a bad escape or
+  number elsewhere, a trailing comma); zuint reads none of them, so such a
+  column is zuarrow's to convert (design §9.1).
+- **A schema past `ZU_METADATA_MAX_ENTRIES` is a `zuint_arrow_error`, not a
+  fallback** (#166, #169). `zu_metadata_get_bounded()` sets `too_many`
+  instead of returning "no such key", because reading the storage format
+  in its place would change the column's type.
 - **The Arrow import refuses what it cannot read as values.** A
   dictionary-encoded array has its indices' format (`l` for int64 indices)
   and a schema with children is nested; both are `zuint_arrow_error`. The

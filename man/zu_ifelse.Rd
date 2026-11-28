@@ -39,19 +39,71 @@ of \code{FUN.VALUE}, a zuint prototype such as \code{int64(0)}; the results take
 type. Both take \code{\link[=decimal128]{decimal128()}} vectors too: \code{zu_ifelse()} combines \code{yes}
 and \code{no} as \code{\link[=c]{c()}} does, and \code{zu_vapply()} converts each result to the
 type of \code{FUN.VALUE} as \code{x[i] <- value} does, exactly or \code{NA}.
-
-The same goes for \code{\link[=sum]{sum()}}, \code{\link[=min]{min()}}, \code{\link[=max]{max()}}, \code{\link[=range]{range()}} and the other
-\code{Summary} functions, which R dispatches on their first argument only:
-\code{sum(int128(5), 1L)} is exact, while \code{sum(1L, int128(5))} reads the raw
-bits. Put the zuint vector first.
-
-\code{\link[base:matrix]{base::matrix()}}, \code{\link[base:array]{base::array()}}, \code{\link[base:outer]{base::outer()}} and \code{\link[base:diag]{base::diag()}} are such functions too,
-and no method can intercept them: they return the raw bits. zuint
-vectors do not form matrices, and the functions that dispatch refuse
-them with an error of class \code{zuint_unsupported_error}: \code{\%*\%},
-\code{\link[base:crossprod]{base::crossprod()}} and \code{\link[base:tcrossprod]{base::tcrossprod()}} (the last two from R 4.4.0),
-\code{\link[=cbind]{cbind()}}, \code{\link[=rbind]{rbind()}}, \code{\link[=as.matrix]{as.matrix()}}, \code{\link[=aperm]{aperm()}} and \code{\link[=scale]{scale()}}.
 }
+\section{Base functions that cannot dispatch}{
+
+R dispatches most functions on their first argument only, and some read
+a vector's payload without dispatching at all. Design 4.1 accepts that
+cost. Each function below returns the raw bits of the values, or drops
+their class, so the answer is wrong, often with no warning. For
+\code{decimal128} the bits are the scaled coefficients.
+\itemize{
+\item \code{c()} and \code{rbind()} of data frames with a non-zuint first argument or
+first column: \code{c(1L, int128(5))} is complex bits, as is
+\code{rbind(data.frame(x = 1L), data.frame(x = int128(5)))}. Put the zuint
+vector first, or use \code{vctrs::vec_rbind()} or \code{dplyr::bind_rows()}.
+\item \code{\link[=sum]{sum()}}, \code{\link[=min]{min()}}, \code{\link[=max]{max()}}, \code{\link[=range]{range()}} and the other \code{Summary} functions
+read only the first argument's class: \code{sum(int128(5), 1L)} is exact and
+\code{sum(1L, int128(5))} reads the raw bits. Put the zuint vector first.
+\item \code{\link[=is.unsorted]{is.unsorted()}}: use \code{is.unsorted(xtfrm(x))}, whose ranks are exact.
+\item \code{\link[=complete.cases]{complete.cases()}} reads the payload's NaN patterns, so its answer is
+inverted for negative \code{int64} values: use \code{!is.na(x)} on each column.
+\item \code{\link[=aggregate]{aggregate()}} and \code{\link[=rowsum]{rowsum()}} read the payload, as a group or as the
+values. A negative \code{int64} group vanishes. Group by \code{as.character(x)},
+and sum each group with \code{zu_vapply(split(x, g), sum, x[0])}.
+\item \code{\link[=var]{var()}} and \code{\link[=cor]{cor()}} read the payload: \code{var(int64(1:10))} is 0. Use
+\code{var(as.double(x))}, which rounds to a double. \code{\link[=sd]{sd()}} is right.
+\item \code{\link[=unlist]{unlist()}}, \code{\link[=sapply]{sapply()}} and \code{\link[=vapply]{vapply()}} drop the class. Use
+\code{do.call(c, list)} and \code{zu_vapply()}.
+\item \code{\link[=ifelse]{ifelse()}}: use \code{zu_ifelse()}.
+\item \code{\link[=formatC]{formatC()}} and \code{sprintf("\%f")} read the bits (\code{sprintf("\%d")} is an
+error). Use \code{\link[=format]{format()}}, \code{\link[=as.character]{as.character()}} or \code{\link[=format_hex]{format_hex()}}; \code{paste()}
+and \code{sprintf("\%s")} are right.
+\item A zuint vector as an index or a count of a base function that does
+not dispatch on it: \code{letters[int64(2)]}, \code{rep(1, int64(3))},
+\code{rep_len()}, \code{seq_len()}, \code{numeric()} and \code{vector()} are empty, and
+an \code{int128} index is an error. Pass
+\code{as.integer(i)}. A zuint vector as the vector being indexed, or as
+\code{rep()}'s \code{x}, is right.
+\item \code{\link[base:matrix]{base::matrix()}}, \code{\link[base:array]{base::array()}}, \code{\link[base:outer]{base::outer()}} and \code{\link[=diag]{diag()}} return the raw bits.
+zuint vectors do not form matrices, and the functions that dispatch
+refuse them with a \code{zuint_unsupported_error}: \code{\%*\%}, \code{\link[base:crossprod]{base::crossprod()}} and
+\code{\link[base:tcrossprod]{base::tcrossprod()}} (the last two from R 4.4.0), \code{\link[=cbind]{cbind()}}, \code{\link[=rbind]{rbind()}},
+\code{\link[=as.matrix]{as.matrix()}}, \code{\link[=aperm]{aperm()}} and \code{\link[=scale]{scale()}}.
+\item \code{\link[base:match]{base::match()}}, \code{\%in\%}, \code{\link[base:table]{base::table()}}, \code{\link[=merge]{merge()}} and the set functions compare
+a bare double as text: see \code{\link[=zu_match]{zu_match()}}.
+\item \code{\link[=cut]{cut()}} has a method: see \link{zu_cut}.
+}
+}
+
+\section{Padding data frames and data.table}{
+
+Base R fills new rows with its own \code{NA}, whose bits are a valid \code{int64},
+\code{uint64}, \code{int128} or \code{uint128} value. Growing a data frame by row
+(\code{d[nrow(d) + 2, "id"] <- 7L}, through \code{xpdrows.data.frame()}) strips the
+class and fills the new rows of every zuint column with that value, not
+\code{NA}. The same holds for data.table's \code{rbindlist(fill = TRUE)},
+\code{d[c(1, NA)]}, \code{shift()} and \verb{:= NA} on \code{uint64}, \code{int128} and \code{uint128}
+columns, and a data.table \code{by} groups the \code{NA} of a \code{uint64} column with
+its neighbouring value (bit64 pads \code{int64} in base data frames the same
+way). No zuint method is reached.
+
+These pad correctly: \code{rbind()} of data frames with a zuint first column,
+\code{\link[=merge]{merge()}}, \code{vctrs::vec_rbind()} and \code{dplyr::bind_rows()}. With data.table,
+fill and join on \code{as.character()} of the column, or convert the column
+after the operation. An \code{int64} column works natively in data.table.
+}
+
 \examples{
 x <- int64(c("-9223372036854775807", "5", NA))
 zu_ifelse(x > 0L, x, int64(0))

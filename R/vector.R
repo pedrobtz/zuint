@@ -52,6 +52,7 @@ zu_methods <- c(
   as.POSIXct = "zu_as_posixct",
   as.POSIXlt = "zu_as_posixlt",
   seq = "zu_seq",
+  cut = "zu_cut",
   all.equal = "zu_all_equal",
   quantile = "zu_quantile",
   cbind = "zu_matrix_unsupported",
