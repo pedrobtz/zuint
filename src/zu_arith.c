@@ -279,8 +279,22 @@ SEXP zu_pow_c(SEXP x, SEXP kx_, SEXP e, SEXP type_, SEXP policy_)
             sa = zu_raw64(x, kx, t, pol, ix, &a64);
             a = zuf_u128_from_u64(a64);
         }
-        if (sa == ZU_RAW_NA || zuf_u128_cmp(ev, ena) == 0) {
-            zu_set_na(out, t, i);
+        bool e_na = zuf_u128_cmp(ev, ena) == 0;
+        bool e_zero = !e_na && (zuf_u128_high(ev) | zuf_u128_low(ev)) == 0;
+        if (sa == ZU_RAW_NA && e_zero) {
+            /* NA^0 is 1, as in base R and bit64 */
+            zuf_u128 one = zuf_u128_from_u64(1);
+            if (zu_type_is_128(t)) zu_store128(COMPLEX(out), i, ZU_OK, one, t, pol);
+            else zu_store64(REAL(out), i, ZU_OK, 1, t, pol);
+        } else if (sa == ZU_RAW_NA || e_na) {
+            if (e_na && sa == ZU_RAW_OK && (zuf_u128_high(a) | (zuf_u128_low(a) ^ 1)) == 0) {
+                /* 1^NA is 1 */
+                zuf_u128 one = zuf_u128_from_u64(1);
+                if (zu_type_is_128(t)) zu_store128(COMPLEX(out), i, ZU_OK, one, t, pol);
+                else zu_store64(REAL(out), i, ZU_OK, 1, t, pol);
+            } else {
+                zu_set_na(out, t, i);
+            }
         } else if (sa == ZU_RAW_LOST) {
             zu_set_na(out, t, i);
             ovf++;

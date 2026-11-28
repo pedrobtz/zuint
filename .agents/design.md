@@ -593,6 +593,14 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
   errors. `MIN %/% -1` cannot overflow because MIN is the NA sentinel.
 - **`^`** with a non-negative integer exponent stays exact; anything else gives
   double.
+- **`^` with an exponent at or past the type's width, and with NA**
+  (decided 2026-11-28, #158): an integral double exponent of any size,
+  `Inf` included, never leaves the type. Every base but 0, 1 and -1 overflows
+  (the policy applies), and those three have their exact answers; the
+  exponent is cut to 2¹²⁷, which every double of that size is even
+  alongside. `NA ^ 0` is 1 and `1 ^ NA` is 1, as in base R and bit64, under
+  every policy: an NA that cannot change the result does not make it NA.
+  `(-1) ^ NA`, `2 ^ NA` and `NA ^ 2` stay NA.
 - **Unsigned negation** is an error (`checked_`) or wraps (`wrapping_`); the
   default gives NA plus a warning. A negative integer operand to an unsigned
   type (§5) is the same case: out of range, handled by the policy.
@@ -618,6 +626,23 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
 | `unique`, `duplicated`, `match`, `%in%`, `table` | open-addressing hash on the exact bits, never through double |
 | `diff`, `rev`, `rep`, `seq_zu()` | exact |
 | `quantile` | exact order statistics; type-7 interpolation returns double |
+
+Decisions of 2026-11-28 (#159, #163):
+
+- `seq_zu(from, to, length.out = n)` computes the step `(to - from) / (n - 1)`
+  when it is whole and is a `zuint_type_error` when it is not (a vector of
+  integers has no fractions); `cut(int64(1:4), 2)` is therefore refused at
+  `seq()` with that error, until `cut()` has a method. `by` defaults to -1
+  when `to` is below `from`, `seq(n)` is `1:n` as in base, a fractional
+  `length.out` rounds up as base does, and `to` with `by` and `length.out`
+  is an error, as in base.
+- Arguments base takes and zuint cannot honour are refused with
+  `zuint_unsupported_error` (`sort(partial =)`, a `zero.print` that is not a
+  string) or `zuint_type_error` (an NA, negative or non-numeric `max`, `lag`
+  or `differences` below 1 or fractional, which base answers with garbage and
+  a warning, a `nomatch` of length other than one), never ignored.
+  `na.rm` is read as a logical, so 1 is TRUE; base's `mean()` tests
+  `isTRUE(na.rm)` and gives NA for 1, which is not copied.
 
 ## 8. Construction, parsing, formatting
 

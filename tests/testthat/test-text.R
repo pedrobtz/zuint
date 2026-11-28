@@ -138,3 +138,107 @@ test_that("print shows exact values and stops at max.print", {
     print(format(int64(1234567), big.mark = ","))
   })
 })
+
+test_that("format() honours big.interval, zero.print, trim and a textual width (#163)", {
+  v <- c(0, 1234567, 12, NA, -5000)
+  for (type in c("int64", "int128")) {
+    x <- zu_ctor(type)(v)
+    vi <- as.integer(v)
+    for (args in list(
+      list(big.mark = ",", big.interval = 4),
+      list(big.mark = ",", big.interval = 2),
+      list(zero.print = "-"),
+      list(big.mark = ",", zero.print = "."),
+      list(width = "12"),
+      list(width = 12L),
+      list(width = -1),
+      list(trim = TRUE),
+      list(trim = TRUE, big.mark = ",")
+    )) {
+      expect_identical(
+        format(
+          x,
+          big.mark = args$big.mark %||% "",
+          big.interval = args$big.interval %||% 3L,
+          zero.print = args$zero.print,
+          width = args$width %||% 0L,
+          trim = args$trim %||% FALSE
+        ),
+        format(
+          vi,
+          big.mark = args$big.mark %||% "",
+          big.interval = args$big.interval %||% 3L,
+          zero.print = args$zero.print,
+          width = args$width %||% 0L,
+          trim = args$trim %||% FALSE
+        ),
+        label = paste(type, deparse(args))
+      )
+    }
+    expect_error(format(x, width = NA), class = "zuint_type_error")
+    expect_error(
+      format(x, big.mark = ",", big.interval = 0),
+      class = "zuint_type_error"
+    )
+    expect_error(format(x, zero.print = 1:2), class = "zuint_unsupported_error")
+  }
+  d <- decimal128(c("0.00", "1234.50", NA), 8, 2)
+  expect_identical(
+    format(d, zero.print = "-"),
+    c("   -", "1234.50", "  NA")[c(1, 2, 3)] |> (\(s) formatC(s, width = 7))()
+  )
+  expect_identical(
+    format(d, big.mark = ",", big.interval = 2)[[2L]],
+    "12,34.50"
+  )
+})
+
+test_that("format() with big.mark equal to OutDec is as quiet as base R (#163)", {
+  withr::local_options(OutDec = ",", warn = 2)
+  x <- int64(c(1234567, NA))
+  expect_identical(
+    format(x, big.mark = "."),
+    format(c(1234567L, NA), big.mark = ".")
+  )
+})
+
+test_that("print() takes quote and max as base R does (#163)", {
+  x <- int64(1:3)
+  v <- 1:3
+  for (type in zu_all_types) {
+    x <- zu_ctor(type)(1:3)
+    expect_identical(
+      capture.output(print(x, quote = TRUE)),
+      c(sprintf("<%s[3]>", type), capture.output(print(v, quote = TRUE)))
+    )
+    for (m in list(0, 1, 1.5, c(1, 2), 3, 99)) {
+      got <- capture.output(print(x, max = m))[-1L]
+      want <- capture.output(print(v, max = m))
+      # base prints a bare "[1]" first for max = 0, which is no value
+      if (identical(m, 0)) {
+        want <- want[-1L]
+      }
+      expect_identical(
+        trimws(got),
+        trimws(want),
+        label = paste(type, deparse(m))
+      )
+    }
+    expect_error(capture.output(print(x, max = NA)), class = "zuint_type_error")
+    expect_error(capture.output(print(x, max = -1)), class = "zuint_type_error")
+    expect_error(
+      capture.output(print(x, max = "a")),
+      class = "zuint_type_error"
+    )
+  }
+  d <- decimal128(c("1.5", "2.5", "3.5"), 3, 1)
+  expect_identical(
+    capture.output(print(d, max = 1.5))[-1L],
+    c(
+      "[1] 1.5",
+      " [ reached 'max' / getOption(\"max.print\") -- omitted 2 entries ]"
+    )
+  )
+  expect_error(capture.output(print(d, max = NA)), class = "zuint_type_error")
+  expect_no_error(capture.output(print(d, quote = TRUE)))
+})

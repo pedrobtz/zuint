@@ -44,17 +44,7 @@ zu_seq <- function(
   if (!is.null(along.with)) {
     length.out <- length(along.with)
   }
-  if (is.null(by)) {
-    if (!is.null(to) && !is.null(length.out)) {
-      zu_abort(
-        "seq() with `to` and `length.out` needs a step that may not be whole; give `by`.",
-        "unsupported",
-        call = sys.call()
-      )
-    }
-    by <- 1L
-  }
-  seq_zu(from, to, by = by, length.out = length.out)
+  zu_seq_impl(from, to, by, length.out, sys.call())
 }
 
 # Exact: the same type and the same values (and names), or a description of

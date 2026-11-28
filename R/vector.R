@@ -351,27 +351,78 @@ zu_as_data_frame <- function(
 
 # Numbers are right-justified whatever `justify` says, as format() does for
 # doubles; format.data.frame() passes "left". `big.mark` groups the digits in
-# threes; `width` is the minimum field width.
-zu_format <- function(x, ..., width = 0L, big.mark = "", justify = "right") {
-  zu_format_text(zu_as_character(x), names(x), width, big.mark)
+# `big.interval`s (threes); `width` is the minimum field width, and `trim`
+# drops the padding; `zero.print` is the text a zero is written as.
+zu_format <- function(
+  x,
+  ...,
+  width = 0L,
+  big.mark = "",
+  justify = "right",
+  big.interval = 3L,
+  zero.print = NULL,
+  trim = FALSE
+) {
+  # the digits have no decimal mark, so OutDec is the one that big.mark may
+  # equal, as for base R's integers
+  zu_format_text(
+    zu_as_character(x),
+    names(x),
+    width,
+    big.mark,
+    big.interval,
+    zero.print,
+    trim,
+    getOption("OutDec")
+  )
 }
 
 # The exact text `s` of a vector, as format() writes it: NA as "NA", digits
 # grouped by `big.mark`, right-justified in at least `width`.
-zu_format_text <- function(s, nm, width, big.mark) {
-  width <- zu_index(width)
+zu_format_text <- function(
+  s,
+  nm,
+  width,
+  big.mark,
+  big.interval = 3L,
+  zero.print = NULL,
+  trim = FALSE,
+  decimal.mark = "."
+) {
+  call <- sys.call(-1L)
+  width <- suppressWarnings(as.integer(width))
+  if (length(width) != 1L || is.na(width)) {
+    zu_abort("`width` must be a single number.", "type", call = call)
+  }
+  trim <- zu_flag(trim, "trim", call)
+  big.interval <- zu_whole_arg(big.interval, "big.interval", 1L, call)
+  if (
+    !is.null(zero.print) &&
+      !isFALSE(zero.print) &&
+      !(is.character(zero.print) && length(zero.print) == 1L)
+  ) {
+    zu_abort(
+      "`zero.print` must be a single string.",
+      "unsupported",
+      call = call
+    )
+  }
   na <- is.na(s)
   if (nzchar(big.mark)) {
     # the text always has ".", whatever OutDec says
     s[!na] <- prettyNum(
       s[!na],
       big.mark = big.mark,
-      decimal.mark = ".",
+      big.interval = big.interval,
+      decimal.mark = decimal.mark,
       preserve.width = "none"
     )
   }
+  if (is.character(zero.print)) {
+    s[!na & grepl("^-?0(\\.0*)?$", s)] <- zero.print
+  }
   s[na] <- "NA"
-  out <- formatC(s, width = max(width, nchar(s, "width"), 0L))
+  out <- if (trim) s else formatC(s, width = max(width, nchar(s, "width"), 0L))
   names(out) <- nm
   out
 }
@@ -390,14 +441,17 @@ zu_print <- function(x, ..., max = NULL) {
 }
 
 # The values of x, formatted by `fmt`, after the caller's header line.
-zu_print_values <- function(x, fmt, max, ...) {
+# `quote` is print()'s, and means nothing for numbers, as for base integers.
+zu_print_values <- function(x, fmt, max, quote = FALSE, ...) {
   n <- length(x)
   if (n == 0L) {
     return(invisible(x))
   }
-  max <- if (is.null(max)) getOption("max.print", 99999L) else zu_index(max)
+  max <- zu_print_max(max, sys.call(-1L))
   shown <- if (n > max) x[seq_len(max)] else x
-  print(fmt(shown), quote = FALSE, ...)
+  if (max > 0L) {
+    print(fmt(shown), quote = FALSE, ...)
+  }
   if (n > max) {
     cat(
       " [ reached 'max' / getOption(\"max.print\") -- omitted",
@@ -406,6 +460,24 @@ zu_print_values <- function(x, fmt, max, ...) {
     )
   }
   invisible(x)
+}
+
+# print()'s `max`: a count, truncated to a whole number as base R does; the
+# first of several; an error if missing or negative.
+zu_print_max <- function(max, call) {
+  if (is.null(max)) {
+    max <- getOption("max.print", 99999L)
+  }
+  max <- zu_index(max)
+  v <- if (length(max) >= 1L && is.numeric(max)) max[[1L]] else NA_real_
+  if (is.na(v) || v < 0) {
+    zu_abort(
+      "`max` must be a non-negative number.",
+      "type",
+      call = call
+    )
+  }
+  as.integer(min(v, .Machine$integer.max))
 }
 
 zu_str <- function(object, ..., vec.len = 4) {

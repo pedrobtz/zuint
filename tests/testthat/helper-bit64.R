@@ -219,6 +219,7 @@ list(
   idiv = zu_storage(checked_idiv(int64(c(5, 5)), B(NA, -1))),
   seq_by = zu_storage(seq_zu(int64(1), by = B(-1), length.out = 3)),
   seq_len = zu_storage(seq_zu(int64(1), length.out = B(3))),
+  seq_down = zu_storage(seq(int64(5), int64(1))), seq_n = zu_storage(seq(int64(4))),
   round = zu_storage(round(int64(1234), B(-2))),
   dec_cmp = d == B(NA, -1, 3),
   dec_lt = d < B(NA, 0, 3),

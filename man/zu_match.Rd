@@ -15,7 +15,8 @@ x \%zin\% table
 
 \item{table}{Values to look them up in.}
 
-\item{nomatch}{The position to give values not in \code{table}.}
+\item{nomatch}{The position to give values not in \code{table}: one number,
+truncated to an integer, as \code{\link[=match]{match()}} does.}
 }
 \value{
 \code{zu_match()} returns an integer vector of positions in \code{table};

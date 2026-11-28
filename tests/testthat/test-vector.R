@@ -269,10 +269,7 @@ test_that("seq() on a zuint from is seq_zu()", {
   expect_identical(seq(int64(1), int64(5)), int64(1:5))
   expect_identical(seq(uint64(2), by = 3L, length.out = 3), uint64(c(2, 5, 8)))
   expect_identical(seq(int128(4), along.with = 1:3), int128(4:6))
-  expect_error(
-    seq(int64(1), int64(5), length.out = 3),
-    class = "zuint_unsupported_error"
-  )
+  expect_identical(seq(int64(1), int64(5), length.out = 3), int64(c(1, 3, 5)))
 })
 
 test_that("all.equal compares exactly", {

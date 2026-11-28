@@ -431,8 +431,25 @@ dec_mtfrm <- function(x) {
 }
 
 # As zu_format(): `justify` is accepted and numbers stay right-justified.
-dec_format <- function(x, ..., width = 0L, big.mark = "", justify = "right") {
-  zu_format_text(dec_as_character(x), names(x), width, big.mark)
+dec_format <- function(
+  x,
+  ...,
+  width = 0L,
+  big.mark = "",
+  justify = "right",
+  big.interval = 3L,
+  zero.print = NULL,
+  trim = FALSE
+) {
+  zu_format_text(
+    dec_as_character(x),
+    names(x),
+    width,
+    big.mark,
+    big.interval,
+    zero.print,
+    trim
+  )
 }
 
 # The header names the type even when x is empty: a zero-length decimal
@@ -1045,17 +1062,48 @@ dec_match <- function(x, table, nomatch, call) {
 
 # The coefficients share one scale, so int128's code orders and hashes them.
 
-dec_sort <- function(x, decreasing = FALSE, na.last = NA, ...) {
-  dec_back(zu_sort(dec_view(x), decreasing = decreasing, na.last = na.last), x)
+dec_sort <- function(
+  x,
+  decreasing = FALSE,
+  na.last = NA,
+  index.return = FALSE,
+  partial = NULL,
+  ...
+) {
+  res <- zu_sort(
+    dec_view(x),
+    decreasing = decreasing,
+    na.last = na.last,
+    index.return = index.return,
+    partial = partial
+  )
+  if (is.list(res)) {
+    res$x <- dec_back(res$x, x)
+    return(res)
+  }
+  dec_back(res, x)
 }
 
 dec_xtfrm <- function(x) .Call(zu_rank_c, x, 3L)
 
 dec_duplicated <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
-  .Call(zu_duplicated_c, x, 3L, isTRUE(fromLast))
+  fromLast <- zu_flag(fromLast, "fromLast", sys.call())
+  d <- .Call(zu_duplicated_c, x, 3L, fromLast)
+  inc <- zu_incomparable(x, incomparables, sys.call())
+  if (!is.null(inc)) {
+    d[inc] <- FALSE
+  }
+  d
 }
 
 dec_unique <- function(x, incomparables = FALSE, fromLast = FALSE, ...) {
+  if (!isFALSE(incomparables)) {
+    out <- x[
+      !dec_duplicated(x, incomparables = incomparables, fromLast = fromLast)
+    ]
+    names(out) <- NULL
+    return(out)
+  }
   dec_back(zu_unique(dec_view(x), fromLast = fromLast), x)
 }
 
@@ -1065,13 +1113,15 @@ dec_any_duplicated <- function(
   fromLast = FALSE,
   ...
 ) {
-  d <- dec_duplicated(x, fromLast = fromLast)
+  fromLast <- zu_flag(fromLast, "fromLast", sys.call())
+  d <- dec_duplicated(x, incomparables = incomparables, fromLast = fromLast)
   if (any(d)) which(d)[[if (fromLast) sum(d) else 1L]] else 0L
 }
 
 # The exact mean of the values, rounded once: DuckDB's avg() is a double,
 # within an ulp or two of it (design 2.2).
 dec_mean <- function(x, trim = 0, na.rm = FALSE, ...) {
+  na.rm <- zu_flag(na.rm, "na.rm", sys.call())
   if (!identical(trim, 0) && !identical(trim, 0L)) {
     zu_abort(
       "mean() with `trim` is not supported for zuint vectors.",
@@ -1083,6 +1133,7 @@ dec_mean <- function(x, trim = 0, na.rm = FALSE, ...) {
 }
 
 dec_median <- function(x, na.rm = FALSE, ...) {
+  na.rm <- zu_flag(na.rm, "na.rm", sys.call())
   zu_median_scaled(dec_view(x), na.rm, dec_s(x))
 }
 
