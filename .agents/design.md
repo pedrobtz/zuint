@@ -715,7 +715,10 @@ duckdb (which imports and exports Arrow streams), ADBC drivers and polars.
     and UHUGEINT this way, including values beyond the 38-digit decimal128
     range (HUGEINT max exports as bits `0x7fff…ff`), so the import must not
     range-check against 10³⁸. A UHUGEINT ≥ 2¹²⁷ is indistinguishable from a
-    negative value in this form; see the extension below.
+    negative value in this form; see the extension below. Under
+    `to = uint128()` the decimal is cast by value (decided 2026-11-28,
+    #167), so such a UHUGEINT is a lost value, and the policy's message
+    names `SET arrow_lossless_conversion = true`.
   - `w:16` with `ARROW:extension:name = "arrow.opaque"` and metadata
     `{"type_name":"hugeint","vendor_name":"DuckDB"}` → int128, and
     `"uhugeint"` → uint128. DuckDB produces this with
@@ -765,13 +768,15 @@ duckdb (which imports and exports Arrow streams), ADBC drivers and polars.
   cast in its own engine. Reopen when a consumer is found that needs it.
 - **NA ↔ null:** sentinel values map to null bits both ways. A real value
   equal to a sentinel (e.g. UINT64_MAX in an engine column) cannot be held,
-  and zuarrow's `lossy` policy decides (2026-11-25; review X4): an error
+  nor can a value out of a `to =` prototype's range (2026-11-28, #167), and
+  zuarrow's `lossy` policy decides (2026-11-25; review X4): an error
   under `"error"`, NA with a warning under `"warn"`, NA under `"allow"`.
   Under `"character"` it is an error too, because the handler returns one
   class for every batch and text for only the batches that hold such a
   value could not be combined. The conditions are zuarrow's classes
   (`zuarrow_lossy_error`, `zuarrow_lossy_warning`), so a caller handles
-  them with the rest of zuarrow's.
+  them with the rest of zuarrow's, and the messages are in zuarrow's form:
+  the column, its format, a value lost and the remedy.
 
 ### 9.4 The zuarrow registrations
 
@@ -784,18 +789,44 @@ unloads:
 | --- | --- | --- | --- |
 | `l` | `int64` | `zu_int64` | `l` |
 | `L` | `uint64` | `zu_uint64` | `L` |
-| `arrow.opaque` | `hugeint` → `int128`, `uhugeint` → `uint128`; any other opaque type through zuarrow's own conversion | `zu_int128`, `zu_uint128` | the extension of §9.1 |
+| `arrow.opaque` | `hugeint` → `int128`, `uhugeint` → `uint128`; any other opaque type through zuarrow's own conversion | none | none |
+| `zuint.int128` | any column, under `to = int128()` | `zu_int128` | the extension of §9.1 |
+| `zuint.uint128` | any column, under `to = uint128()` | `zu_uint128` | the extension of §9.1 |
 
-All three are exact. There is no `d:*` registration (review X5): a decimal
+All five are exact. There is no `d:*` registration (review X5): a decimal
 column is the `decimal` package's, and `to = int128()` is the opt-in that
-reads a `decimal128(p, 0)` with `p` up to 38 as its bits. When a caller
-names a zuint prototype for a column of another format, zuarrow calls that
-class's handler, which reads the column, through zuarrow's built-in
-conversion if zuint does not read the format itself, and casts it to the
-prototype's type under zuint's rules. The `arrow.opaque` handler serves
-two classes, so it casts nothing. Under an `int64()` or `uint64()`
-prototype, zuint reads the small integer formats (`c`, `C`, `s`, `S`, `i`,
-`I`) itself, exactly, before the cast (decided 2026-11-27, #155): through
+reads a `decimal128(p, 0)` with `p` up to 38 as its bits.
+
+A named zuint prototype always gives that type or a condition (decided
+2026-11-28, #167). When a caller names a zuint prototype in `to =`, zuarrow
+calls the handler registered for that class, with a column of any format:
+it reads the column, itself if zuint reads the format and through
+zuarrow's built-in conversion if not, and casts it to the prototype's type
+by value. A value the type cannot hold follows zuarrow's `lossy` policy
+in zuarrow's classes, as a sentinel does (§9.1), never a
+`zuint_cast_warning`: so `to = uint64()` on a negative value is an error by
+default. A decimal128 is cast by value too: `to = uint128()` loses its
+negative values rather than reinterpreting their bits. Under a 128-bit
+prototype an `l` or `L` column is read straight into the 128-bit
+counterpart, so INT64_MIN and UINT64_MAX, the 64-bit NA patterns, are
+values.
+
+zuarrow 0.1.0 passes a handler `(array, schema, lossy)` and no prototype,
+and finds the handler of a prototype by its class, the first registration
+listing it winning a tie. One `arrow.opaque` registration for both 128-bit
+classes therefore could not tell `int128()` from `uint128()`, and cast
+nothing. So each class has one registration: `arrow.opaque` reads DuckDB's
+extension columns and claims no class, and `zuint.int128` and
+`zuint.uint128`, extension names no Arrow column is known to use, carry
+the 128-bit classes, their `to` for a prototype and their `from` for
+writing, which is unchanged. A column whose extension name really is one of
+them is read by that handler, through zuarrow's conversion of its storage,
+and cast. zuarrow 0.1.1 is to pass the prototype to a handler as a fourth
+argument; the two keys can then go.
+
+Under a zuint prototype, zuint reads the small integer formats (`c`, `C`,
+`s`, `S`, `i`, `I`) itself, exactly, before the cast (decided 2026-11-27,
+#155; every prototype since #167): through
 zuarrow they became R integers first, whose `NA` is INT32_MIN. Every
 handler error about the schema or the array is a `zuint_arrow_error`
 (#166).
@@ -805,7 +836,7 @@ handler error about the schema or the array is a `zuint_arrow_error`
 | Partner | Mapping |
 | --- | --- |
 | bit64 `integer64` | zero-copy both ways (`as_integer64()`, and `int64()` on an integer64 only swaps the class) |
-| Arrow | through zuarrow (§9.4): `int64` ↔ int64, `uint64` ↔ uint64, `arrow.opaque` hugeint/uhugeint ↔ int128/uint128; `decimal128(p, 0)` → int128 only with `to = int128()`. `decimal128(p, s>0)` has no zuint reader: the Arrow mapping of zuint's `decimal128` class waits (§2.2, §15). arrow R today converts uint64, uint32 and decimal128 to double. Since Stage 9 zuint registers no methods on arrow's generics |
+| Arrow | through zuarrow (§9.4): `int64` ↔ int64, `uint64` ↔ uint64, `arrow.opaque` hugeint/uhugeint ↔ int128/uint128; `decimal128(p, 0)` → int128 only under a zuint prototype: its bits with `to = int128()`, its value cast to any other (#167). `decimal128(p, s>0)` has no zuint reader: the Arrow mapping of zuint's `decimal128` class waits (§2.2, §15). arrow R today converts uint64, uint32 and decimal128 to double. Since Stage 9 zuint registers no methods on arrow's generics |
 | DuckDB | BIGINT ↔ int64, UBIGINT ↔ uint64, HUGEINT ↔ int128, UHUGEINT ↔ uint128, via DuckDB's Arrow export and zuarrow: `SET arrow_lossless_conversion = true`, since the default export loses UHUGEINT values ≥ 2¹²⁷ (§9.1), then `zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))`. The former `zu_duckdb_query()` and `zu_duckdb_register()` are gone (Stage 9). Today the R client's `bigint` option accepts only `"numeric"` and `"integer64"`; HUGEINT and UHUGEINT always arrive as doubles |
 | nanoarrow | zuarrow reads and writes nanoarrow handles; zuint registers no nanoarrow methods since Stage 9. Today `convert_array(uint64_array, bit64::integer64())` clamps 2⁶³ and above to 2⁶³ − 1 |
 | data.table | int64 works natively. Other types: `as.character()` or `as_integer64()` before keyed joins; documented. data.table pads `uint64`, `int128` and `uint128` columns with R's NA bits, a valid value, in `rbindlist(fill = TRUE)`, `d[c(1, NA)]`, `shift()` and `:= NA`, and groups a `uint64` NA with its neighbour (decided 2026-11-28, #162; §4.1) |
