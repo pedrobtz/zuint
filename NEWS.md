@@ -1,5 +1,8 @@
 # zuint 0.0.0.9000
 
+* The Arrow import refuses an array whose offset and length would overflow
+  the index or byte arithmetic with a `zuint_arrow_error`, instead of
+  reading outside its buffers (#81).
 * `format(x, width = )` reads a bit64 `integer64` width by its value when
   bit64 is not loaded, as the other counts do (#153); it had read the bits
   as a double, so the width was 0.

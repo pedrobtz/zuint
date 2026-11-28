@@ -151,6 +151,11 @@ static const struct ArrowArray *zu_array_arg(SEXP array)
     const struct ArrowArray *a = (const struct ArrowArray *)R_ExternalPtrAddr(array);
     if (a->release == NULL) Rf_error("zuint: the ArrowArray has been released");
     if (a->length < 0 || a->offset < 0) Rf_error("zuint: the ArrowArray has a negative length or offset");
+    /* The producer's offset and length are trusted no further than this:
+       the last index read, offset + length - 1, and its byte position, at
+       most 16 bytes a value, must fit in int64_t (#81). */
+    if (a->length > INT64_MAX / 16 || a->offset > INT64_MAX / 16 - a->length)
+        Rf_error("zuint: the ArrowArray's offset and length are out of range");
     if (a->n_buffers != 2) Rf_error("zuint: expected an ArrowArray with 2 buffers, not %d", (int)a->n_buffers);
     if (a->length > 0 && a->buffers[1] == NULL) Rf_error("zuint: the ArrowArray has no data buffer");
     return a;
@@ -471,7 +476,8 @@ SEXP zu_arrow_schema_c(SEXP array)
 /* For the tests: make an exported array malformed, one field at a time,
    so the import's guards can be reached; nanoarrow refuses to build such
    arrays. 1: negative length; 2: negative offset; 3: three buffers; 4: no
-   data buffer; 5: the schema in its tag released. The buffers the array
+   data buffer; 5: the schema in its tag released; 6 and 7: an offset whose
+   last index, or its byte position, overflows int64_t. The buffers the array
    owns are left where the release callback frees them: case 4 points
    `buffers` at a static pair instead. */
 static const void *zu_no_buffers[2] = {NULL, NULL};
@@ -485,6 +491,8 @@ SEXP zu_arrow_corrupt_c(SEXP xp, SEXP what)
     case 2: a->offset = -1; break;
     case 3: a->n_buffers = 3; break;
     case 4: a->buffers = zu_no_buffers; break;
+    case 6: a->offset = INT64_MAX - 1; break;
+    case 7: a->offset = INT64_MAX / 16; break;
     case 5: {
         SEXP tag = R_ExternalPtrTag(xp);
         struct ArrowSchema *s = TYPEOF(tag) == EXTPTRSXP ? (struct ArrowSchema *)R_ExternalPtrAddr(tag) : NULL;

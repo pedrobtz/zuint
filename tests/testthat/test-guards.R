@@ -53,8 +53,14 @@ test_that("every routine refuses a bad type code or a payload of the wrong type"
 
 test_that("the Arrow import refuses a malformed array as a zuint_arrow_error", {
   to <- zu_arrow_to(NA_integer_)
-  for (what in 1:4) {
+  # 6 and 7: an offset past what the index or byte arithmetic can hold (#81)
+  for (what in c(1:4, 6:7)) {
     a <- zu_arrow_from(int64(c(1, 2)))
+    .Call(zu_arrow_corrupt_c, a, what)
+    expect_error(to(a, zu_arrow_tag(a), "error"), class = "zuint_arrow_error")
+  }
+  for (what in 6:7) {
+    a <- zu_arrow_from(uint128(c(1, 2)))
     .Call(zu_arrow_corrupt_c, a, what)
     expect_error(to(a, zu_arrow_tag(a), "error"), class = "zuint_arrow_error")
   }
