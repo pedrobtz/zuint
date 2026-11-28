@@ -28,7 +28,14 @@ test_that("the forbidden-symbol matcher catches every platform's spelling (#72)"
     "_exit",
     "_rand"
   )
-  good <- c("Rprintf", "REprintf", "Rf_error", "_Rprintf", "R_alloc", "memcpy@GLIBC_2.14")
+  good <- c(
+    "Rprintf",
+    "REprintf",
+    "Rf_error",
+    "_Rprintf",
+    "R_alloc",
+    "memcpy@GLIBC_2.14"
+  )
   expect_identical(forbidden_symbols(bad), bad)
   expect_identical(forbidden_symbols(good), character())
 })

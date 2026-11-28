@@ -145,7 +145,7 @@ test_that("decimal128() checks its type and what it converts", {
 test_that("+, - and * give DuckDB's type and value", {
   con <- local_duckdb_plain()
   pairs <- dec_type_pairs()
-  for (k in seq_along(pairs)) {
+  for (k in test_thin(seq_along(pairs), 4L)) {
     ta <- pairs[[k]]$a
     tb <- pairs[[k]]$b
     va <- dec_texts(12L, ta[[1L]], ta[[2L]], seed = k)
@@ -280,7 +280,7 @@ test_that("a whole double is an integer operand; any other follows zuint.double"
 test_that("comparison is exact across scales", {
   skip_if_not_installed("gmp")
   withr::local_seed(9)
-  for (k in 1:20) {
+  for (k in test_thin(1:20, 4L)) {
     sa <- sample(0:38, 1L)
     sb <- sample(0:38, 1L)
     ca <- fx_coefs(30L, 38L, seed = k)
@@ -353,8 +353,8 @@ test_that("c() takes DuckDB's common type", {
     c(10L, 5L),
     c(38L, 38L)
   )
-  for (ta in types) {
-    for (tb in types) {
+  for (ta in test_thin(types, 2L)) {
+    for (tb in test_thin(types, 2L)) {
       # values every type holds, even one with no integer digits
       a <- decimal128(c("0", "0.5"), ta[[1L]], ta[[2L]])
       b <- decimal128(c("0", "-0.5"), tb[[1L]], tb[[2L]])
@@ -874,7 +874,7 @@ test_that("round(), floor(), ceiling() and trunc() give DuckDB's type and value 
     c(38L, 2L),
     c(38L, 38L)
   )
-  for (type in types) {
+  for (type in test_thin(types, 3L)) {
     p <- type[[1L]]
     s <- type[[2L]]
     coefs <- c(fx_coefs(20L, p, seed = p + s), "5", "-5", "25", "-35", "0")

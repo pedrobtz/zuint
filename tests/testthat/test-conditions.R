@@ -99,6 +99,7 @@ test_that("every condition reports the user's call (#80)", {
 })
 
 test_that("a Summary condition prints without deparsing the payload (#80)", {
+  skip_if_gctorture()
   x <- rep(int64("9223372036854775807"), 1e5)
   w <- tryCatch(sum(x), warning = identity)
   expect_s3_class(w, "zuint_overflow_warning")

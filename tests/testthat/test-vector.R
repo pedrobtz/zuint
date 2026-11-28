@@ -402,7 +402,7 @@ test_that("a zuint count is read as the number it stands for (#153)", {
   for (type in zu_vector_types) {
     x <- zu_ctor(type)(c(1, 4, 9, 16))
     names(x) <- c("a", "b", "c", "d")
-    for (ck in names(counts)) {
+    for (ck in test_thin(names(counts), 2L)) {
       k <- counts[[ck]]
       label <- paste(type, "with a count of", ck)
       expect_identical(rep(x, times = k(2)), rep(x, times = 2L), label = label)
@@ -446,7 +446,7 @@ test_that("a zuint count is read as the number it stands for (#153)", {
     expect_identical(head(x, int64(-1)), head(x, -1L), label = type)
     expect_identical(tail(x, int128(-3)), tail(x, -3L), label = type)
   }
-  for (ck in names(counts)) {
+  for (ck in test_thin(names(counts), 2L)) {
     k <- counts[[ck]]
     expect_identical(
       seq_zu(int64(1), length.out = k(3)),

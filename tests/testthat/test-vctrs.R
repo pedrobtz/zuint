@@ -194,4 +194,3 @@ test_that("vctrs methods register whichever of vctrs and zuint loads first (#82)
     "TRUE"
   )
 })
-
