@@ -581,3 +581,44 @@ test_that("the double fallback of zuint.double = \"allow\" keeps names (#164)", 
     )
   }
 })
+
+test_that("round and signif take a fractional or infinite digits as base R does (#157)", {
+  v <- c(12345, 123456, -12345, 15, 0, 7)
+  for (type in c("int64", "int128", "uint64", "uint128")) {
+    x <- zu_ctor(type)(if (grepl("^u", type)) abs(v) else v)
+    xv <- if (grepl("^u", type)) abs(v) else v
+    for (d in c(-2.7, -1.7, -1.5, -0.5, 2.5, 0.4, -Inf, Inf, 2^31, -2^31, 2^40)) {
+      expect_identical(
+        as.double(round(x, d)),
+        round(xv, d),
+        label = paste(type, "round", d)
+      )
+    }
+    # base R's signif() of a finite digits beyond the int range is an
+    # accident of C's conversion, not a rule, so only Inf is compared
+    for (d in c(2.7, 2.5, 0.4, -3.2, Inf, -Inf)) {
+      expect_identical(
+        as.double(signif(x, d)),
+        signif(xv, d),
+        label = paste(type, "signif", d)
+      )
+    }
+    expect_error(round(x, NA), class = "zuint_type_error")
+    expect_error(round(x, NA_real_), class = "zuint_type_error")
+    expect_error(signif(x, NA_integer_), class = "zuint_type_error")
+  }
+})
+
+test_that("round of a decimal128 takes a fractional or infinite digits as base R does (#157)", {
+  x <- decimal128("1.2345", 5, 4)
+  # digits 2.5 is 3; the decimal is exact where base's double is not
+  expect_identical(round(x, 2.5), round(x, 3))
+  expect_identical(as.double(round(x, 2.5)), 1.235)
+  expect_identical(as.double(round(x, Inf)), 1.2345)
+  expect_identical(as.double(round(x, -Inf)), 0)
+  expect_identical(as.double(round(x, 2^31)), 1.2345)
+  expect_identical(as.double(round(x, -2^31)), 0)
+  y <- decimal128("12345", 5, 0)
+  expect_identical(as.double(round(y, -1.7)), round(12345, -1.7))
+  expect_error(round(x, NA), class = "zuint_type_error")
+})

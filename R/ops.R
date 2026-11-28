@@ -447,10 +447,12 @@ zu_signif <- function(x, digits = 6L, ..., call = NULL) {
 
 zu_digits_arg <- function(digits, call) {
   digits <- zu_index(digits)
-  if (length(digits) != 1L || is.na(digits) || !is.numeric(digits)) {
+  if (length(digits) != 1L || !is.numeric(digits) || is.na(digits)) {
     zu_abort("`digits` must be a single number.", "type", call = call)
   }
-  as.integer(digits)
+  # base R's rule: round half up, clamped (beyond 10^4 every type is
+  # unchanged or rounds to zero, so the clamp does not alter a result)
+  as.integer(max(-1e4, min(1e4, floor(digits + 0.5))))
 }
 
 zu_round_to <- function(x, k, call) {
