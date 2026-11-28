@@ -324,6 +324,7 @@ dec_methods <- c(
   as.complex = "dec_as_complex",
   all.equal = "dec_all_equal",
   seq = "zu_unsupported",
+  cut = "zu_cut",
   as.raw = "zu_unsupported",
   as.Date = "zu_unsupported",
   as.POSIXct = "zu_unsupported",
