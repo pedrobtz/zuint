@@ -334,6 +334,44 @@ test_that("rep() of an empty vector pads with the type's NA (#55)", {
   )
 })
 
+test_that("Conj(), Re(), Im(), Mod() and Arg() refuse every zuint type (#152)", {
+  for (type in zu_vector_types) {
+    x <- zu_ctor(type)(c(5, 0, NA))
+    for (fn in c("Conj", "Re", "Im", "Mod", "Arg")) {
+      expect_error(
+        get(fn)(x),
+        class = "zuint_unsupported_error",
+        label = paste(type, fn)
+      )
+    }
+  }
+})
+
+test_that("%*%, crossprod() and tcrossprod() refuse every zuint type (#160)", {
+  for (type in zu_vector_types) {
+    x <- zu_ctor(type)(1:2)
+    expect_error(x %*% x, class = "zuint_unsupported_error", label = type)
+    expect_error(1:2 %*% x, class = "zuint_unsupported_error", label = type)
+    expect_error(x %*% 1:2, class = "zuint_unsupported_error", label = type)
+  }
+  # S3 generic, through matrixOps, since R 4.4.0
+  skip_if(getRversion() < "4.4.0")
+  for (type in zu_vector_types) {
+    x <- zu_ctor(type)(1:2)
+    expect_error(crossprod(x), class = "zuint_unsupported_error", label = type)
+    expect_error(
+      crossprod(1:2, x),
+      class = "zuint_unsupported_error",
+      label = type
+    )
+    expect_error(
+      tcrossprod(x, x),
+      class = "zuint_unsupported_error",
+      label = type
+    )
+  }
+})
+
 test_that("a zuint count is read as the number it stands for (#153)", {
   counts <- list(
     int64 = int64,

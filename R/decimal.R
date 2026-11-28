@@ -333,7 +333,11 @@ dec_methods <- c(
   rbind = "zu_matrix_unsupported",
   as.matrix = "zu_matrix_unsupported",
   aperm = "zu_matrix_unsupported",
-  scale = "zu_matrix_unsupported"
+  scale = "zu_matrix_unsupported",
+  "%*%" = "zu_matrix_unsupported",
+  crossprod = "zu_matrix_unsupported",
+  tcrossprod = "zu_matrix_unsupported",
+  Complex = "zu_complex_unsupported"
 )
 
 dec_s3_registrations <- function() {

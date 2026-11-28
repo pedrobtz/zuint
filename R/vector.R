@@ -58,7 +58,15 @@ zu_methods <- c(
   rbind = "zu_matrix_unsupported",
   as.matrix = "zu_matrix_unsupported",
   aperm = "zu_matrix_unsupported",
-  scale = "zu_matrix_unsupported"
+  scale = "zu_matrix_unsupported",
+  # matrixOps: %*% since R 4.3.0, crossprod() and tcrossprod() since 4.4.0.
+  # bit64 has a %*% method, so without one here the answer for int64 would
+  # depend on whether bit64 is loaded (#160)
+  "%*%" = "zu_matrix_unsupported",
+  crossprod = "zu_matrix_unsupported",
+  tcrossprod = "zu_matrix_unsupported",
+  # Conj(), Re(), Im(), Mod() and Arg() would read the payload (#152)
+  Complex = "zu_complex_unsupported"
 )
 
 # NAMESPACE lines, written by roxygen through @evalNamespace.

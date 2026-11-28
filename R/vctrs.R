@@ -301,6 +301,13 @@ zu_pillar_shaft <- function(x, ...) {
 #' `sum(int128(5), 1L)` is exact, while `sum(1L, int128(5))` reads the raw
 #' bits. Put the zuint vector first.
 #'
+#' [base::matrix()], [base::array()], [base::outer()] and [base::diag()] are such functions too,
+#' and no method can intercept them: they return the raw bits. zuint
+#' vectors do not form matrices, and the functions that dispatch refuse
+#' them with an error of class `zuint_unsupported_error`: `%*%`,
+#' [base::crossprod()] and [base::tcrossprod()] (the last two from R 4.4.0),
+#' [cbind()], [rbind()], [as.matrix()], [aperm()] and [scale()].
+#'
 #' @param test A logical vector.
 #' @param yes,no Values for `TRUE` and `FALSE`, recycled to `test`.
 #' @param X A vector or list.

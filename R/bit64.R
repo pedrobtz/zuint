@@ -101,6 +101,15 @@ zu_unsupported <- function(x, ...) {
   )
 }
 
+# The Complex group's generics take `z`.
+zu_complex_unsupported <- function(z) {
+  zu_abort(
+    sprintf("%s() is not supported for zuint vectors.", .Generic),
+    "unsupported",
+    call = sys.call()
+  )
+}
+
 zu_quantile <- function(x, ...) {
   zu_abort(
     "quantile() for zuint vectors comes after zuint 0.1.0.",

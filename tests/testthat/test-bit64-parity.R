@@ -125,8 +125,7 @@ test_that("every base generic bit64 has an integer64 method for has a zu_int64 m
     "rowSums",
     "identical",
     "is.double",
-    "is.vector",
-    "%*%"
+    "is.vector"
   )
   # only the generics R itself defines: bit and bit64's own generics exist
   # only with those packages loaded, and work on int64's bits as they are
@@ -238,6 +237,13 @@ test_that("bit64's masked set functions work on int64 (#161)", {
   expect_identical(v$intersect, zu_storage(int64(c("-1", NA))))
   expect_identical(v$is_element, c(FALSE, TRUE, FALSE, FALSE, TRUE))
   expect_identical(v$setequal, c(TRUE, FALSE))
+})
+
+test_that("%*%, crossprod() and tcrossprod() refuse int64 whatever is loaded (#160)", {
+  res <- expect_bit64_parity("matrix")
+  for (r in res$attached$value) {
+    expect_identical(r, "zuint_unsupported_error")
+  }
 })
 
 test_that("integer64 with any zuint type on the right is exact with bit64 attached (#151)", {

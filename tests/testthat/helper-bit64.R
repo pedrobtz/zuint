@@ -253,6 +253,17 @@ list(
   is_element = is.element(x, y),
   setequal = c(setequal(x, rev(x)), setequal(x, y))
 )
+',
+  # %*% is a bit64 method, not a mask (#160)
+  matrix = '
+err <- function(expr) tryCatch(expr, error = function(e) class(e)[[1L]])
+x <- int64(1:2)
+list(
+  matmul = err(x %*% x),
+  matmul_right = err(1:2 %*% x),
+  crossprod = err(crossprod(x)),
+  tcrossprod = err(tcrossprod(x, x))
+)
 '
 )
 

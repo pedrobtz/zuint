@@ -44,6 +44,13 @@ The same goes for \code{\link[=sum]{sum()}}, \code{\link[=min]{min()}}, \code{\l
 \code{Summary} functions, which R dispatches on their first argument only:
 \code{sum(int128(5), 1L)} is exact, while \code{sum(1L, int128(5))} reads the raw
 bits. Put the zuint vector first.
+
+\code{\link[base:matrix]{base::matrix()}}, \code{\link[base:array]{base::array()}}, \code{\link[base:outer]{base::outer()}} and \code{\link[base:diag]{base::diag()}} are such functions too,
+and no method can intercept them: they return the raw bits. zuint
+vectors do not form matrices, and the functions that dispatch refuse
+them with an error of class \code{zuint_unsupported_error}: \code{\%*\%},
+\code{\link[base:crossprod]{base::crossprod()}} and \code{\link[base:tcrossprod]{base::tcrossprod()}} (the last two from R 4.4.0),
+\code{\link[=cbind]{cbind()}}, \code{\link[=rbind]{rbind()}}, \code{\link[=as.matrix]{as.matrix()}}, \code{\link[=aperm]{aperm()}} and \code{\link[=scale]{scale()}}.
 }
 \examples{
 x <- int64(c("-9223372036854775807", "5", NA))
