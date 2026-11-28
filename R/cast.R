@@ -25,6 +25,18 @@ zu_kind <- function(x) {
   )
 }
 
+# A bit64 integer64 that is not a zu_int64, as one; anything else as it is.
+# Base is.na(), as.logical() and == read an integer64's raw bits when bit64
+# is not loaded, where -1 is NaN and NA (-0.0) a value (#150); on a zu_int64
+# they dispatch to zuint's methods. Only the class changes.
+zu_from_bit64 <- function(x) {
+  if (inherits(x, "integer64") && !inherits(x, "zu_int64")) {
+    zu_new(x, 1L)
+  } else {
+    x
+  }
+}
+
 # A double vector with no class: base data, not a zuint or other classed
 # vector.
 zu_is_bare_double <- function(x) is.double(x) && !is.object(x)

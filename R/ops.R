@@ -40,10 +40,21 @@ zu_ops <- function(e1, e2) {
     "%%" = zu_arith(op, e1, e2, zu_policy_default, call),
     "/" = zu_divide(e1, e2, call),
     "^" = zu_pow(e1, e2, zu_policy_default, call),
-    "&" = as.logical(e1) & as.logical(e2),
-    "|" = as.logical(e1) | as.logical(e2),
+    "&" = ,
+    "|" = zu_logic(op, e1, e2),
     zu_compare(op, e1, e2, call)
   )
+}
+
+# & and | on the logical values, names as base R gives them. A plain
+# integer64 operand is read by its values, not its bits (#150).
+zu_logic <- function(op, x, y) {
+  out <- get(op, baseenv())(
+    as.logical(zu_from_bit64(x)),
+    as.logical(zu_from_bit64(y))
+  )
+  names(out) <- zu_result_names(x, y, length(out))
+  out
 }
 
 zu_math <- function(x, ...) {
@@ -199,7 +210,7 @@ zu_arith <- function(op, x, y, policy, call) {
     policy == zu_policy_checked &&
       op %in% c("%/%", "%%") &&
       length(x) > 0L &&
-      isTRUE(any(y == 0L, na.rm = TRUE))
+      isTRUE(any(zu_from_bit64(y) == 0L, na.rm = TRUE))
   ) {
     zu_abort("Division by zero.", "division", call = call)
   }
@@ -418,6 +429,7 @@ zu_signif <- function(x, digits = 6L, ..., call = NULL) {
 }
 
 zu_digits_arg <- function(digits, call) {
+  digits <- zu_index(digits)
   if (length(digits) != 1L || is.na(digits) || !is.numeric(digits)) {
     zu_abort("`digits` must be a single number.", "type", call = call)
   }

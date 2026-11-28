@@ -118,6 +118,7 @@ zu_vec_ptype2 <- function(x, y, ..., x_arg = "", y_arg = "") {
 # x as the type of `to`; a value that does not convert exactly is a lossy
 # cast error, as vctrs casts are.
 zu_vec_cast <- function(x, to, ..., x_arg = "", to_arg = "") {
+  x <- zu_from_bit64(x)
   code <- zu_code(to)
   out <- zu_quiet_cast(zu_cast(x, code))
   lossy <- zu_is_na(out) & !is.na(x)
@@ -201,6 +202,7 @@ dec_vec_ptype2 <- function(x, y, ..., x_arg = "", y_arg = "") {
 # x as the type of `to`. A cast that rounds is lossy, like one that loses a
 # value: vctrs casts must be exact.
 dec_vec_cast <- function(x, to, ..., x_arg = "", to_arg = "") {
+  x <- zu_from_bit64(x)
   out <- zu_quiet_cast(dec_cast(x, dec_p(to), dec_s(to), NULL))
   lost <- dec_is_na(out) & !is.na(x)
   changed <- if (is_decimal128(x)) {
@@ -321,7 +323,7 @@ zu_ifelse <- function(test, yes, no) {
   zu_check_operands(kinds, list(yes, no), call)
   code <- zu_common_code(kinds, call)
   nm <- names(test)
-  test <- as.logical(test)
+  test <- as.logical(zu_from_bit64(test))
   n <- length(test)
   # a double follows the rule of c() and the operators: integral and in
   # range, or a zuint_double_error
@@ -388,7 +390,7 @@ dec_ifelse <- function(test, yes, no, call) {
     return(ifelse(test, dec_dbl_quiet(yes), dec_dbl_quiet(no)))
   }
   nm <- names(test)
-  test <- as.logical(test)
+  test <- as.logical(zu_from_bit64(test))
   n <- length(test)
   ny <- length(yes)
   out <- rep(both[seq_len(ny)], length.out = n)

@@ -181,3 +181,38 @@ test_that("a plain integer64 on the left of a wider type is exact or NA, never t
     expect_identical(r, bit64::NA_integer64_, label = type)
   }
 })
+
+test_that("a plain integer64 operand reads as its values with bit64 absent (#150)", {
+  res <- expect_bit64_parity("operands")
+  v <- res$absent$value
+  expect_identical(v$and, c(TRUE, FALSE, NA))
+  expect_identical(v$or, c(TRUE, FALSE, NA))
+  expect_identical(v$xor, c(FALSE, TRUE, NA))
+  expect_identical(v$match, c(2L, 1L, NA))
+  expect_identical(v$match_table, c(3L, 2L, 1L))
+  expect_identical(v$zin, c(TRUE, FALSE, FALSE))
+  expect_identical(v$ifelse, zu_storage(int64(c(1, 2, NA, 1))))
+  expect_identical(v$idiv, zu_storage(int64(c(NA, -5))))
+  expect_identical(v$seq_by, zu_storage(int64(c(1, 0, -1))))
+  expect_identical(v$seq_len, zu_storage(int64(1:3)))
+  expect_identical(v$round, zu_storage(int64(1200)))
+  expect_identical(v$dec_cmp, c(NA, TRUE, FALSE))
+  expect_identical(v$dec_lt, c(NA, TRUE, TRUE))
+  expect_identical(v$dec_match, c(2L, 1L))
+  expect_identical(v$dec_and, c(FALSE, FALSE, NA))
+  expect_identical(v$dec_ifelse, c("0.00", "-1.00", NA))
+  expect_identical(res$absent$warnings, character())
+})
+
+test_that("vctrs casts a plain integer64 by its values with bit64 absent (#150)", {
+  skip_if_not_installed("vctrs")
+  res <- expect_bit64_parity("operands_vctrs")
+  v <- res$absent$value
+  expect_identical(v$int64, zu_storage(int64(c(1, NA, -1))))
+  expect_identical(v$uint64, "lossy")
+  expect_identical(v$uint64_ok, zu_storage(uint64(c(1, NA))))
+  expect_identical(v$int128, zu_storage(int128(c(-1, NA))))
+  expect_identical(v$decimal, c("1.00", NA, "-1.00"))
+  expect_identical(v$decimal_lossy, "lossy")
+  expect_identical(v$combine, zu_storage(int64(c(5, NA, -1))))
+})

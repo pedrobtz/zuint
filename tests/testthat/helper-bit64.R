@@ -201,6 +201,46 @@ list(
   predicates = list(is.numeric(x), is.nan(x), is.finite(x)),
   all_equal = all.equal(x, x)
 )
+',
+  # a plain integer64 as an operand of zuint code (#150): with bit64 absent,
+  # base is.na(), as.logical() and == read its bits, where -1 is NaN and NA
+  # (-0.0) is a value
+  operands = '
+B <- function(...) as_integer64(int64(c(...)))
+d <- decimal128(c("0.00", "-1.00", "2.50"), 10, 2)
+list(
+  and = int64(c(1, 1, 1)) & B(-1, 0, NA),
+  or = int64(c(0, 0, 0)) | B(-1, 0, NA),
+  xor = xor(int64(c(1, 1, 1)), B(-1, 0, NA)),
+  match = zu_match(int64(c(NA, -1, 7)), B(-1, NA)),
+  match_table = zu_match(B(-1, NA, 5), int64(c(5, NA, -1))),
+  zin = int64(c(NA, 3, -1)) %zin% B(NA, 5),
+  ifelse = zu_storage(zu_ifelse(B(1, 0, NA, -1), int64(1), int64(2))),
+  idiv = zu_storage(checked_idiv(int64(c(5, 5)), B(NA, -1))),
+  seq_by = zu_storage(seq_zu(int64(1), by = B(-1), length.out = 3)),
+  seq_len = zu_storage(seq_zu(int64(1), length.out = B(3))),
+  round = zu_storage(round(int64(1234), B(-2))),
+  dec_cmp = d == B(NA, -1, 3),
+  dec_lt = d < B(NA, 0, 3),
+  dec_match = zu_match(decimal128(c("-1", NA), 10, 2), B(NA, -1)),
+  dec_and = d & B(-1, 0, NA),
+  dec_ifelse = as.character(zu_ifelse(B(-1, 0, NA), d[1:3], d[3:1]))
+)
+',
+  operands_vctrs = '
+B <- function(...) as_integer64(int64(c(...)))
+lossy <- function(expr) {
+  tryCatch(expr, vctrs_error_cast_lossy = function(e) "lossy")
+}
+list(
+  int64 = zu_storage(vctrs::vec_cast(B(1, NA, -1), int64())),
+  uint64 = lossy(vctrs::vec_cast(B(-1), uint64())),
+  uint64_ok = zu_storage(vctrs::vec_cast(B(1, NA), uint64())),
+  int128 = zu_storage(vctrs::vec_cast(B(-1, NA), int128())),
+  decimal = as.character(vctrs::vec_cast(B(1, NA, -1), decimal128("0", 10, 2))),
+  decimal_lossy = lossy(vctrs::vec_cast(B("9223372036854775807"), decimal128("0", 10, 2))),
+  combine = zu_storage(vctrs::vec_c(int64(5), B(NA, -1)))
+)
 '
 )
 

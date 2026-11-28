@@ -333,3 +333,75 @@ test_that("rep() of an empty vector pads with the type's NA (#55)", {
     uint128(c(NA, 2))
   )
 })
+
+test_that("a zuint count is read as the number it stands for (#153)", {
+  counts <- list(
+    int64 = int64,
+    uint64 = uint64,
+    int128 = int128,
+    uint128 = uint128,
+    integer64 = function(v) as_integer64(int64(v))
+  )
+  # the oracle: the same call with the count as an integer
+  for (type in zu_vector_types) {
+    x <- zu_ctor(type)(c(1, 4, 9, 16))
+    names(x) <- c("a", "b", "c", "d")
+    for (ck in names(counts)) {
+      k <- counts[[ck]]
+      label <- paste(type, "with a count of", ck)
+      expect_identical(rep(x, times = k(2)), rep(x, times = 2L), label = label)
+      expect_identical(rep(x, k(2)), rep(x, 2L), label = label)
+      expect_identical(rep(x, each = k(2)), rep(x, each = 2L), label = label)
+      expect_identical(
+        rep(x, length.out = k(5)),
+        rep(x, length.out = 5L),
+        label = label
+      )
+      expect_identical(diff(x, lag = k(2)), diff(x, lag = 2L), label = label)
+      expect_identical(
+        diff(x, differences = k(2)),
+        diff(x, differences = 2L),
+        label = label
+      )
+      expect_identical(head(x, k(2)), head(x, 2L), label = label)
+      expect_identical(tail(x, k(3)), tail(x, 3L), label = label)
+      y <- x
+      length(y) <- k(6)
+      z <- x
+      length(z) <- 6L
+      expect_identical(y, z, label = label)
+      expect_identical(
+        format(x, width = k(4)),
+        format(x, width = 4L),
+        label = label
+      )
+      expect_identical(
+        capture.output(print(x, max = k(2))),
+        capture.output(print(x, max = 2L)),
+        label = label
+      )
+      expect_identical(
+        capture.output(str(x, vec.len = k(1))),
+        capture.output(str(x, vec.len = 1L)),
+        label = label
+      )
+    }
+    # a signed count counts from the other end, as an integer does
+    expect_identical(head(x, int64(-1)), head(x, -1L), label = type)
+    expect_identical(tail(x, int128(-3)), tail(x, -3L), label = type)
+  }
+  for (ck in names(counts)) {
+    k <- counts[[ck]]
+    expect_identical(
+      seq_zu(int64(1), length.out = k(3)),
+      int64(1:3),
+      label = ck
+    )
+    expect_identical(seq(uint64(1), length.out = k(3)), uint64(1:3), label = ck)
+  }
+  # beyond an integer, as an index is: NA with a warning
+  expect_warning(
+    try(rep(int64(1), times = int64("9007199254740993")), silent = TRUE),
+    class = "zuint_cast_warning"
+  )
+})

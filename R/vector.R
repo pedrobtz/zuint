@@ -38,6 +38,8 @@ zu_methods <- c(
   anyDuplicated = "zu_any_duplicated",
   mtfrm = "zu_mtfrm",
   diff = "zu_diff",
+  "utils::head" = "zu_head",
+  "utils::tail" = "zu_tail",
   chooseOpsMethod = "zu_choose_ops_method",
   # R/bit64.R
   is.numeric = "zu_is_numeric",
@@ -67,12 +69,18 @@ zu_s3_registrations <- function() {
     class = classes,
     stringsAsFactors = FALSE
   )
-  sprintf(
-    'S3method("%s", %s, %s)',
-    grid$generic,
-    grid$class,
-    zu_methods[grid$generic]
+  zu_s3_lines(grid$generic, grid$class, zu_methods[grid$generic])
+}
+
+# A generic written pkg::name, from a package zuint does not import, is
+# registered when that package loads.
+zu_s3_lines <- function(generic, class, method) {
+  quoted <- ifelse(
+    grepl("::", generic, fixed = TRUE),
+    generic,
+    sprintf('"%s"', generic)
   )
+  sprintf("S3method(%s, %s, %s)", quoted, class, method)
 }
 
 #' @evalNamespace zu_s3_registrations()
@@ -113,6 +121,8 @@ zu_fill_na <- function(payload, code, where) {
 
 # A zuint index is a number, not its raw bits: base `[` would read those.
 # Converted exactly to an integer, or NA with a warning beyond its range.
+# Counts (rep()'s times, diff()'s lag, head()'s n, length<-, a width) are
+# converted the same way (#153). A bit64 integer64 is converted too.
 zu_index <- function(i) {
   if (is.na(zu_code(i))) i else zu_as_integer(i)
 }
@@ -193,6 +203,7 @@ zu_subassign2 <- function(x, i, ..., value) {
 }
 
 zu_set_length <- function(x, value) {
+  value <- zu_index(value)
   code <- zu_code(x)
   n <- length(x)
   s <- zu_unclass(x)
@@ -246,12 +257,18 @@ zu_c <- function(...) {
 # here (#55): those slots get the type's NA.
 zu_rep <- function(x, ...) {
   code <- zu_code(x)
-  out <- rep(zu_unclass(x), ...)
+  out <- do.call(rep, c(list(zu_unclass(x)), lapply(list(...), zu_index)))
   if (length(x) == 0L && length(out) > 0L) {
     out <- zu_fill_na(out, code, rep(TRUE, length(out)))
   }
   zu_new(out, code)
 }
+
+# head() and tail() with a zuint `n`, which head.default() would read as
+# its bits; the rest is the default method's, indexing x by its own `[`.
+zu_head <- function(x, n = 6L, ...) NextMethod(n = zu_index(n))
+
+zu_tail <- function(x, n = 6L, ...) NextMethod(n = zu_index(n))
 
 zu_rev <- function(x) {
   if (length(x)) x[length(x):1L] else x
@@ -334,6 +351,7 @@ zu_format <- function(x, ..., width = 0L, big.mark = "", justify = "right") {
 # The exact text `s` of a vector, as format() writes it: NA as "NA", digits
 # grouped by `big.mark`, right-justified in at least `width`.
 zu_format_text <- function(s, nm, width, big.mark) {
+  width <- zu_index(width)
   na <- is.na(s)
   if (nzchar(big.mark)) {
     # the text always has ".", whatever OutDec says
@@ -369,7 +387,7 @@ zu_print_values <- function(x, fmt, max, ...) {
   if (n == 0L) {
     return(invisible(x))
   }
-  max <- if (is.null(max)) getOption("max.print", 99999L) else max
+  max <- if (is.null(max)) getOption("max.print", 99999L) else zu_index(max)
   shown <- if (n > max) x[seq_len(max)] else x
   print(fmt(shown), quote = FALSE, ...)
   if (n > max) {
@@ -389,6 +407,7 @@ zu_str <- function(object, ..., vec.len = 4) {
 # str()'s one line: the type `label`, the length, and the first values as
 # `as_chr` writes them.
 zu_str_line <- function(object, label, as_chr, vec.len) {
+  vec.len <- zu_index(vec.len)
   n <- length(object)
   shown <- object[seq_len(min(n, max(1L, round(2.5 * vec.len))))]
   vals <- as_chr(shown)
