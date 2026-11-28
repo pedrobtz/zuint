@@ -23,9 +23,9 @@ truncated to an integer, as \code{\link[base:match]{base::match()}} does.}
 \verb{\%zin\%} a logical vector.
 }
 \description{
-\code{zu_match()} is \code{\link[base:match]{base::match()}} for zuint vectors, and \verb{\%zin\%} is \code{\%in\%}. Base
-\code{match()} and \code{\%in\%} compare exact decimal text when both sides are zuint
-vectors; these hash the values themselves and are much faster on long
+\code{zu_match()} is \code{\link[base:match]{base::match()}} for zuint vectors, and \verb{\%zin\%} is \code{\%in\%}.
+Base \code{match()} and \code{\%in\%} compare exact decimal text when both sides are
+zuint vectors; these hash the values themselves and are much faster on long
 vectors. They are also exact when one side is a bare number, which base
 \code{match()} is not (see below).
 }
@@ -36,17 +36,17 @@ matches \code{NA}. A \code{\link[=decimal128]{decimal128()}} matches by value, w
 }
 \section{Base functions and a bare number}{
 
-\code{\link[base:match]{base::match()}} and \code{\%in\%} are not generic. They turn the zuint side into text
-with \code{mtfrm()}, and the other side, if it is a bare double or logical,
+\code{\link[base:match]{base::match()}} and \code{\%in\%} are not generic. They turn the zuint side into
+text with \code{mtfrm()}, and the other side, if it is a bare double or logical,
 into text by R's own rules. The two texts then differ: \code{1e5} is \code{"1e+05"},
 and \code{int64(100000) \%in\% 100000} is \code{FALSE}. The answer also changes with
 \code{options(scipen =)} and \code{OutDec}, and with bit64 attached, whose masked
 \code{\%in\%} answers differently. A method cannot reach the bare side.
 
-\code{\link[base:table]{base::table()}}, \code{\link[=merge]{merge()}} and the set functions \code{\link[base:intersect]{base::intersect()}}, \code{\link[base:setdiff]{base::setdiff()}},
-\code{\link[base:union]{base::union()}} and \code{\link[base:is.element]{base::is.element()}} go through \code{match()} and have the same
-limit. \code{intersect(int64(1e5), 1e5)} is empty, and \code{setdiff()} and
-\code{union()} return the raw bits of the zuint side.
+\code{\link[base:table]{base::table()}}, \code{\link[=merge]{merge()}} and the set functions \code{\link[base:intersect]{base::intersect()}},
+\code{\link[base:setdiff]{base::setdiff()}}, \code{\link[base:union]{base::union()}} and \code{\link[base:is.element]{base::is.element()}} go through
+\code{match()} and have the same limit. \code{intersect(int64(1e5), 1e5)} is empty, and
+\code{setdiff()} and \code{union()} return the raw bits of the zuint side.
 
 Use \code{zu_match()} or \verb{\%zin\%}, or convert the bare side first, for example
 \code{int64(1e5)}. Two zuint vectors of the same type are always safe.

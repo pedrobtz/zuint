@@ -321,17 +321,16 @@ zu_pillar_shaft <- function(x, ...) {
 #' * [formatC()] and `sprintf("%f")` read the bits (`sprintf("%d")` is an
 #'   error). Use [format()], [as.character()] or [format_hex()]; `paste()`
 #'   and `sprintf("%s")` are right.
-#' * A zuint vector as an index or a count of a base function that does
-#'   not dispatch on it: `letters[int64(2)]`, `rep(1, int64(3))`,
-#'   `rep_len()`, `seq_len()`, `numeric()` and `vector()` are empty, and
-#'   an `int128` index is an error. Pass
-#'   `as.integer(i)`. A zuint vector as the vector being indexed, or as
-#'   `rep()`'s `x`, is right.
-#' * [base::matrix()], [base::array()], [base::outer()] and [diag()] return the raw bits.
-#'   zuint vectors do not form matrices, and the functions that dispatch
-#'   refuse them with a `zuint_unsupported_error`: `%*%`, [base::crossprod()] and
-#'   [base::tcrossprod()] (the last two from R 4.4.0), [cbind()], [rbind()],
-#'   [as.matrix()], [aperm()] and [scale()].
+#' * A zuint vector as an index or a count of a base function that does not
+#'   dispatch on it: `letters[int64(2)]`, `rep(1, int64(3))`, `rep_len()`,
+#'   `seq_len()`, `numeric()` and `vector()` are empty, and an `int128` index is
+#'   an error. Pass `as.integer(i)`. A zuint vector as the vector being indexed,
+#'   or as `rep()`'s `x`, is right.
+#' * [base::matrix()], [base::array()], [base::outer()] and [diag()] return the
+#'   raw bits. zuint vectors do not form matrices, and the functions that
+#'   dispatch refuse them with a `zuint_unsupported_error`: `%*%`,
+#'   [base::crossprod()] and [base::tcrossprod()] (the last two from R 4.4.0),
+#'   [cbind()], [rbind()], [as.matrix()], [aperm()] and [scale()].
 #' * [base::match()], `%in%`, [base::table()], [merge()] and the set functions
 #'   compare a bare double as text: see [zu_match()].
 #' * [cut()] has a method: see [zu_cut].

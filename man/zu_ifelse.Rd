@@ -69,17 +69,16 @@ and sum each group with \code{zu_vapply(split(x, g), sum, x[0])}.
 \item \code{\link[=formatC]{formatC()}} and \code{sprintf("\%f")} read the bits (\code{sprintf("\%d")} is an
 error). Use \code{\link[=format]{format()}}, \code{\link[=as.character]{as.character()}} or \code{\link[=format_hex]{format_hex()}}; \code{paste()}
 and \code{sprintf("\%s")} are right.
-\item A zuint vector as an index or a count of a base function that does
-not dispatch on it: \code{letters[int64(2)]}, \code{rep(1, int64(3))},
-\code{rep_len()}, \code{seq_len()}, \code{numeric()} and \code{vector()} are empty, and
-an \code{int128} index is an error. Pass
-\code{as.integer(i)}. A zuint vector as the vector being indexed, or as
-\code{rep()}'s \code{x}, is right.
-\item \code{\link[base:matrix]{base::matrix()}}, \code{\link[base:array]{base::array()}}, \code{\link[base:outer]{base::outer()}} and \code{\link[=diag]{diag()}} return the raw bits.
-zuint vectors do not form matrices, and the functions that dispatch
-refuse them with a \code{zuint_unsupported_error}: \code{\%*\%}, \code{\link[base:crossprod]{base::crossprod()}} and
-\code{\link[base:tcrossprod]{base::tcrossprod()}} (the last two from R 4.4.0), \code{\link[=cbind]{cbind()}}, \code{\link[=rbind]{rbind()}},
-\code{\link[=as.matrix]{as.matrix()}}, \code{\link[=aperm]{aperm()}} and \code{\link[=scale]{scale()}}.
+\item A zuint vector as an index or a count of a base function that does not
+dispatch on it: \code{letters[int64(2)]}, \code{rep(1, int64(3))}, \code{rep_len()},
+\code{seq_len()}, \code{numeric()} and \code{vector()} are empty, and an \code{int128} index is
+an error. Pass \code{as.integer(i)}. A zuint vector as the vector being indexed,
+or as \code{rep()}'s \code{x}, is right.
+\item \code{\link[base:matrix]{base::matrix()}}, \code{\link[base:array]{base::array()}}, \code{\link[base:outer]{base::outer()}} and \code{\link[=diag]{diag()}} return the
+raw bits. zuint vectors do not form matrices, and the functions that
+dispatch refuse them with a \code{zuint_unsupported_error}: \code{\%*\%},
+\code{\link[base:crossprod]{base::crossprod()}} and \code{\link[base:tcrossprod]{base::tcrossprod()}} (the last two from R 4.4.0),
+\code{\link[=cbind]{cbind()}}, \code{\link[=rbind]{rbind()}}, \code{\link[=as.matrix]{as.matrix()}}, \code{\link[=aperm]{aperm()}} and \code{\link[=scale]{scale()}}.
 \item \code{\link[base:match]{base::match()}}, \code{\%in\%}, \code{\link[base:table]{base::table()}}, \code{\link[=merge]{merge()}} and the set functions
 compare a bare double as text: see \code{\link[=zu_match]{zu_match()}}.
 \item \code{\link[=cut]{cut()}} has a method: see \link{zu_cut}.
