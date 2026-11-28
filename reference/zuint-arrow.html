@@ -57,28 +57,39 @@ and <code><a href="https://pedrobtz.github.io/zuarrow/reference/arrow_array.html
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
 
-<table class="table table"><tr><td>Key</td><td>Arrow type</td><td>zuint type</td></tr><tr><td><code>l</code></td><td><code>int64</code></td><td><code>int64</code></td></tr><tr><td><code>L</code></td><td><code>uint64</code></td><td><code>uint64</code></td></tr><tr><td><code>arrow.opaque</code></td><td>DuckDB's <code>hugeint</code> extension (<code>w:16</code>)</td><td><code>int128</code></td></tr><tr><td><code>arrow.opaque</code></td><td>DuckDB's <code>uhugeint</code> extension (<code>w:16</code>)</td><td><code>uint128</code></td></tr></table><p>An <code>arrow.opaque</code> column is DuckDB's when its JSON metadata says so at
+<table class="table table"><tr><td>Key</td><td>Arrow type</td><td>zuint type</td></tr><tr><td><code>l</code></td><td><code>int64</code></td><td><code>int64</code></td></tr><tr><td><code>L</code></td><td><code>uint64</code></td><td><code>uint64</code></td></tr><tr><td><code>arrow.opaque</code></td><td>DuckDB's <code>hugeint</code> extension (<code>w:16</code>)</td><td><code>int128</code></td></tr><tr><td><code>arrow.opaque</code></td><td>DuckDB's <code>uhugeint</code> extension (<code>w:16</code>)</td><td><code>uint128</code></td></tr><tr><td><code>zuint.int128</code></td><td>none: <code>to = int128()</code>, and writing</td><td><code>int128</code></td></tr><tr><td><code>zuint.uint128</code></td><td>none: <code>to = uint128()</code>, and writing</td><td><code>uint128</code></td></tr></table><p>An <code>arrow.opaque</code> column is DuckDB's when its JSON metadata says so at
 the top level: <code>vendor_name</code> <code>"DuckDB"</code> and <code>type_name</code> <code>"hugeint"</code> or
 <code>"uhugeint"</code>. Other <code>arrow.opaque</code> types, which DuckDB uses for types
 Arrow has no form for, keep zuarrow's own conversion, as does metadata
-that is not valid JSON.</p>
-<p>With <code>to = int64()</code> or <code>to = uint64()</code>, 8-, 16- and 32-bit integer
-columns are read exactly and cast to the prototype.</p>
+that is not valid JSON. The <code>zuint.int128</code> and <code>zuint.uint128</code> keys match
+no Arrow column: zuarrow finds a prototype's handler by its class, so
+each 128-bit class has a registration of its own.</p>
+<p>A zuint prototype in <code>to =</code>, such as <code>to = list(x = uint64())</code>, gives
+that type for a column of any format, or a condition. zuint reads its
+own formats and the 8-, 16- and 32-bit integers exactly, and any other
+column through zuarrow's own conversion, then casts the values to the
+prototype's type. A value the type cannot hold, such as <code>-1</code> under
+<code><a href="zuint-types.html">uint64()</a></code>, <code>0.5</code> or the text <code>"abc"</code>, follows the <code>lossy</code> policy below.</p>
 <p>A <code>decimal128(p, 0)</code> column is a decimal, not an integer, so zuint does
 not register for it. Asking for <code>int128</code> with <code>to = int128()</code> in
 <code><a href="https://pedrobtz.github.io/zuarrow/reference/arrow_to_r.html" class="external-link">zuarrow::arrow_to_r()</a></code> reads one with <code>p</code> up to 38 as the 128 bits it
-holds. DuckDB writes <code>HUGEINT</code> that way unless its
-<code>arrow_lossless_conversion</code> setting is on, so turn the setting on, and
-<code>HUGEINT</code> and <code>UHUGEINT</code> arrive as the extension:</p>
+holds, and <code>to = uint128()</code> reads its value, so a negative one is lost.
+DuckDB writes <code>HUGEINT</code> and <code>UHUGEINT</code> that way unless its
+<code>arrow_lossless_conversion</code> setting is on, and a <code>UHUGEINT</code> of 2^127 or
+more is then a negative decimal. So turn the setting on, and <code>HUGEINT</code>
+and <code>UHUGEINT</code> arrive as the extension:</p>
 <p></p><div class="sourceCode r"><pre><code><span><span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbExecute.html" class="external-link">dbExecute</a></span><span class="op">(</span><span class="va">con</span>, <span class="st">"SET arrow_lossless_conversion = true"</span><span class="op">)</span></span>
 <span><span class="fu">zuarrow</span><span class="fu">::</span><span class="fu"><a href="https://pedrobtz.github.io/zuarrow/reference/arrow_to_r.html" class="external-link">arrow_to_r</a></span><span class="op">(</span><span class="fu">DBI</span><span class="fu">::</span><span class="fu"><a href="https://dbi.r-dbi.org/reference/dbGetQueryArrow.html" class="external-link">dbGetQueryArrow</a></span><span class="op">(</span><span class="va">con</span>, <span class="va">sql</span><span class="op">)</span><span class="op">)</span></span></code></pre><p></p></div>
 <p>A null reads as <code>NA</code> and an <code>NA</code> writes as a null. A valid value equal to
 a type's <code>NA</code> bit pattern, such as <code>UINT64_MAX</code> in a <code>UBIGINT</code> column,
-cannot be held. zuarrow's <code>lossy</code> policy decides what happens to it:</p><ul><li><p><code>"error"</code> and <code>"character"</code> raise <code>zuarrow_lossy_error</code>, naming the
-value. <code>"character"</code> would give the column as text only when every
-batch held such a value, so it fails like <code>"error"</code> instead.</p></li>
-<li><p><code>"warn"</code> reads it as <code>NA</code> with one <code>zuarrow_lossy_warning</code> per batch.</p></li>
-<li><p><code>"allow"</code> reads it as <code>NA</code> silently.</p></li>
+cannot be held, nor can a value out of a prototype's range. zuarrow's
+<code>lossy</code> policy decides what happens to them, in zuarrow's condition
+classes:</p><ul><li><p><code>"error"</code> and <code>"character"</code> raise <code>zuarrow_lossy_error</code>, naming the
+column, its format and a value. <code>"character"</code> would give the column as
+text only for the batches that lose a value, which could not be
+combined with the others, so it fails like <code>"error"</code> instead.</p></li>
+<li><p><code>"warn"</code> reads them as <code>NA</code> with one <code>zuarrow_lossy_warning</code> per batch.</p></li>
+<li><p><code>"allow"</code> reads them as <code>NA</code> silently.</p></li>
 </ul><p>Writing never loses a value: <code>int128</code> and <code>uint128</code> are written as the
 DuckDB extension, which DuckDB reads back as <code>HUGEINT</code> and <code>UHUGEINT</code>.</p>
     </div>
