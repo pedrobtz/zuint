@@ -489,6 +489,42 @@ Subclassing `integer64` has two consequences the implementation must handle:
   for every zuint class as the matrix refusal (§3). The parity test's
   allowlist no longer lists it.
 
+- **Base functions that cannot dispatch.** Decided 2026-11-28 (#165, #149,
+  #162). Class-unaware code reads the payload, and no method can stop it.
+  `?zu_ifelse` lists them, each with the zuint route; the list, checked on
+  the code of 2026-11-28:
+  - `c()` and `rbind()` of data frames whose first argument or first column
+    is not zuint (put the zuint first, or vctrs and dplyr);
+  - the `Summary` group's first-argument rule (#125);
+  - `is.unsorted()` (use `xtfrm()`), `complete.cases()` (use `!is.na()`),
+    `aggregate()` and `rowsum()` (group by `as.character()`), `var()` and
+    `cor()` (use `as.double()`), `unlist()`, `sapply()` and `vapply()` (use
+    `do.call(c, )` and `zu_vapply()`), `ifelse()` (`zu_ifelse()`),
+    `formatC()` and `sprintf("%f")` (use `format()` and `as.character()`);
+  - a zuint vector as the index or the count of a base function that does
+    not dispatch on it: `letters[int64(2)]`, `rep(1, int64(3))`,
+    `rep_len()`, `seq_len()`, `numeric()`, `vector()` (use `as.integer()`); #153 converts a count only where the function
+    dispatches on the zuint argument (`rep(x, times)`);
+  - `matrix()`, `array()`, `outer()` and `diag()`;
+  - `match()`, `%in%`, `table()`, `merge()` and the set functions of a zuint
+    vector against a bare double or logical (§7);
+  - row growth of data frames and data.table's fills (§9).
+  `cut()` has a method (§7).
+- **A bare number meets a zuint vector as text in base `match()`.**
+  Decided 2026-11-28 (#149): base `match()` applies `mtfrm()` to the
+  classed side only, and the unclassed double becomes text by R's own rules
+  (`1e5` is `"1e+05"`), so the answer depends on `scipen` and `OutDec`. No
+  method can reach the bare side, and `intersect()` and its kin are not
+  generic, so zuint defines no method for them and does not refuse a bare
+  double. `zu_match()` and `%zin%` are the exact route.
+- **Padded rows read as a value.** Decided 2026-11-28 (#162): base R pads
+  with `NA_real_` and `NA_complex_`, which are valid payloads (§4.3). Row
+  growth of a data frame (`d[n + k, col] <- v`, `xpdrows.data.frame()`) and
+  data.table's `rbindlist(fill = TRUE)`, `d[c(1, NA)]`, `shift()` and
+  `:= NA` pad zuint columns with them without reaching a method, and a
+  data.table `by` groups a `uint64` NA with its neighbour. `rbind()`,
+  `merge()`, vctrs and dplyr pad correctly. Documented, not fixable here.
+
 ### 4.2 Why the other types use ALTREP
 
 These are new types with no ecosystem expecting their bits, so they can degrade
@@ -626,13 +662,13 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
 | `unique`, `duplicated`, `match`, `%in%`, `table` | open-addressing hash on the exact bits, never through double |
 | `diff`, `rev`, `rep`, `seq_zu()` | exact |
 | `quantile` | exact order statistics; type-7 interpolation returns double |
+| `cut` | decided 2026-11-28 (#165): compares each value with the breaks exactly (`x > b`, never through double), so values beyond 2^53 land in their interval; breaks are zuint or numbers in any order; the labels write the breaks in full, so `dig.lab` is accepted and unused. A single number of intervals (a fractional step) is a `zuint_unsupported_error`; `NA` or repeated breaks, or the wrong number of labels, a `zuint_type_error` |
 
 Decisions of 2026-11-28 (#159, #163):
 
 - `seq_zu(from, to, length.out = n)` computes the step `(to - from) / (n - 1)`
   when it is whole and is a `zuint_type_error` when it is not (a vector of
-  integers has no fractions); `cut(int64(1:4), 2)` is therefore refused at
-  `seq()` with that error, until `cut()` has a method. `by` defaults to -1
+  integers has no fractions). `by` defaults to -1
   when `to` is below `from`, `seq(n)` is `1:n` as in base, a fractional
   `length.out` rounds up as base does, and `to` with `by` and `length.out`
   is an error, as in base.
@@ -768,7 +804,7 @@ handler error about the schema or the array is a `zuint_arrow_error`
 | Arrow | through zuarrow (§9.4): `int64` ↔ int64, `uint64` ↔ uint64, `arrow.opaque` hugeint/uhugeint ↔ int128/uint128; `decimal128(p, 0)` → int128 only with `to = int128()`. `decimal128(p, s>0)` has no zuint reader: the Arrow mapping of zuint's `decimal128` class waits (§2.2, §15). arrow R today converts uint64, uint32 and decimal128 to double. Since Stage 9 zuint registers no methods on arrow's generics |
 | DuckDB | BIGINT ↔ int64, UBIGINT ↔ uint64, HUGEINT ↔ int128, UHUGEINT ↔ uint128, via DuckDB's Arrow export and zuarrow: `SET arrow_lossless_conversion = true`, since the default export loses UHUGEINT values ≥ 2¹²⁷ (§9.1), then `zuarrow::arrow_to_r(DBI::dbGetQueryArrow(con, sql))`. The former `zu_duckdb_query()` and `zu_duckdb_register()` are gone (Stage 9). Today the R client's `bigint` option accepts only `"numeric"` and `"integer64"`; HUGEINT and UHUGEINT always arrive as doubles |
 | nanoarrow | zuarrow reads and writes nanoarrow handles; zuint registers no nanoarrow methods since Stage 9. Today `convert_array(uint64_array, bit64::integer64())` clamps 2⁶³ and above to 2⁶³ − 1 |
-| data.table | int64 works natively. Other types: `as.character()` or `as_integer64()` before keyed joins; documented |
+| data.table | int64 works natively. Other types: `as.character()` or `as_integer64()` before keyed joins; documented. data.table pads `uint64`, `int128` and `uint128` columns with R's NA bits, a valid value, in `rbindlist(fill = TRUE)`, `d[c(1, NA)]`, `shift()` and `:= NA`, and groups a `uint64` NA with its neighbour (decided 2026-11-28, #162; §4.1) |
 | vctrs / dplyr / tibble | `vec_ptype2`/`vec_cast`/`vec_proxy` registered lazily; `vec_proxy` returns the payload for exact equality and ordering |
 
 ### 9.3 Upstream adoption (the real distribution channel)

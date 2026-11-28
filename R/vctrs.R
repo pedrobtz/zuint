@@ -296,17 +296,64 @@ zu_pillar_shaft <- function(x, ...) {
 #' and `no` as [c()] does, and `zu_vapply()` converts each result to the
 #' type of `FUN.VALUE` as `x[i] <- value` does, exactly or `NA`.
 #'
-#' The same goes for [sum()], [min()], [max()], [range()] and the other
-#' `Summary` functions, which R dispatches on their first argument only:
-#' `sum(int128(5), 1L)` is exact, while `sum(1L, int128(5))` reads the raw
-#' bits. Put the zuint vector first.
+#' @section Base functions that cannot dispatch:
+#' R dispatches most functions on their first argument only, and some read
+#' a vector's payload without dispatching at all. Design 4.1 accepts that
+#' cost. Each function below returns the raw bits of the values, or drops
+#' their class, so the answer is wrong, often with no warning. For
+#' `decimal128` the bits are the scaled coefficients.
 #'
-#' [base::matrix()], [base::array()], [base::outer()] and [base::diag()] are such functions too,
-#' and no method can intercept them: they return the raw bits. zuint
-#' vectors do not form matrices, and the functions that dispatch refuse
-#' them with an error of class `zuint_unsupported_error`: `%*%`,
-#' [base::crossprod()] and [base::tcrossprod()] (the last two from R 4.4.0),
-#' [cbind()], [rbind()], [as.matrix()], [aperm()] and [scale()].
+#' * `c()` and `rbind()` of data frames with a non-zuint first argument or
+#'   first column: `c(1L, int128(5))` is complex bits, as is
+#'   `rbind(data.frame(x = 1L), data.frame(x = int128(5)))`. Put the zuint
+#'   vector first, or use `vctrs::vec_rbind()` or `dplyr::bind_rows()`.
+#' * [sum()], [min()], [max()], [range()] and the other `Summary` functions
+#'   read only the first argument's class: `sum(int128(5), 1L)` is exact and
+#'   `sum(1L, int128(5))` reads the raw bits. Put the zuint vector first.
+#' * [is.unsorted()]: use `is.unsorted(xtfrm(x))`, whose ranks are exact.
+#' * [complete.cases()] reads the payload's NaN patterns, so its answer is
+#'   inverted for negative `int64` values: use `!is.na(x)` on each column.
+#' * [aggregate()] and [rowsum()] read the payload, as a group or as the
+#'   values. A negative `int64` group vanishes. Group by `as.character(x)`,
+#'   and sum each group with `zu_vapply(split(x, g), sum, x[0])`.
+#' * [var()] and [cor()] read the payload: `var(int64(1:10))` is 0. Use
+#'   `var(as.double(x))`, which rounds to a double. [sd()] is right.
+#' * [unlist()], [sapply()] and [vapply()] drop the class. Use
+#'   `do.call(c, list)` and `zu_vapply()`.
+#' * [ifelse()]: use `zu_ifelse()`.
+#' * [formatC()] and `sprintf("%f")` read the bits (`sprintf("%d")` is an
+#'   error). Use [format()], [as.character()] or [format_hex()]; `paste()`
+#'   and `sprintf("%s")` are right.
+#' * A zuint vector as an index or a count of a base function that does
+#'   not dispatch on it: `letters[int64(2)]`, `rep(1, int64(3))`,
+#'   `rep_len()`, `seq_len()`, `numeric()` and `vector()` are empty, and
+#'   an `int128` index is an error. Pass
+#'   `as.integer(i)`. A zuint vector as the vector being indexed, or as
+#'   `rep()`'s `x`, is right.
+#' * [base::matrix()], [base::array()], [base::outer()] and [diag()] return the raw bits.
+#'   zuint vectors do not form matrices, and the functions that dispatch
+#'   refuse them with a `zuint_unsupported_error`: `%*%`, [base::crossprod()] and
+#'   [base::tcrossprod()] (the last two from R 4.4.0), [cbind()], [rbind()],
+#'   [as.matrix()], [aperm()] and [scale()].
+#' * [base::match()], `%in%`, [base::table()], [merge()] and the set functions compare
+#'   a bare double as text: see [zu_match()].
+#' * [cut()] has a method: see [zu_cut].
+#'
+#' @section Padding data frames and data.table:
+#' Base R fills new rows with its own `NA`, whose bits are a valid `int64`,
+#' `uint64`, `int128` or `uint128` value. Growing a data frame by row
+#' (`d[nrow(d) + 2, "id"] <- 7L`, through `xpdrows.data.frame()`) strips the
+#' class and fills the new rows of every zuint column with that value, not
+#' `NA`. The same holds for data.table's `rbindlist(fill = TRUE)`,
+#' `d[c(1, NA)]`, `shift()` and `:= NA` on `uint64`, `int128` and `uint128`
+#' columns, and a data.table `by` groups the `NA` of a `uint64` column with
+#' its neighbouring value (bit64 pads `int64` in base data frames the same
+#' way). No zuint method is reached.
+#'
+#' These pad correctly: `rbind()` of data frames with a zuint first column,
+#' [merge()], `vctrs::vec_rbind()` and `dplyr::bind_rows()`. With data.table,
+#' fill and join on `as.character()` of the column, or convert the column
+#' after the operation. An `int64` column works natively in data.table.
 #'
 #' @param test A logical vector.
 #' @param yes,no Values for `TRUE` and `FALSE`, recycled to `test`.
