@@ -80,8 +80,8 @@ zuint vectors do not form matrices, and the functions that dispatch
 refuse them with a \code{zuint_unsupported_error}: \code{\%*\%}, \code{\link[base:crossprod]{base::crossprod()}} and
 \code{\link[base:tcrossprod]{base::tcrossprod()}} (the last two from R 4.4.0), \code{\link[=cbind]{cbind()}}, \code{\link[=rbind]{rbind()}},
 \code{\link[=as.matrix]{as.matrix()}}, \code{\link[=aperm]{aperm()}} and \code{\link[=scale]{scale()}}.
-\item \code{\link[base:match]{base::match()}}, \code{\%in\%}, \code{\link[base:table]{base::table()}}, \code{\link[=merge]{merge()}} and the set functions compare
-a bare double as text: see \code{\link[=zu_match]{zu_match()}}.
+\item \code{\link[base:match]{base::match()}}, \code{\%in\%}, \code{\link[base:table]{base::table()}}, \code{\link[=merge]{merge()}} and the set functions
+compare a bare double as text: see \code{\link[=zu_match]{zu_match()}}.
 \item \code{\link[=cut]{cut()}} has a method: see \link{zu_cut}.
 }
 }

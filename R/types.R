@@ -1,6 +1,9 @@
 # The four types. Codes match zu_type in src/zu_wide.h.
 zu_types <- c("int64", "uint64", "int128", "uint128")
 
+# The four class names, in code order, written once (#77).
+zu_classes_all <- c("zu_int64", "zu_uint64", "zu_int128", "zu_uint128")
+
 zu_classes <- list(
   int64 = c("zu_int64", "integer64"),
   uint64 = "zu_uint64",
@@ -17,7 +20,7 @@ zu_code <- function(x) {
   if (is.null(cl)) {
     return(NA_integer_)
   }
-  code <- match(cl[[1L]], c("zu_int64", "zu_uint64", "zu_int128", "zu_uint128"))
+  code <- match(cl[[1L]], zu_classes_all)
   if (is.na(code)) {
     if (!inherits(x, "integer64")) {
       return(code)

@@ -363,13 +363,32 @@ zu_compare <- function(op, x, y, call) {
 #' Operands take their common type first (see [zu_common_type()]). `%/%`
 #' rounds towards negative infinity and `%%` takes the sign of the divisor,
 #' as in R; division by zero is `NA`, except in `checked_idiv()` and
-#' `checked_mod()`, where it is an error of class `zuint_division_error`. `/` divides in double. `^` is exact
+#' `checked_mod()`, where it is an error of class `zuint_division_error`. `/`
+#' divides in double. `^` is exact
 #' for a non-negative integer exponent, however large (at or past the type's
 #' width, only the bases 0, 1 and -1 have an answer; any other overflows), and
 #' computed in double otherwise. `checked_pow()` and `wrapping_pow()` have no
 #' double result: a negative or fractional exponent is an error of class
 #' `zuint_type_error`. `NA ^ 0` and `1 ^ NA` are 1, as in base R.
 #' Comparison is exact across all the types and doubles.
+#'
+#' `sum()` of the integer types is exact and keeps the type. `mean()` and
+#' `median()` return a double: the exact mean, rounded once to the nearest
+#' double with ties to even. They do not warn when that rounds, as base R's
+#' `mean()` and DuckDB's `avg()` do not; a result past 2^53 may differ from
+#' the exact mean. For the exact answer use `sum()` and divide in integers,
+#' for example `sum(x) %/% length(x)` with `sum(x) %% length(x)` for the
+#' remainder. `x / 1L` and `x ^ 0.5` are double too.
+#'
+#' int128 and uint128 have no common type, nor do int64 and uint128, so
+#' mixing them in arithmetic or `c()` is an error of class
+#' `zuint_incompatible_error`. No fixed-width type holds both ranges (int128
+#' is -2^127 to 2^127 - 1, uint128 is 0 to 2^128 - 1). Choosing one side
+#' would overflow the other without notice, choosing by the data would make
+#' the result's type depend on values, and double is lossy. The cast is the
+#' statement of which range you accept: `int128(y)` or `uint128(x)`, where
+#' values out of range become `NA` with a `zuint_cast_warning`. Comparison
+#' is exempt: `x < y` across the two types is exact and never an error.
 #'
 #' @param x,y zuint vectors, or a zuint vector and a logical, integer or
 #'   double vector. They are recycled.

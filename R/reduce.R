@@ -51,11 +51,10 @@ zu_summary_group <- function(..., na.rm = FALSE) {
     )
     code <- zu_code(x)
   }
-  p <- x
   switch(
     .Generic,
-    sum = zu_reduce_result(.Call(zu_sum_c, p, code, na.rm), code, call),
-    prod = zu_reduce_result(.Call(zu_prod_c, p, code, na.rm), code, call),
+    sum = zu_reduce_result(.Call(zu_sum_c, x, code, na.rm), code, call),
+    prod = zu_reduce_result(.Call(zu_prod_c, x, code, na.rm), code, call),
     min = zu_extreme(x, code, na.rm, 1L, call),
     max = zu_extreme(x, code, na.rm, 2L, call),
     range = c(
@@ -379,7 +378,11 @@ zu_diff <- function(x, lag = 1L, differences = 1L, ...) {
 #'   the step). A fraction rounds up, as in [seq()]. `seq_zu(n)` is `1:n`.
 #' @return A zuint vector.
 #' @examples
-#' seq_zu(uint64("18446744073709551600"), uint64("18446744073709551614"), by = 7L)
+#' seq_zu(
+#'   uint64("18446744073709551600"),
+#'   uint64("18446744073709551614"),
+#'   by = 7L
+#' )
 #' seq_zu(int128(-2), by = int128("1000000000000000000000"), length.out = 3)
 #' @export
 seq_zu <- function(from, to = NULL, by = 1L, length.out = NULL) {

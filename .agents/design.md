@@ -596,6 +596,8 @@ logical ─► integer ─► int64 ──► int128
                        └─────────► uint128
 ```
 
+Why no common type for int128 ⊕ uint128 (and int64 ⊕ uint128): no wider fixed type holds both ranges, picking a side would overflow the other, picking by the data makes the type depend on values, and double is lossy; so the explicit cast is the user's choice of range (#51). Comparison is exempt.
+
 | x ⊕ y | result |
 | --- | --- |
 | logical ⊕ integer | integer, as base R |
@@ -658,7 +660,7 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
 | --- | --- |
 | `sum` | type stable (decided 2026-10-15): the result has the input's type, and overflow gives NA plus a warning, as base R's `sum()` on integers does. int64 and uint64 accumulate in 128 bits so the overflow check is exact; `sum(int128(x))` is the wide sum |
 | `cumsum`, `cumprod` | same type as input; overflow gives NA from that point on |
-| `mean` | exact sum ÷ n, returned as double; `mean_exact()` returns the quotient and remainder. The double is the exact quotient rounded once, to nearest with ties to even (decided 2026-11-27, #148): the 128-bit (or wider) sum is divided in integers and its quotient and remainder rounded together, never a double sum divided by n. `median()` is the mean of the middle pair, the same way |
+| `mean` | exact sum ÷ n, returned as double, with no warning when it rounds (decided 2026-11-28, #71). `mean_exact()` is not exported (it is on the later list); the exact route is `sum()` and integer division, `sum(x) %/% length(x)` with `sum(x) %% length(x)`. The double is the exact quotient rounded once, to nearest with ties to even (decided 2026-11-27, #148): the 128-bit (or wider) sum is divided in integers and its quotient and remainder rounded together, never a double sum divided by n. `median()` is the mean of the middle pair, the same way |
 | `min`, `max`, `range` | exact; `na.rm` supported |
 | `sort`, `order`, `rank`, `xtfrm` | LSD radix sort on the unsigned-key transform (sign bit flipped for signed types); stable. `xtfrm` returns integer ranks (ties `"min"`, NA kept), never a double proxy, so base `order()` on several keys stays exact |
 | `unique`, `duplicated`, `match`, `%in%`, `table` | open-addressing hash on the exact bits, never through double |

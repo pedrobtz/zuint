@@ -3,8 +3,6 @@
 # pieces: the payload itself would not do, because vctrs treats every NaN
 # bit pattern as one value and many int64 values are NaN patterns.
 
-zu_classes_all <- c("zu_int64", "zu_uint64", "zu_int128", "zu_uint128")
-
 zu_register_vctrs <- function(...) {
   ns <- asNamespace("vctrs")
   reg <- function(generic, cls, fun) {
@@ -275,7 +273,6 @@ dec_pillar_shaft <- function(x, ...) {
 
 zu_pillar_shaft <- function(x, ...) {
   out <- zu_as_character(x)
-  out[is.na(out)] <- NA
   pillar::new_pillar_shaft_simple(
     ifelse(is.na(out), pillar::style_na("NA"), out),
     align = "right"
@@ -335,8 +332,8 @@ zu_pillar_shaft <- function(x, ...) {
 #'   refuse them with a `zuint_unsupported_error`: `%*%`, [base::crossprod()] and
 #'   [base::tcrossprod()] (the last two from R 4.4.0), [cbind()], [rbind()],
 #'   [as.matrix()], [aperm()] and [scale()].
-#' * [base::match()], `%in%`, [base::table()], [merge()] and the set functions compare
-#'   a bare double as text: see [zu_match()].
+#' * [base::match()], `%in%`, [base::table()], [merge()] and the set functions
+#'   compare a bare double as text: see [zu_match()].
 #' * [cut()] has a method: see [zu_cut].
 #'
 #' @section Padding data frames and data.table:

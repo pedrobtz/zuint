@@ -65,13 +65,32 @@ of an unsigned type wraps too.
 Operands take their common type first (see \code{\link[=zu_common_type]{zu_common_type()}}). \code{\%/\%}
 rounds towards negative infinity and \code{\%\%} takes the sign of the divisor,
 as in R; division by zero is \code{NA}, except in \code{checked_idiv()} and
-\code{checked_mod()}, where it is an error of class \code{zuint_division_error}. \code{/} divides in double. \code{^} is exact
+\code{checked_mod()}, where it is an error of class \code{zuint_division_error}. \code{/}
+divides in double. \code{^} is exact
 for a non-negative integer exponent, however large (at or past the type's
 width, only the bases 0, 1 and -1 have an answer; any other overflows), and
 computed in double otherwise. \code{checked_pow()} and \code{wrapping_pow()} have no
 double result: a negative or fractional exponent is an error of class
 \code{zuint_type_error}. \code{NA ^ 0} and \code{1 ^ NA} are 1, as in base R.
 Comparison is exact across all the types and doubles.
+
+\code{sum()} of the integer types is exact and keeps the type. \code{mean()} and
+\code{median()} return a double: the exact mean, rounded once to the nearest
+double with ties to even. They do not warn when that rounds, as base R's
+\code{mean()} and DuckDB's \code{avg()} do not; a result past 2^53 may differ from
+the exact mean. For the exact answer use \code{sum()} and divide in integers,
+for example \code{sum(x) \%/\% length(x)} with \code{sum(x) \%\% length(x)} for the
+remainder. \code{x / 1L} and \code{x ^ 0.5} are double too.
+
+int128 and uint128 have no common type, nor do int64 and uint128, so
+mixing them in arithmetic or \code{c()} is an error of class
+\code{zuint_incompatible_error}. No fixed-width type holds both ranges (int128
+is -2^127 to 2^127 - 1, uint128 is 0 to 2^128 - 1). Choosing one side
+would overflow the other without notice, choosing by the data would make
+the result's type depend on values, and double is lossy. The cast is the
+statement of which range you accept: \code{int128(y)} or \code{uint128(x)}, where
+values out of range become \code{NA} with a \code{zuint_cast_warning}. Comparison
+is exempt: \code{x < y} across the two types is exact and never an error.
 }
 \examples{
 x <- int64("9223372036854775807")

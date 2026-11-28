@@ -25,6 +25,10 @@ A zuint vector.
 arguments.
 }
 \examples{
-seq_zu(uint64("18446744073709551600"), uint64("18446744073709551614"), by = 7L)
+seq_zu(
+  uint64("18446744073709551600"),
+  uint64("18446744073709551614"),
+  by = 7L
+)
 seq_zu(int128(-2), by = int128("1000000000000000000000"), length.out = 3)
 }

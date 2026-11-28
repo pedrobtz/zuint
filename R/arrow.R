@@ -210,6 +210,6 @@ zu_arrow_tag <- function(array) .Call(zu_arrow_schema_c, array)
 
 # The zuint type code an ArrowSchema maps to, or NA.
 zu_arrow_type <- function(schema) {
-  t <- .Call(zu_arrow_type_c, schema)
-  if (is.integer(t)) t else NA_integer_
+  type <- .Call(zu_arrow_type_c, schema)
+  if (is.integer(type)) type else NA_integer_
 }

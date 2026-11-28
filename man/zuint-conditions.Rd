@@ -30,7 +30,9 @@ Warnings:
 \itemize{
 \item \code{zuint_cast_warning}: values that could not be represented became \code{NA}.
 \item \code{zuint_overflow_warning}: a result out of range became \code{NA}.
-\item \code{zuint_precision_warning}: a conversion to double rounded.
+\item \code{zuint_precision_warning}: an explicit conversion
+to double (\code{as.double()}) rounded. \code{mean()} and \code{median()} round once
+and do not warn.
 \item \code{zuint_double_warning}: a double was computed in double, under
 \code{options(zuint.double = "allow")}.
 \item \code{zuint_recycling_warning}: operand lengths are not multiples.
@@ -38,6 +40,12 @@ Warnings:
 }
 }
 \examples{
-tryCatch(int128(1) + uint128(1), zuint_incompatible_error = function(e) "no common type")
-withCallingHandlers(int64(1.5), zuint_cast_warning = function(w) invokeRestart("muffleWarning"))
+tryCatch(
+  int128(1) + uint128(1),
+  zuint_incompatible_error = function(e) "no common type"
+)
+withCallingHandlers(
+  int64(1.5),
+  zuint_cast_warning = function(w) invokeRestart("muffleWarning")
+)
 }
