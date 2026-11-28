@@ -21,8 +21,15 @@ zu_summary_double <- function(x, generic, na.rm, finite) {
   get(generic, baseenv())(x, na.rm = na.rm)
 }
 
+# The call a Summary condition reports: the generic over `...`. The
+# method's sys.call() holds the evaluated arguments, the payload as
+# doubles, which is meaningless and slow to deparse (#80).
+zu_summary_call <- function(generic) {
+  as.call(list(as.name(generic), quote(...)))
+}
+
 zu_summary_group <- function(..., na.rm = FALSE) {
-  call <- sys.call()
+  call <- zu_summary_call(.Generic)
   a <- zu_summary_args(list(...), .Generic, na.rm)
   args <- a$args
   na.rm <- a$na.rm
@@ -78,7 +85,8 @@ zu_extreme <- function(x, code, na.rm, which, call) {
         c("min", "max")[[which]],
         c("Inf", "-Inf")[[which]]
       ),
-      "empty"
+      "empty",
+      call = call
     )
     return(c(Inf, -Inf)[[which]])
   }

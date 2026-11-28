@@ -175,6 +175,27 @@ test_that("as.logical is FALSE for zero and NA for NA", {
   expect_identical(as.logical(int128(c(0, -3, NA))), c(FALSE, TRUE, NA))
 })
 
+test_that("as.logical is v != 0 against gmp, names dropped as base does (#81)", {
+  for (type in zu_all_types) {
+    v <- oracle_edges(type)
+    if (zu_width(type) == 128L) {
+      # a zero low word under a non-zero high word
+      v <- c(
+        v,
+        "18446744073709551616",
+        "340282366920938463463374607431768211454"
+      )
+      v <- v[oracle_fits(type, v)]
+    }
+    x <- zu_ctor(type)(c(v, NA))
+    names(x) <- seq_along(x)
+    want <- c(as.logical(gmp::as.bigz(v) != 0), NA)
+    expect_identical(as.logical(x), want, label = type)
+  }
+  # base as.logical() drops names too
+  expect_null(names(as.logical(c(a = 1, b = 0))))
+})
+
 test_that("as.character drops names and gives NA_character_ for NA", {
   expect_identical(as.character(uint64(c(a = 1, b = NA))), c("1", NA))
 })

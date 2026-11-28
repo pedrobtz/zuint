@@ -324,8 +324,9 @@ zu_as_integer <- function(x, ...) {
   res[[1L]]
 }
 
+# A zero test in C, names dropped as base as.logical() drops them (#81).
 zu_as_logical <- function(x, ...) {
-  zu_as_character(x) != "0"
+  .Call(zu_compare_c, zu_compare_ops[["!="]], x, zu_code(x), 0L, zu_kind_int)
 }
 
 zu_as_list <- function(x, ...) {
@@ -391,7 +392,7 @@ zu_format_text <- function(
   decimal.mark = "."
 ) {
   call <- sys.call(-1L)
-  width <- suppressWarnings(as.integer(width))
+  width <- suppressWarnings(as.integer(zu_index(width)))
   if (length(width) != 1L || is.na(width)) {
     zu_abort("`width` must be a single number.", "type", call = call)
   }

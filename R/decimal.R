@@ -724,7 +724,7 @@ dec_in_double <- function(op, e1, e2, call, check = TRUE) {
   if (check) {
     zu_double_problem("decimal128", call)
   }
-  zu_check_recycling(e1, e2)
+  zu_check_recycling(e1, e2, call)
   out <- get(op, baseenv())(dec_dbl_quiet(e1), dec_dbl_quiet(e2))
   names(out) <- zu_result_names(e1, e2, length(out))
   out
@@ -742,7 +742,7 @@ dec_arith <- function(op, e1, e2, call) {
   if (is.null(a) || is.null(b)) {
     return(dec_in_double(op, e1, e2, call))
   }
-  zu_check_recycling(e1, e2)
+  zu_check_recycling(e1, e2, call)
   # recycled first, so that a value lost in the rescale is counted once
   # for each result it makes NA
   pp <- dec_recycle(a$x, b$x)
@@ -811,7 +811,7 @@ dec_compare_operand <- function(x, call) {
 # Comparison is exact with every operand, doubles included, as for the
 # integer types (design 5).
 dec_compare <- function(op, e1, e2, call) {
-  zu_check_recycling(e1, e2)
+  zu_check_recycling(e1, e2, call)
   if (zu_is_bare_double(e1) || zu_is_bare_double(e2)) {
     flip <- zu_is_bare_double(e1)
     d <- if (flip) e2 else e1
@@ -1145,7 +1145,7 @@ dec_extreme <- function(x, which) {
 }
 
 dec_summary_group <- function(..., na.rm = FALSE) {
-  call <- sys.call()
+  call <- zu_summary_call(.Generic)
   a <- zu_summary_args(list(...), .Generic, na.rm)
   na.rm <- a$na.rm
   x <- if (length(a$args) == 1L) a$args[[1L]] else do.call(dec_c, a$args)

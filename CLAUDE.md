@@ -280,6 +280,8 @@ Grows with the stages; `.agents/design.md` §10 has the planned C layout.
   and a schema with children is nested; both are `zuint_arrow_error`. The
   binary metadata has no total length, so its parser rejects negative counts
   and lengths and caps the entries; `zu_metadata_get_c()` tests it bounded.
+  An array's offset and length are the producer's: `zu_array_arg()`
+  refuses any whose last index or byte position would overflow `int64_t`.
 - **arrow aborts R on the `arrow.opaque` type as an R object.**
   `arrow::as_arrow_array()`, `infer_type()` and `as_data_type()` crash on
   it in arrow 24.0.0 and 25.0.1, with or without zuint: an unchecked cast in

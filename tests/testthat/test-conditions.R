@@ -56,3 +56,52 @@ test_that("condition messages and the calls they report", {
   withr::local_options(zuint.double = "allow")
   expect_snapshot(x <- int64(1) + 1.5)
 })
+
+test_that("every condition reports the user's call (#80)", {
+  call_of <- function(expr) {
+    tryCatch(expr, condition = function(c) conditionCall(c))
+  }
+  x <- int64(1:3)
+  y <- int64(1:2)
+  d <- decimal128(c("1.5", "2.5", "3.5"), 5L, 1L)
+  e <- decimal128(c("1.5", "2.5"), 5L, 1L)
+  # the recycling warning, from each kind of operation that checks it
+  expect_identical(call_of(x + y), quote(Ops.zu_int64(x, y)))
+  expect_identical(call_of(x == y), quote(Ops.zu_int64(x, y)))
+  expect_identical(call_of(x^y), quote(Ops.zu_int64(x, y)))
+  expect_identical(call_of(bit_and(x, y)), quote(bit_and(x, y)))
+  expect_identical(call_of(shift_left(x, 1:2)), quote(shift_left(x, 1:2)))
+  expect_identical(call_of(d + e), quote(Ops.zu_decimal128(d, e)))
+  expect_identical(call_of(d < e), quote(Ops.zu_decimal128(d, e)))
+  withr::with_options(
+    list(zuint.double = "allow"),
+    expect_identical(
+      call_of(d / c(1, 2)),
+      quote(Ops.zu_decimal128(d, c(1, 2)))
+    )
+  )
+  # an invalid zuint.double option
+  withr::with_options(
+    list(zuint.double = "sometimes"),
+    expect_identical(call_of(x + 1.5), quote(Ops.zu_int64(x, 1.5)))
+  )
+  # min(), max() and range() of nothing, and sum() and prod() overflowing,
+  # name the generic, not the payload the method was called with
+  big <- int64("9223372036854775807")
+  expect_identical(call_of(min(int64())), quote(min(...)))
+  expect_identical(call_of(max(int64(NA), na.rm = TRUE)), quote(max(...)))
+  expect_identical(call_of(range(uint128())), quote(range(...)))
+  expect_identical(call_of(sum(big, big)), quote(sum(...)))
+  expect_identical(call_of(prod(big, 2L)), quote(prod(...)))
+  dbig <- decimal128(strrep("9", 38), 38L, 0L)
+  expect_identical(call_of(sum(dbig, dbig)), quote(sum(...)))
+  expect_identical(call_of(min(d[0])), quote(min(...)))
+})
+
+test_that("a Summary condition prints without deparsing the payload (#80)", {
+  x <- rep(int64("9223372036854775807"), 1e5)
+  w <- tryCatch(sum(x), warning = identity)
+  expect_s3_class(w, "zuint_overflow_warning")
+  elapsed <- system.time(utils::capture.output(print(w)))[["elapsed"]]
+  expect_lt(elapsed, 1)
+})

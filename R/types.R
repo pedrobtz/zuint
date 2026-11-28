@@ -9,15 +9,37 @@ zu_classes <- list(
 )
 
 # The type code of a zuint vector, or NA. A bare bit64 integer64 reads as
-# int64: same layout, only the class differs.
+# int64: same layout, only the class differs. A zuint class or integer64 on
+# the wrong storage type is a type error here, where every method reads the
+# code, rather than an unclassed error from the C payload check (#69).
 zu_code <- function(x) {
   cl <- oldClass(x)
   if (is.null(cl)) {
     return(NA_integer_)
   }
   code <- match(cl[[1L]], c("zu_int64", "zu_uint64", "zu_int128", "zu_uint128"))
-  if (is.na(code) && inherits(x, "integer64")) 1L else code
+  if (is.na(code)) {
+    if (!inherits(x, "integer64")) {
+      return(code)
+    }
+    code <- 1L
+  }
+  if (typeof(x) != zu_payload_types[[code]]) {
+    zu_abort(
+      sprintf(
+        "A <%s> vector must be stored as %s, not %s.",
+        paste(cl, collapse = "/"),
+        zu_payload_types[[code]],
+        typeof(x)
+      ),
+      "type"
+    )
+  }
+  code
 }
+
+# The storage type of each type's payload.
+zu_payload_types <- c("double", "double", "complex", "complex")
 
 zu_type_code <- function(type) {
   code <- match(type, zu_types)
@@ -188,7 +210,7 @@ zu_storage <- function(x) {
 #' @export
 zu_from_storage <- function(payload, type) {
   code <- zu_type_code(type)
-  want <- if (code <= 2L) "double" else "complex"
+  want <- zu_payload_types[[code]]
   if (typeof(payload) != want || is.object(payload)) {
     zu_abort(
       sprintf("`payload` for %s must be a bare %s vector.", type, want),

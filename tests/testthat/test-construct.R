@@ -143,6 +143,34 @@ test_that("a zuint vector passes through its own constructor unchanged", {
   expect_identical(int128(x), x)
 })
 
+test_that("a classed object with the wrong storage type is a type error (#69)", {
+  # what each type's constructor itself stores
+  storage <- c(
+    int64 = typeof(int64(1)),
+    uint64 = typeof(uint64(1)),
+    int128 = typeof(int128(1)),
+    uint128 = typeof(uint128(1))
+  )
+  expect_identical(unname(storage), c("double", "double", "complex", "complex"))
+  wrong <- list(1L, "1", TRUE, 1, 1i)
+  for (type in names(storage)) {
+    ctor <- get(type)
+    cls <- class(ctor())
+    for (w in wrong) {
+      x <- structure(w, class = cls)
+      if (typeof(w) == storage[[type]]) {
+        expect_identical(typeof(ctor(x)), storage[[type]], label = type)
+      } else {
+        expect_error(ctor(x), class = "zuint_type_error", label = type)
+        expect_error(x + 1L, class = "zuint_type_error", label = type)
+      }
+    }
+  }
+  # a bit64 integer64 over an integer vector, as the review found it
+  x <- structure(1L, class = "integer64")
+  expect_error(int64(x), class = "zuint_type_error")
+})
+
 test_that("unsupported inputs are type errors", {
   expect_error(int64(list(1)), class = "zuint_type_error")
   expect_error(int64(1i), class = "zuint_type_error")
