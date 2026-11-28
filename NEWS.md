@@ -1,5 +1,8 @@
 # zuint 0.0.0.9000
 
+* `format(x, width = )` reads a bit64 `integer64` width by its value when
+  bit64 is not loaded, as the other counts do (#153); it had read the bits
+  as a double, so the width was 0.
 * A zuint class, or bit64's `integer64`, on the wrong storage type (an
   `integer64` over an integer vector, say) is a `zuint_type_error` in the
   constructors and every method, instead of an unclassed "corrupt payload"

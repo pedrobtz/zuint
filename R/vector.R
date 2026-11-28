@@ -391,7 +391,7 @@ zu_format_text <- function(
   decimal.mark = "."
 ) {
   call <- sys.call(-1L)
-  width <- suppressWarnings(as.integer(width))
+  width <- suppressWarnings(as.integer(zu_index(width)))
   if (length(width) != 1L || is.na(width)) {
     zu_abort("`width` must be a single number.", "type", call = call)
   }
