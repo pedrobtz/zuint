@@ -123,19 +123,18 @@ and sum each group with <code>zu_vapply(split(x, g), sum, x[0])</code>.</p></li>
 <li><p><code><a href="https://rdrr.io/r/base/formatc.html" class="external-link">formatC()</a></code> and <code>sprintf("%f")</code> read the bits (<code>sprintf("%d")</code> is an
 error). Use <code><a href="https://rdrr.io/r/base/format.html" class="external-link">format()</a></code>, <code><a href="https://rdrr.io/r/base/character.html" class="external-link">as.character()</a></code> or <code><a href="format_hex.html">format_hex()</a></code>; <code><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste()</a></code>
 and <code>sprintf("%s")</code> are right.</p></li>
-<li><p>A zuint vector as an index or a count of a base function that does
-not dispatch on it: <code>letters[int64(2)]</code>, <code>rep(1, int64(3))</code>,
-<code><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep_len()</a></code>, <code><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len()</a></code>, <code><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric()</a></code> and <code><a href="https://rdrr.io/r/base/vector.html" class="external-link">vector()</a></code> are empty, and
-an <code>int128</code> index is an error. Pass
-<code>as.integer(i)</code>. A zuint vector as the vector being indexed, or as
-<code><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep()</a></code>'s <code>x</code>, is right.</p></li>
-<li><p><code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">base::matrix()</a></code>, <code><a href="https://rdrr.io/r/base/array.html" class="external-link">base::array()</a></code>, <code><a href="https://rdrr.io/r/base/outer.html" class="external-link">base::outer()</a></code> and <code><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag()</a></code> return the raw bits.
-zuint vectors do not form matrices, and the functions that dispatch
-refuse them with a <code>zuint_unsupported_error</code>: <code>%*%</code>, <code><a href="https://rdrr.io/r/base/crossprod.html" class="external-link">base::crossprod()</a></code> and
-<code><a href="https://rdrr.io/r/base/crossprod.html" class="external-link">base::tcrossprod()</a></code> (the last two from R 4.4.0), <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code>, <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind()</a></code>,
-<code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix()</a></code>, <code><a href="https://rdrr.io/r/base/aperm.html" class="external-link">aperm()</a></code> and <code><a href="https://rdrr.io/r/base/scale.html" class="external-link">scale()</a></code>.</p></li>
-<li><p><code><a href="https://rdrr.io/r/base/match.html" class="external-link">base::match()</a></code>, <code>%in%</code>, <code><a href="https://rdrr.io/r/base/table.html" class="external-link">base::table()</a></code>, <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> and the set functions compare
-a bare double as text: see <code><a href="zu_match.html">zu_match()</a></code>.</p></li>
+<li><p>A zuint vector as an index or a count of a base function that does not
+dispatch on it: <code>letters[int64(2)]</code>, <code>rep(1, int64(3))</code>, <code><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep_len()</a></code>,
+<code><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len()</a></code>, <code><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric()</a></code> and <code><a href="https://rdrr.io/r/base/vector.html" class="external-link">vector()</a></code> are empty, and an <code>int128</code> index is
+an error. Pass <code>as.integer(i)</code>. A zuint vector as the vector being indexed,
+or as <code><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep()</a></code>'s <code>x</code>, is right.</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">base::matrix()</a></code>, <code><a href="https://rdrr.io/r/base/array.html" class="external-link">base::array()</a></code>, <code><a href="https://rdrr.io/r/base/outer.html" class="external-link">base::outer()</a></code> and <code><a href="https://rdrr.io/r/base/diag.html" class="external-link">diag()</a></code> return the
+raw bits. zuint vectors do not form matrices, and the functions that
+dispatch refuse them with a <code>zuint_unsupported_error</code>: <code>%*%</code>,
+<code><a href="https://rdrr.io/r/base/crossprod.html" class="external-link">base::crossprod()</a></code> and <code><a href="https://rdrr.io/r/base/crossprod.html" class="external-link">base::tcrossprod()</a></code> (the last two from R 4.4.0),
+<code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind()</a></code>, <code><a href="https://rdrr.io/r/base/cbind.html" class="external-link">rbind()</a></code>, <code><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix()</a></code>, <code><a href="https://rdrr.io/r/base/aperm.html" class="external-link">aperm()</a></code> and <code><a href="https://rdrr.io/r/base/scale.html" class="external-link">scale()</a></code>.</p></li>
+<li><p><code><a href="https://rdrr.io/r/base/match.html" class="external-link">base::match()</a></code>, <code>%in%</code>, <code><a href="https://rdrr.io/r/base/table.html" class="external-link">base::table()</a></code>, <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> and the set functions
+compare a bare double as text: see <code><a href="zu_match.html">zu_match()</a></code>.</p></li>
 <li><p><code><a href="https://rdrr.io/r/base/cut.html" class="external-link">cut()</a></code> has a method: see <a href="zu_cut.html">zu_cut</a>.</p></li>
 </ul></div>
     <div class="section level2">

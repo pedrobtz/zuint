@@ -54,7 +54,7 @@ int64(-1) + uint64("18446744073709551614")
 #> [1] 18446744073709551613
 try(int128(1) + uint128(1))
 #> Error in Ops.zu_int128(int128(1), uint128(1)) : 
-#>   int128 and uint128 have no common type; convert one explicitly.
+#>   int128 and uint128 have no common type: neither holds the other's range. Cast one explicitly, with `int128(y)` or `uint128(x)`; values out of range become NA with a `zuint_cast_warning`.
 ```
 
 A double takes the zuint type if it is a whole number in range, and is

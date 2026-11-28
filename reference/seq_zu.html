@@ -75,7 +75,11 @@ the step). A fraction rounds up, as in <code><a href="https://rdrr.io/r/base/seq
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">seq_zu</span><span class="op">(</span><span class="fu"><a href="zuint-types.html">uint64</a></span><span class="op">(</span><span class="st">"18446744073709551600"</span><span class="op">)</span>, <span class="fu"><a href="zuint-types.html">uint64</a></span><span class="op">(</span><span class="st">"18446744073709551614"</span><span class="op">)</span>, by <span class="op">=</span> <span class="fl">7L</span><span class="op">)</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">seq_zu</span><span class="op">(</span></span></span>
+<span class="r-in"><span>  <span class="fu"><a href="zuint-types.html">uint64</a></span><span class="op">(</span><span class="st">"18446744073709551600"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  <span class="fu"><a href="zuint-types.html">uint64</a></span><span class="op">(</span><span class="st">"18446744073709551614"</span><span class="op">)</span>,</span></span>
+<span class="r-in"><span>  by <span class="op">=</span> <span class="fl">7L</span></span></span>
+<span class="r-in"><span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;uint64[3]&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] 18446744073709551600 18446744073709551607 18446744073709551614</span>
 <span class="r-in"><span><span class="fu">seq_zu</span><span class="op">(</span><span class="fu"><a href="zuint-types.html">int128</a></span><span class="op">(</span><span class="op">-</span><span class="fl">2</span><span class="op">)</span>, by <span class="op">=</span> <span class="fu"><a href="zuint-types.html">int128</a></span><span class="op">(</span><span class="st">"1000000000000000000000"</span><span class="op">)</span>, length.out <span class="op">=</span> <span class="fl">3</span><span class="op">)</span></span></span>

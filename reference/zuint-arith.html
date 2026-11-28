@@ -96,13 +96,30 @@ of an unsigned type wraps too.</p></li>
 </ul><p>Operands take their common type first (see <code><a href="zu_common_type.html">zu_common_type()</a></code>). <code>%/%</code>
 rounds towards negative infinity and <code>%%</code> takes the sign of the divisor,
 as in R; division by zero is <code>NA</code>, except in <code>checked_idiv()</code> and
-<code>checked_mod()</code>, where it is an error of class <code>zuint_division_error</code>. <code>/</code> divides in double. <code>^</code> is exact
+<code>checked_mod()</code>, where it is an error of class <code>zuint_division_error</code>. <code>/</code>
+divides in double. <code>^</code> is exact
 for a non-negative integer exponent, however large (at or past the type's
 width, only the bases 0, 1 and -1 have an answer; any other overflows), and
 computed in double otherwise. <code>checked_pow()</code> and <code>wrapping_pow()</code> have no
 double result: a negative or fractional exponent is an error of class
 <code>zuint_type_error</code>. <code>NA ^ 0</code> and <code>1 ^ NA</code> are 1, as in base R.
 Comparison is exact across all the types and doubles.</p>
+<p><code><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum()</a></code> of the integer types is exact and keeps the type. <code><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean()</a></code> and
+<code><a href="https://rdrr.io/r/stats/median.html" class="external-link">median()</a></code> return a double: the exact mean, rounded once to the nearest
+double with ties to even. They do not warn when that rounds, as base R's
+<code><a href="https://rdrr.io/r/base/mean.html" class="external-link">mean()</a></code> and DuckDB's <code>avg()</code> do not; a result past 2^53 may differ from
+the exact mean. For the exact answer use <code><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum()</a></code> and divide in integers,
+for example <code>sum(x) %/% length(x)</code> with <code>sum(x) %% length(x)</code> for the
+remainder. <code>x / 1L</code> and <code>x ^ 0.5</code> are double too.</p>
+<p>int128 and uint128 have no common type, nor do int64 and uint128, so
+mixing them in arithmetic or <code><a href="https://rdrr.io/r/base/c.html" class="external-link">c()</a></code> is an error of class
+<code>zuint_incompatible_error</code>. No fixed-width type holds both ranges (int128
+is -2^127 to 2^127 - 1, uint128 is 0 to 2^128 - 1). Choosing one side
+would overflow the other without notice, choosing by the data would make
+the result's type depend on values, and double is lossy. The cast is the
+statement of which range you accept: <code>int128(y)</code> or <code>uint128(x)</code>, where
+values out of range become <code>NA</code> with a <code>zuint_cast_warning</code>. Comparison
+is exempt: <code>x &lt; y</code> across the two types is exact and never an error.</p>
     </div>
 
     <div class="section level2">

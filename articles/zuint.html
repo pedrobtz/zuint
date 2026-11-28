@@ -136,7 +136,7 @@ error.</p>
 <span><span class="co">#&gt; [1] 18446744073709551613</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/try.html" class="external-link">try</a></span><span class="op">(</span><span class="fu"><a href="../reference/zuint-types.html">int128</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span> <span class="op">+</span> <span class="fu"><a href="../reference/zuint-types.html">uint128</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Error in Ops.zu_int128(int128(1), uint128(1)) : </span></span>
-<span><span class="co">#&gt;   int128 and uint128 have no common type; convert one explicitly.</span></span></code></pre></div>
+<span><span class="co">#&gt;   int128 and uint128 have no common type: neither holds the other's range. Cast one explicitly, with `int128(y)` or `uint128(x)`; values out of range become NA with a `zuint_cast_warning`.</span></span></code></pre></div>
 <p>A double takes the zuint type if it is a whole number in range, and
 is an error otherwise; comparisons with doubles are exact and never an
 error:</p>

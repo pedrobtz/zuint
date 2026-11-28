@@ -49,5 +49,5 @@ zu_common_type(uint64(1), 1L)
 #> [1] "uint64"
 try(zu_common_type(int128(1), uint128(1)))
 #> Error in zu_common_type(int128(1), uint128(1)) : 
-#>   int128 and uint128 have no common type; convert one explicitly.
+#>   int128 and uint128 have no common type: neither holds the other's range. Cast one explicitly, with `int128(y)` or `uint128(x)`; values out of range become NA with a `zuint_cast_warning`.
 ```

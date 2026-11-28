@@ -41,7 +41,11 @@ Warnings:
 
 - `zuint_overflow_warning`: a result out of range became `NA`.
 
-- `zuint_precision_warning`: a conversion to double rounded.
+- `zuint_precision_warning`: an explicit conversion to double
+  ([`as.double()`](https://rdrr.io/r/base/double.html)) rounded.
+  [`mean()`](https://rdrr.io/r/base/mean.html) and
+  [`median()`](https://rdrr.io/r/stats/median.html) round once and do
+  not warn.
 
 - `zuint_double_warning`: a double was computed in double, under
   `options(zuint.double = "allow")`.
@@ -54,9 +58,15 @@ Warnings:
 ## Examples
 
 ``` r
-tryCatch(int128(1) + uint128(1), zuint_incompatible_error = function(e) "no common type")
+tryCatch(
+  int128(1) + uint128(1),
+  zuint_incompatible_error = function(e) "no common type"
+)
 #> [1] "no common type"
-withCallingHandlers(int64(1.5), zuint_cast_warning = function(w) invokeRestart("muffleWarning"))
+withCallingHandlers(
+  int64(1.5),
+  zuint_cast_warning = function(w) invokeRestart("muffleWarning")
+)
 #> <int64[1]>
 #> [1] NA
 ```
