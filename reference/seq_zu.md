@@ -18,11 +18,15 @@ seq_zu(from, to = NULL, by = 1L, length.out = NULL)
 
 - by:
 
-  The step, length 1, not zero.
+  The step, length 1, not zero. Without it the step is 1, or -1 when
+  `to` is below `from`; with `to` and `length.out` it is the whole step
+  between them, and an error if there is none.
 
 - length.out:
 
-  The number of values, instead of `to`.
+  The number of values, instead of `to` (or with it, to fix the step). A
+  fraction rounds up, as in [`seq()`](https://rdrr.io/r/base/seq.html).
+  `seq_zu(n)` is `1:n`.
 
 ## Value
 

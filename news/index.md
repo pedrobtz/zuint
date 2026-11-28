@@ -2,6 +2,45 @@
 
 ## zuint 0.0.0.9000
 
+- Arguments zuint methods ignored are now honoured or refused
+  ([\#163](https://github.com/pedrobtz/zuint/issues/163)):
+  [`mean()`](https://rdrr.io/r/base/mean.html) and
+  [`median()`](https://rdrr.io/r/stats/median.html) read `na.rm` as a
+  logical (`NA` or text is a `zuint_type_error`);
+  [`sort()`](https://rdrr.io/r/base/sort.html) returns `list(x, ix)` for
+  `index.return = TRUE`, checks `na.last`, and refuses `partial` with a
+  `zuint_unsupported_error`;
+  [`duplicated()`](https://rdrr.io/r/base/duplicated.html),
+  [`unique()`](https://rdrr.io/r/base/unique.html) and
+  [`anyDuplicated()`](https://rdrr.io/r/base/duplicated.html) honour
+  `incomparables`; [`format()`](https://rdrr.io/r/base/format.html)
+  honours `big.interval`, `zero.print`, `trim` and a textual `width`,
+  and `format(big.mark = ".")` no longer warns under
+  `options(OutDec = ",")`; [`diff()`](https://rdrr.io/r/base/diff.html)
+  refuses a `lag` or `differences` below 1 or fractional;
+  [`zu_match()`](https://pedrobtz.github.io/zuint/reference/zu_match.md)
+  refuses a `nomatch` of length other than one;
+  [`print()`](https://rdrr.io/r/base/print.html) accepts `quote` and
+  truncates a fractional `max` as base R does, and refuses a missing,
+  negative or non-numeric one.
+- [`seq_zu()`](https://pedrobtz.github.io/zuint/reference/seq_zu.md) and
+  [`seq()`](https://rdrr.io/r/base/seq.html) of a zuint vector no longer
+  ignore `to` when `length.out` is given: the whole step between them is
+  computed, and a fractional one is a `zuint_type_error`. The step
+  defaults to -1 when `to` is below `from`, `seq(n)` is `1:n`, and a
+  fractional `length.out` rounds up as in base R; a negative or `NA` one
+  is a `zuint_type_error`
+  ([\#159](https://github.com/pedrobtz/zuint/issues/159)).
+- [`round()`](https://rdrr.io/r/base/Round.html) and
+  [`signif()`](https://rdrr.io/r/base/Round.html) take a fractional
+  `digits` as base R does (round half up, so `round(x, 2.5)` rounds to 3
+  digits), and an infinite or very large one no longer fails with an
+  unclassed error; an `NA` `digits` is a `zuint_type_error`
+  ([\#157](https://github.com/pedrobtz/zuint/issues/157)).
+- `x ^ y` with an integral double exponent of 2^128 or more stays in the
+  type: 0, 1 and -1 have their exact answers and any other base
+  overflows. `NA ^ 0` and `1 ^ NA` are 1, as in base R and bit64
+  ([\#158](https://github.com/pedrobtz/zuint/issues/158)).
 - [`int64()`](https://pedrobtz.github.io/zuint/reference/zuint-types.md),
   [`uint64()`](https://pedrobtz.github.io/zuint/reference/zuint-types.md),
   [`int128()`](https://pedrobtz.github.io/zuint/reference/zuint-types.md)

@@ -58,8 +58,10 @@ Operands take their common type first (see
 divisor, as in R; division by zero is `NA`, except in `checked_idiv()`
 and `checked_mod()`, where it is an error of class
 `zuint_division_error`. `/` divides in double. `^` is exact for a
-non-negative integer exponent and computed in double otherwise.
-Comparison is exact across all the types and doubles.
+non-negative integer exponent, however large (at or past the type's
+width, only the bases 0, 1 and -1 have an answer; any other overflows),
+and computed in double otherwise. `NA ^ 0` and `1 ^ NA` are 1, as in
+base R. Comparison is exact across all the types and doubles.
 
 ## Examples
 

@@ -27,7 +27,8 @@ x %zin% table
 
 - nomatch:
 
-  The position to give values not in `table`.
+  The position to give values not in `table`: one number, truncated to
+  an integer, as [`match()`](https://rdrr.io/r/base/match.html) does.
 
 ## Value
 

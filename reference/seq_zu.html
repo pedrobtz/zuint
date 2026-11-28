@@ -58,11 +58,14 @@ arguments.</p>
 
 
 <dt id="arg-by">by<a class="anchor" aria-label="anchor" href="#arg-by"></a></dt>
-<dd><p>The step, length 1, not zero.</p></dd>
+<dd><p>The step, length 1, not zero. Without it the step is 1, or -1
+when <code>to</code> is below <code>from</code>; with <code>to</code> and <code>length.out</code> it is the whole
+step between them, and an error if there is none.</p></dd>
 
 
 <dt id="arg-length-out">length.out<a class="anchor" aria-label="anchor" href="#arg-length-out"></a></dt>
-<dd><p>The number of values, instead of <code>to</code>.</p></dd>
+<dd><p>The number of values, instead of <code>to</code> (or with it, to fix
+the step). A fraction rounds up, as in <code><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq()</a></code>. <code>seq_zu(n)</code> is <code>1:n</code>.</p></dd>
 
 </dl></div>
     <div class="section level2">
