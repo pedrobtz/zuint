@@ -123,7 +123,7 @@ zu_check_operands <- function(kinds, args, call) {
 # warning when options(zuint.double = "allow"), in which case the caller
 # computes in double.
 zu_double_problem <- function(type, call) {
-  if (zu_double_policy() == "allow") {
+  if (zu_double_policy(call) == "allow") {
     zu_warn(
       sprintf(
         "A double is not an integral value in range of %s; computing in double.",
@@ -191,13 +191,14 @@ zu_result_names <- function(x, y, n) {
   }
 }
 
-zu_check_recycling <- function(x, y) {
+zu_check_recycling <- function(x, y, call) {
   nx <- length(x)
   ny <- length(y)
   if (nx > 0L && ny > 0L && max(nx, ny) %% min(nx, ny) != 0L) {
     zu_warn(
       "longer object length is not a multiple of shorter object length",
-      "recycling"
+      "recycling",
+      call = call
     )
   }
 }
@@ -224,7 +225,7 @@ zu_report_overflow <- function(n, policy, call) {
 zu_arith <- function(op, x, y, policy, call) {
   kinds <- c(zu_kind(x), zu_kind(y))
   zu_check_operands(kinds, list(x, y), call)
-  zu_check_recycling(x, y)
+  zu_check_recycling(x, y, call)
   if (
     policy == zu_policy_checked &&
       op %in% c("%/%", "%%") &&
@@ -281,7 +282,7 @@ zu_divide <- function(x, y, call) {
 zu_pow <- function(x, y, policy, call) {
   kinds <- c(zu_kind(x), zu_kind(y))
   zu_check_operands(kinds, list(x, y), call)
-  zu_check_recycling(x, y)
+  zu_check_recycling(x, y, call)
   code <- if (kinds[[1L]] > 0L) kinds[[1L]] else zu_common_code(kinds, call)
   ky <- kinds[[2L]]
   exact <- if (ky == zu_kind_dbl) {
@@ -332,7 +333,7 @@ zu_compare <- function(op, x, y, call) {
   }
   kinds <- c(zu_kind(x), zu_kind(y))
   zu_check_operands(kinds, list(x, y), call)
-  zu_check_recycling(x, y)
+  zu_check_recycling(x, y, call)
   out <- .Call(
     zu_compare_c,
     zu_compare_ops[[op]],

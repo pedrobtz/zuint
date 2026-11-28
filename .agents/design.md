@@ -872,6 +872,11 @@ as_integer64(x)              # zero-copy to bit64
 zu_storage(int128(1))        # raw CPLXSXP payload
 ```
 
+Every condition reports the user's call (decided 2026-11-28, #80): the
+exported function's or the method's `sys.call()`, except in the `Summary`
+group, whose `sys.call()` holds the evaluated payload as doubles; there the
+call names the generic over its arguments, `sum(...)`, `min(...)`.
+
 ## 12. Testing
 
 - **Round-trip matrix (acceptance test, in CI and the README).** For each engine

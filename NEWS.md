@@ -1,5 +1,10 @@
 # zuint 0.0.0.9000
 
+* Every condition reports the call it came from (#80): the recycling
+  warning, the error for an invalid `options(zuint.double = )`, and
+  `min()`, `max()` and `range()` of nothing, which reported none. The
+  `Summary` group's conditions name the generic, `sum(...)`, instead of the
+  method called on the payload as doubles, which was slow to print.
 * `checked_pow()` and `wrapping_pow()` refuse a negative or fractional
   exponent with a `zuint_type_error`. They had computed in double, returning
   `0.5` for `checked_pow(int64(2), -1L)` and rounding the exact elements

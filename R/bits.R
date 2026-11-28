@@ -46,7 +46,7 @@ zu_bit_binary <- function(op, x, y, call) {
       call = call
     )
   }
-  zu_check_recycling(x, y)
+  zu_check_recycling(x, y, call)
   code <- zu_common_code(kinds, call)
   cx <- zu_convert(x, kinds[[1L]], code)
   cy <- zu_convert(y, kinds[[2L]], code)
@@ -64,7 +64,7 @@ zu_bit_result <- function(res, code, nm, call) {
 
 zu_bit_shift <- function(op, x, n, call) {
   zu_check_operands(zu_kind(x), list(x), call)
-  zu_check_recycling(x, n)
+  zu_check_recycling(x, n, call)
   code <- zu_code(x)
   if (!is.integer(n)) {
     n <- zu_as_integer(int64(n))

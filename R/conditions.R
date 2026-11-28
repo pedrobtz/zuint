@@ -39,7 +39,8 @@ NULL
 # The kinds are listed in the topic above; keep it in step.
 #
 # `call` is the user's call to report, usually the exported function's own
-# sys.call().
+# sys.call(). A Summary method reports zu_summary_call(.Generic), `sum(...)`
+# and the like, instead: its sys.call() holds the evaluated payload (#80).
 
 zu_abort <- function(message, kind, call = NULL) {
   stop(errorCondition(

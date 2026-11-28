@@ -23,12 +23,12 @@
     Code
       x <- int64(1:3) + int64(1:2)
     Condition
-      Warning:
+      Warning in `Ops.zu_int64()`:
       longer object length is not a multiple of shorter object length
     Code
       x <- min(int64())
     Condition
-      Warning:
+      Warning in `min()`:
       no non-missing arguments to min; returning Inf
 
 ---

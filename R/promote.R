@@ -96,10 +96,14 @@ zu_common_type <- function(...) {
   zu_types[[zu_common_code(kinds, call = sys.call())]]
 }
 
-zu_double_policy <- function() {
+zu_double_policy <- function(call = NULL) {
   opt <- getOption("zuint.double", "error")
   if (!identical(opt, "allow") && !identical(opt, "error")) {
-    zu_abort('`options(zuint.double)` must be "error" or "allow".', "type")
+    zu_abort(
+      '`options(zuint.double)` must be "error" or "allow".',
+      "type",
+      call = call
+    )
   }
   opt
 }
