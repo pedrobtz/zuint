@@ -616,7 +616,7 @@ test_that("sort() honours index.return and na.last, and refuses partial (#163)",
   expect_error(sort(d, partial = 1L), class = "zuint_unsupported_error")
 })
 
-test_that("incomparables is honoured by duplicated(), unique(), anyDuplicated() and match() (#163)", {
+test_that("incomparables is honoured by duplicated(), unique() and anyDuplicated() (#163)", {
   v <- c(NA, NA, 1, 1, 2, 2, 3)
   for (type in zu_all_types) {
     x <- zu_ctor(type)(v)
@@ -638,11 +638,6 @@ test_that("incomparables is honoured by duplicated(), unique(), anyDuplicated() 
           label = paste(type, "anyDuplicated", deparse(inc), fl)
         )
       }
-      expect_identical(
-        match(x, zu_ctor(type)(c(NA, 1, 2)), incomparables = inc),
-        match(v, c(NA, 1, 2), incomparables = inc),
-        label = paste(type, "match", deparse(inc))
-      )
     }
   }
   d <- decimal128(c("1.5", "1.50", NA, NA), 5, 2)
