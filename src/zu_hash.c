@@ -148,8 +148,8 @@ SEXP zu_unique_c(SEXP x, SEXP type_)
     }
     SEXP out = PROTECT(zu_alloc(t, m));
     for (R_xlen_t j = 0; j < m; j++) {
-        if (zu_type_is_128(t)) zu_set128(COMPLEX(out), j, zu_get128(COMPLEX(x), keep[j]));
-        else zu_set64(REAL(out), j, zu_get64(REAL(x), keep[j]));
+        /* t is 128-bit here: the 64-bit types returned above */
+        zu_set128(COMPLEX(out), j, zu_get128(COMPLEX(x), keep[j]));
     }
     UNPROTECT(1);
     return out;

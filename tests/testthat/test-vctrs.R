@@ -171,3 +171,27 @@ test_that("vctrs casts zuint vectors to double and integer exactly or not at all
     class = "vctrs_error_cast_lossy"
   )
 })
+
+test_that("vctrs methods register whichever of vctrs and zuint loads first (#82)", {
+  skip_on_cran()
+  skip_if_not_installed("vctrs")
+  probe <- c(
+    "ok <- tryCatch(",
+    "  inherits(vctrs::vec_c(zuint::int64(1), 2L), 'zu_int64'),",
+    "  error = function(e) FALSE",
+    ")",
+    "cat(ok)"
+  )
+  loader <- zuint_loader()
+  # zuint first: the hook on vctrs' load registers the methods
+  expect_identical(
+    fresh_r(c(loader, probe)),
+    "TRUE"
+  )
+  # vctrs first: zuint's .onLoad finds it loaded and registers at once
+  expect_identical(
+    fresh_r(c("invisible(loadNamespace('vctrs'))", loader, probe)),
+    "TRUE"
+  )
+})
+

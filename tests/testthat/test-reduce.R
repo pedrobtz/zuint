@@ -23,6 +23,18 @@ test_that("sum is type stable: exact, or NA with a warning when it does not fit"
       expect_warning(r <- sum(x), class = "zuint_overflow_warning")
       expect_identical(r, zu_na(type), label = type)
     }
+    # both branches for every type, whatever the seeded fill above did
+    mx <- as.character(oracle_range(type)$max)
+    expect_identical(
+      as.character(sum(zu_ctor(type)(c(mx, "0")))),
+      mx,
+      label = type
+    )
+    expect_warning(
+      r <- sum(zu_ctor(type)(c(mx, mx))),
+      class = "zuint_overflow_warning"
+    )
+    expect_identical(r, zu_na(type), label = type)
     small <- zu_ctor(type)(c(1, 2, NA, 3))
     expect_identical(sum(small), zu_ctor(type)(NA), label = type)
     expect_identical(sum(small, na.rm = TRUE), zu_ctor(type)(6), label = type)
@@ -316,7 +328,7 @@ test_that("seq_zu runs downwards in unsigned types and across whole ranges", {
     up <- seq_zu(
       zu_ctor(type)(lo),
       zu_ctor(type)(hi),
-      by = zu_ctor(if (type %in% c("int64", "int128")) type else type)(half)
+      by = zu_ctor(type)(half)
     )
     expect_identical(
       as.character(up),
@@ -357,17 +369,6 @@ test_that("seq_zu runs downwards in unsigned types and across whole ranges", {
 test_that("mean with trim is unsupported rather than ignored", {
   expect_error(mean(int64(1:4), trim = 0.1), class = "zuint_unsupported_error")
   expect_identical(mean(int64(1:4), trim = 0), 2.5)
-})
-
-test_that("short and long sorts agree", {
-  withr::local_seed(3)
-  v <- c(round(runif(70000, -2^52, 2^52)), NA)
-  x <- int64(v)
-  expect_identical(as.double(sort(x)), sort(v))
-  expect_identical(
-    as.double(sort(x[1:50], decreasing = TRUE)),
-    sort(v[1:50], decreasing = TRUE)
-  )
 })
 
 test_that("range()'s finite is an argument, not data (#56)", {

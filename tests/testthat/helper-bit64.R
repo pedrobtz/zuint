@@ -6,17 +6,26 @@
 # `codes` is a named list of strings of R code, all evaluated in one child per
 # state, each in a fresh environment: starting the processes is what costs.
 # Each result is its value (or the class of the error it raised) and the
-# classes of the warnings it gave, keyed by name. In a
-# development session (load_all) the child loads the same source tree;
-# otherwise it loads the installed zuint the parent is testing.
+# classes of the warnings it gave, keyed by name.
 bit64_states <- function(codes) {
   testthat::skip_on_cran()
   testthat::skip_if_not_installed("bit64")
+  loader <- zuint_loader()
+  list(
+    attached = bit64_child(codes, loader, attach = TRUE),
+    absent = bit64_child(codes, loader, attach = FALSE)
+  )
+}
+
+# The R line a child process runs to load the zuint under test. In a
+# development session (load_all) the child loads the same source tree;
+# otherwise it loads the installed zuint the parent is testing.
+zuint_loader <- function() {
   path <- getNamespaceInfo(asNamespace("zuint"), "path")
   # an installed package has its code in a lazy-load database; load_all()
   # points the namespace at the source tree instead
   dev <- !file.exists(file.path(path, "R", "zuint.rdb"))
-  loader <- if (dev) {
+  if (dev) {
     sprintf(
       "pkgload::load_all(%s, quiet = TRUE, export_all = FALSE)",
       deparse(path)
@@ -24,9 +33,19 @@ bit64_states <- function(codes) {
   } else {
     sprintf("library(zuint, lib.loc = %s)", deparse(dirname(path)))
   }
-  list(
-    attached = bit64_child(codes, loader, attach = TRUE),
-    absent = bit64_child(codes, loader, attach = FALSE)
+}
+
+# Run lines of R in a fresh `Rscript --vanilla` with the parent's libraries
+# and return what it printed, so a test can see the load order it chooses.
+fresh_r <- function(lines) {
+  script <- tempfile(fileext = ".R")
+  on.exit(unlink(script))
+  writeLines(c(sprintf(".libPaths(%s)", deparse1(.libPaths())), lines), script)
+  system2(
+    file.path(R.home("bin"), "Rscript"),
+    c("--vanilla", shQuote(script)),
+    stdout = TRUE,
+    stderr = FALSE
   )
 }
 

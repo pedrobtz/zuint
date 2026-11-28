@@ -46,6 +46,8 @@
 
 #define ZU_ARROW_FLAG_NULLABLE 2
 
+/* The big-endian branches below are not reachable on any machine CI
+   builds on (x86-64 and arm64 are little-endian), so no test runs them. */
 static int zu_little_endian(void)
 {
     const uint16_t one = 1;
