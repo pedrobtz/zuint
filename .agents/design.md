@@ -593,6 +593,14 @@ The same table backs `vec_ptype2`/`vec_cast` when vctrs is installed, and
   errors. `MIN %/% -1` cannot overflow because MIN is the NA sentinel.
 - **`^`** with a non-negative integer exponent stays exact; anything else gives
   double.
+- **`^` with an exponent at or past the type's width, and with NA**
+  (decided 2026-11-28, #158): an integral double exponent of any size,
+  `Inf` included, never leaves the type. Every base but 0, 1 and -1 overflows
+  (the policy applies), and those three have their exact answers; the
+  exponent is cut to 2¹²⁷, which every double of that size is even
+  alongside. `NA ^ 0` is 1 and `1 ^ NA` is 1, as in base R and bit64, under
+  every policy: an NA that cannot change the result does not make it NA.
+  `(-1) ^ NA`, `2 ^ NA` and `NA ^ 2` stay NA.
 - **Unsigned negation** is an error (`checked_`) or wraps (`wrapping_`); the
   default gives NA plus a warning. A negative integer operand to an unsigned
   type (§5) is the same case: out of range, handled by the policy.

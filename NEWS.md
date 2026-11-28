@@ -1,5 +1,12 @@
 # zuint 0.0.0.9000
 
+* `round()` and `signif()` take a fractional `digits` as base R does (round
+  half up, so `round(x, 2.5)` rounds to 3 digits), and an infinite or very
+  large one no longer fails with an unclassed error; an `NA` `digits` is a
+  `zuint_type_error` (#157).
+* `x ^ y` with an integral double exponent of 2^128 or more stays in the
+  type: 0, 1 and -1 have their exact answers and any other base overflows.
+  `NA ^ 0` and `1 ^ NA` are 1, as in base R and bit64 (#158).
 * `int64()`, `uint64()`, `int128()` and `uint128()` create signed and
   unsigned 64- and 128-bit integer vectors from logical, integer, double,
   decimal character, bit64 `integer64` and each other. Conversion is exact

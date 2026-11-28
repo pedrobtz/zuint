@@ -284,7 +284,7 @@ zu_pow <- function(x, y, policy, call) {
   code <- if (kinds[[1L]] > 0L) kinds[[1L]] else zu_common_code(kinds, call)
   ky <- kinds[[2L]]
   exact <- if (ky == zu_kind_dbl) {
-    all(is.na(y) | (y >= 0 & y == floor(y) & y < 2^128))
+    all(is.na(y) | (y >= 0 & y == floor(y)))
   } else if (ky == zu_kind_int) {
     all(is.na(y) | y >= 0L)
   } else {
@@ -292,6 +292,12 @@ zu_pow <- function(x, y, policy, call) {
   }
   if (!exact) {
     return(zu_in_double("^", x, y))
+  }
+  if (ky == zu_kind_dbl) {
+    # at or past the type's width every base but 0, 1 and -1 overflows, so
+    # the exponent is cut to the largest even power of two a uint128 holds
+    # (even, as every double of that size is, for the sign of (-1)^y)
+    y <- pmin(y, 2^127)
   }
   e <- zu_convert(y, ky, 4L)[[1L]]
   ox <- zu_operand(x, kinds[[1L]], code)
@@ -349,7 +355,9 @@ zu_compare <- function(op, x, y, call) {
 #' rounds towards negative infinity and `%%` takes the sign of the divisor,
 #' as in R; division by zero is `NA`, except in `checked_idiv()` and
 #' `checked_mod()`, where it is an error of class `zuint_division_error`. `/` divides in double. `^` is exact
-#' for a non-negative integer exponent and computed in double otherwise.
+#' for a non-negative integer exponent, however large (at or past the type's
+#' width, only the bases 0, 1 and -1 have an answer; any other overflows), and
+#' computed in double otherwise. `NA ^ 0` and `1 ^ NA` are 1, as in base R.
 #' Comparison is exact across all the types and doubles.
 #'
 #' @param x,y zuint vectors, or a zuint vector and a logical, integer or

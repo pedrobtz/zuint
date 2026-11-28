@@ -121,9 +121,7 @@ test_that("NA in gives NA out under every policy, silently", {
       `%/%`,
       `%%`,
       checked_add,
-      wrapping_mul,
-      checked_pow,
-      wrapping_pow
+      wrapping_mul
     )) {
       expect_no_warning(res <- f(x, y))
       expect_identical(res, zu_na(type, 3), label = type)
@@ -621,4 +619,43 @@ test_that("round of a decimal128 takes a fractional or infinite digits as base R
   y <- decimal128("12345", 5, 0)
   expect_identical(as.double(round(y, -1.7)), round(12345, -1.7))
   expect_error(round(x, NA), class = "zuint_type_error")
+})
+
+test_that("an integral exponent at or past the type's width stays in the type (#158)", {
+  for (type in zu_all_types) {
+    mk <- zu_ctor(type)
+    signed <- !grepl("^u", type)
+    for (e in c(2^63, 2^64, 2^127, 2^128, 2^200, Inf)) {
+      # bases with an exact answer: 0, 1, and -1 (every such double is even)
+      b <- mk(c(0, 1))
+      r <- b^e
+      expect_identical(r, mk(c(0, 1)), label = paste(type, e))
+      if (signed) {
+        expect_identical(mk(-1)^e, mk(1), label = paste(type, "-1", e))
+      }
+      # any other base overflows: NA, with the warning, in the type
+      expect_warning(r <- mk(2)^e, class = "zuint_overflow_warning")
+      expect_identical(r, zu_ctor(type)(NA), label = paste(type, "2", e))
+      expect_error(checked_pow(mk(2), e), class = "zuint_overflow_error")
+      expect_identical(wrapping_pow(mk(0), e), mk(0))
+    }
+    # NA ^ 0 and 1 ^ NA are 1, as in base R; any other base ^ NA is NA
+    expect_identical(NA_integer_^0L, 1)
+    expect_identical(1L^NA_integer_, 1)
+    expect_identical(zu_ctor(type)(NA)^0L, mk(1))
+    expect_identical(zu_ctor(type)(NA)^0, mk(1))
+    expect_identical(mk(1)^NA, mk(1))
+    expect_identical(mk(1)^NA_integer_, mk(1))
+    expect_identical(mk(1)^NA_real_, mk(1))
+    expect_identical(mk(2)^NA, zu_ctor(type)(NA))
+    expect_identical(zu_ctor(type)(NA)^2, zu_ctor(type)(NA))
+    expect_identical(zu_ctor(type)(NA)^NA, zu_ctor(type)(NA))
+    # and so under the other policies, where NA ^ NA stays NA
+    x <- zu_ctor(type)(c(NA, 1, NA, 2))
+    y <- zu_ctor(type)(c(0, NA, NA, NA))
+    for (f in list(`^`, checked_pow, wrapping_pow)) {
+      expect_no_warning(res <- f(x, y))
+      expect_identical(res, mk(c(1, 1, NA, NA)), label = type)
+    }
+  }
 })
